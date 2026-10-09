@@ -3315,3 +3315,22 @@ network transfer; saved files are still read and hashed locally during repair.
 Evidence: `build_wasm/pwa-resume-request-proof.json`,
 `build_wasm/pwa-resume-live.log`, and `build_wasm/pwa-resume-repaired.png`.
 The temporary server and tab were closed.
+
+
+### Public-master address fallback, October 9
+
+Public discovery now tries alternate resolved master addresses when an address
+is silent or unreachable. It alternates IPv4/IPv6 families, deduplicates DNS
+answers, and caps attempts at four addresses per family. All UDP attempts share
+the existing total timeout; the bounded discovery worker still isolates DNS
+lookup latency. Connected UDP peer filtering, packet validation, public-target
+filtering, and the 4096-server native capacity remain in effect.
+
+A real loopback regression failed before the change when the first address was
+silent and a second master responded. It now passes within the shared deadline.
+Additional tests cover IPv6 socket failure followed by IPv4 success, empty DNS
+answers, and bounded duplicate resolution. All 94 service tests passed. A live
+query returned 412 unique public-master entries in approximately 0.47 seconds;
+this is discovery evidence, not proof that those servers accept this browser
+client. Evidence: `build_wasm/master-fallback-tests.log` and
+`build_wasm/master-fallback-live.json`.

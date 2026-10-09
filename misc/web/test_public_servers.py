@@ -67,6 +67,63 @@ class DiscoveryTests(unittest.TestCase):
         # The live ET master also ends chunks directly after the last port.
         self.assertEqual(parse_master_packet(REGULAR + record('8.8.8.8')), [('8.8.8.8', 27960)])
 
+    def test_master_alternates_families_and_retries_socket_errors(self):
+        targets=[(socket.AF_INET6,socket.SOCK_DGRAM,0,'',('::1',27950,0,0)),
+                 (socket.AF_INET6,socket.SOCK_DGRAM,0,'',('::2',27950,0,0)),
+                 (socket.AF_INET,socket.SOCK_DGRAM,0,'',('127.0.0.1',27950)),
+                 (socket.AF_INET,socket.SOCK_DGRAM,0,'',('127.0.0.1',27950))]
+        calls=[]
+        class FakeUDP:
+            def __init__(self,family):self.family=family;self.sent=False
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def connect(self,target):
+                calls.append((self.family,target))
+                if self.family==socket.AF_INET6:raise OSError('IPv6 network unreachable')
+            def settimeout(self,timeout):self.timeout=timeout
+            def send(self,data):
+                self.sent=True
+                if data!=b'\xff\xff\xff\xffgetservers 84 full empty':raise AssertionError(data)
+            def recv(self,size):
+                if self.sent:self.sent=False;return REGULAR+record('8.8.8.8')+b'\\EOT'
+                raise TimeoutError()
+        with patch('public_servers.socket.getaddrinfo',return_value=targets), patch('public_servers.socket.socket',side_effect=lambda family,*args:FakeUDP(family)):
+            self.assertEqual(query_master(),[('8.8.8.8',27960)])
+        self.assertEqual([call[0] for call in calls],[socket.AF_INET6,socket.AF_INET])
+
+    def test_master_empty_resolution_and_bounded_deduplicated_attempts(self):
+        with patch('public_servers.socket.getaddrinfo',return_value=[]):
+            with self.assertRaises(TimeoutError):query_master()
+        targets=[(socket.AF_INET,socket.SOCK_DGRAM,0,'',('127.0.0.1',port))
+                 for port in range(10000,10010)]
+        targets=targets+targets
+        with patch('public_servers.socket.getaddrinfo',return_value=targets), patch('public_servers._query_master_target',side_effect=OSError('Unreachable')) as probe:
+            with self.assertRaises(TimeoutError):query_master()
+        self.assertEqual(probe.call_count,4,'DNS answers cannot create unlimited UDP attempts')
+        self.assertEqual(len({call.args[1] for call in probe.call_args_list}),4)
+
+    def test_master_falls_back_after_a_silent_resolved_address(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as silent, socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as master:
+            silent.bind(('127.0.0.1', 0)); master.bind(('127.0.0.1', 0)); master.settimeout(2)
+            errors=[]
+            def respond():
+                try:
+                    request, client=master.recvfrom(1024)
+                    self.assertEqual(request,b'\xff\xff\xff\xffgetservers 84 full empty')
+                    master.sendto(REGULAR+record('8.8.8.8')+b'\\EOT',client)
+                except Exception as error: errors.append(error)
+            worker=threading.Thread(target=respond);worker.start()
+            targets=[(socket.AF_INET,socket.SOCK_DGRAM,0,'',silent.getsockname()),
+                     (socket.AF_INET,socket.SOCK_DGRAM,0,'',master.getsockname())]
+            started=time.monotonic()
+            try:
+                with patch('public_servers.socket.getaddrinfo',return_value=targets):
+                    result=query_master('dual-stack.test',27950,timeout=.8)
+            finally:worker.join(3)
+            self.assertFalse(errors)
+            self.assertEqual(result,[('8.8.8.8',27960)])
+            self.assertLess(time.monotonic()-started,1.5,'Fallback shares the original query deadline')
+
     def test_connected_udp_rejects_other_peer_and_merges_replies(self):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as master, socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as stranger:
             master.bind(('127.0.0.1', 0))

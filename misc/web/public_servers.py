@@ -67,8 +67,33 @@ def parse_master_packet(packet):
 
 
 def query_master(host=MASTER_HOST, port=MASTER_PORT, timeout=2.0):
-    """Query the fixed master over connected UDP and merge bounded reply packets."""
-    family, _, _, _, target = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)[0]
+    """Try resolved master addresses within one shared UDP query deadline."""
+    addresses = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)
+    groups = {}
+    for family, _, _, _, target in addresses:
+        if family not in (socket.AF_INET, socket.AF_INET6):
+            continue
+        group = groups.setdefault(family, [])
+        if target not in group and len(group) < 4:
+            group.append(target)
+    # Alternate families so several unreachable IPv6 addresses cannot delay IPv4.
+    targets = [(family, group[index]) for index in range(4)
+               for family, group in groups.items() if index < len(group)]
+    deadline = time.monotonic() + timeout
+    for index, (family, target) in enumerate(targets):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        try:
+            return _query_master_target(family, target, remaining / (len(targets) - index))
+        except OSError:
+            # A silent or unreachable address must leave time for its alternatives.
+            continue
+    raise TimeoutError('The public server master did not return a valid list')
+
+
+def _query_master_target(family, target, timeout):
+    """Connected UDP rejects replies from other peers for each resolved target."""
     # Match CL_GlobalServers_f: IPv4 uses getservers; IPv6 uses the extended query.
     request = b'getserversExt et 84 full empty' if family == socket.AF_INET6 else b'getservers 84 full empty'
     with socket.socket(family, socket.SOCK_DGRAM) as udp:
