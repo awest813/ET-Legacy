@@ -1,0 +1,86 @@
+// This script contains functionality to allow engineers to plant tripmines in the silEnT mod
+this.Name = "TRIPMINE";
+this.Parent = "HighLevel";
+this.SkipGetPriorityWhenActive = true;
+if (WEAPON.TRIPMINE)
+{
+	this.LimitToWeapon(WEAPON.TRIPMINE);
+}
+else
+{
+	this.AutoAdd = false;
+}
+
+this.Initialize = function()
+{
+	// check ammo so we can finish if too many tripmines are placed
+	this.LimitTo(this.CheckTripmineAmmo, 2);
+};
+
+this.CheckTripmineAmmo = function()
+{
+	return Util.HasAmmoForWeapon(this.Bot, WEAPON.TRIPMINE);
+};
+
+this.GetPriority = function()
+{
+	Util.GetPriority(this,0x4e8856e1 /* TRIPMINE */, WEAPON.DYNAMITE);
+};
+
+this.Enter = this.MarkInProgress;
+
+this.Exit = function()
+{
+	this.Bot.ReleaseButton(BTN.CROUCH);
+	this.MapGoal = null;
+};
+
+this.Update = function()
+{
+	Util.RouteTo(this);
+
+	if (this.MapGoal.Stance == "crouch") {
+		this.Bot.HoldButton(BTN.CROUCH, 99);
+	}
+
+	this.ExplosiveEntity = null;
+	this.Priority = 2.0;
+
+	this.AddAimRequest(Priority.High, "position", this.MapGoal.AimPosition);
+	this.Bot.MoveTowards(this.MapGoal.GetPosition(), 5);
+	this.AddWeaponRequest(WEAPON.TRIPMINE);
+	this.BlockForWeaponChange(WEAPON.TRIPMINE);
+
+	for (t = 0; !this.ExplosiveEntity; ++t)
+	{
+		if (t > 15)
+		{
+			this.BlackboardDelay(40);
+			Util.ScriptDebugPrint(this.MapGoal.GetName(), "timedout");
+			this.Finished();
+		}
+		this.Bot.PressButton(BTN.ATTACK1);
+		sleep(0.25);
+	}
+
+	this.AddWeaponRequest(WEAPON.PLIERS);
+	this.BlockForWeaponChange(WEAPON.PLIERS);
+
+	while (EntityIsValid(this.ExplosiveEntity) && this.Bot.GetExplosiveState(this.ExplosiveEntity) == 1) {
+		position = GetEntPosition(this.ExplosiveEntity);
+		this.AddAimRequest(Priority.High, "position", position);
+		this.Bot.MoveTowards(position);
+		this.Bot.PressButton(BTN.ATTACK1);
+		yield();
+	}
+
+	this.Finished();
+};
+
+this.Events[EVENT.WEAPON_FIRE] = function(weapon, entity)
+{
+	if (weapon == WEAPON.TRIPMINE)
+	{
+		this.ExplosiveEntity = entity;
+	}
+};

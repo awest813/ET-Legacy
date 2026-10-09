@@ -1,0 +1,212 @@
+global _MG = 
+{
+	AMMOCAB_south_ammocabinet = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-22.000, -438.000, 184.000),
+		Range = 1250,
+		TeamAvailability = 6,
+	},
+	AMMOCAB_south_ammocabinet_1 = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-229.000, 494.000, -976.000),
+		Range = 1250,
+		TeamAvailability = 6,
+	},
+	AMMOCAB_south_ammocabinet_2 = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(445.000, 506.000, -1304.000),
+		Range = 1250,
+		TeamAvailability = 6,
+	},
+	BUILD_Command_Post = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-56.948, -77.704, 205.000),
+		TeamAvailability = 6,
+	},
+	BUILD_Dam_Explosives_2 = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-324.000, 696.000, -1288.000),
+		TeamAvailability = 4,
+	},
+	BUILD_Electric_Fence_Controls = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(1812.000, 288.000, -1348.000),
+		TeamAvailability = 2,
+	},
+	BUILD_Entry_Door_Construction = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-428.000, -1188.000, 252.000),
+		TeamAvailability = 2,
+	},
+	BUILD_Explosive_1 = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-724.000, -1264.000, -1288.000),
+		TeamAvailability = 4,
+	},
+	BUILD_Explosive_Trigger_Primer = 
+	{
+		Position = Vec3(2800.668, 2559.752, 264.324),
+		TraceInfo = 
+		{
+			class = "GOAL",
+			endPos = Vec3(1866.718, 2445.830, -34.263),
+			eyePos = Vec3(2818.130, 2558.363, 327.299),
+			id = 343,
+		},
+	},
+	BUILD_Grate_1_Repair = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-444.000, -271.000, 212.000),
+		TeamAvailability = 2,
+	},
+	BUILD_Grate_3__Repair = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-440.000, -207.000, 212.000),
+		TeamAvailability = 2,
+	},
+	BUILD_Grate_4__Repair = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-444.000, -140.000, 212.000),
+		TeamAvailability = 2,
+	},
+	BUILD_Grate__2_Repair = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-444.000, -328.000, 212.000),
+		TeamAvailability = 2,
+	},
+	CHECKPOINT_topdamflag = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-680.000, -256.000, 272.000),
+	},
+	HEALTHCAB_south_healthcabinet = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-25.000, -362.000, 182.000),
+		Range = 1250,
+		TeamAvailability = 6,
+	},
+	HEALTHCAB_south_healthcabinet_1 = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-365.000, 497.000, -978.000),
+		Range = 1250,
+		TeamAvailability = 6,
+	},
+	HEALTHCAB_south_healthcabinet_2 = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(445.000, 370.000, -1304.000),
+		Range = 1250,
+		TeamAvailability = 6,
+	},
+	MOUNTMG42_10 = 
+	{
+		CreateOnLoad = 0,
+		MaxCampTime = 60,
+		MinCampTime = 15,
+		Position = Vec3(144.000, -1332.000, 788.000),
+		TeamAvailability = 6,
+	},
+	MOUNTMG42_13 = 
+	{
+		CreateOnLoad = 0,
+		MaxCampTime = 60,
+		MinCampTime = 15,
+		Position = Vec3(-856.000, -1342.000, 788.000),
+		TeamAvailability = 6,
+	},
+	PLANT_Command_Post = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 3,
+		Position = Vec3(-27.001, -74.999, 205.000),
+		TeamAvailability = 6,
+	},
+	PLANT_Dam_Explosives_2 = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 1,
+		Position = Vec3(-564.000, 720.000, -1276.000),
+		TeamAvailability = 2,
+	},
+	PLANT_Electric_Fence_Controls = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 3,
+		Position = Vec3(1952.000, 288.000, -1364.000),
+		TeamAvailability = 4,
+	},
+	PLANT_Entry_Door = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 1,
+		Position = Vec3(-64.000, -1316.000, 412.000),
+		TeamAvailability = 4,
+	},
+	PLANT_Explosive_1 = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 1,
+		Position = Vec3(-728.000, -940.000, -1276.000),
+		TeamAvailability = 2,
+	},
+	PLANT_Grate_1_Repair = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 3,
+		Position = Vec3(-1904.000, 280.000, 48.000),
+		TeamAvailability = 4,
+	},
+	PLANT_Grate_3__Repair = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 3,
+		Position = Vec3(-1376.000, 616.000, 48.000),
+		TeamAvailability = 4,
+	},
+	PLANT_Grate_4__Repair = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 3,
+		Position = Vec3(-1408.000, -472.000, 48.000),
+		TeamAvailability = 4,
+	},
+	PLANT_Grate__2_Repair = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 3,
+		Position = Vec3(-1896.000, -176.000, 48.000),
+		TeamAvailability = 4,
+	},
+	REPAIRMG42_10 = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(144.000, -1332.000, 788.000),
+		TeamAvailability = 6,
+	},
+	REPAIRMG42_13 = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-856.000, -1342.000, 788.000),
+		TeamAvailability = 6,
+	},
+	SWITCH_Explosive_Trigger = 
+	{
+		AimPosition = Vec3(2008.256, 2120.125, 299.911),
+		Position = Vec3(2008.385, 2140.818, 262.063),
+	},
+	Version = 1,
+};

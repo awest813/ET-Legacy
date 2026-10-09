@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>ET Legacy — Offline recovery</title><style>body{margin:0;background:#0a0b0d;color:#eee;font:16px system-ui;min-height:100dvh;display:grid;place-items:center}main{max-width:460px;padding:28px}p{line-height:1.6;color:#c6c7ca}button{font:inherit;background:#e8c766;color:#111;border:0;border-radius:5px;padding:12px 18px}button:focus-visible{outline:3px solid white;outline-offset:4px}</style>
+ <main><h1>Restore offline play</h1><p id="status" role="status">If the app cannot start or offline files are missing, reconnect and retry saving. This repair keeps saved game packs and settings.</p><button id="retry">Retry offline saving</button><p><a id="launcherlink" href="./" style="color:#e8c766">Return to the launcher</a></p></main>
+ <script>
+ const button=document.getElementById('retry'),status=document.getElementById('status');let pending='',deadline,attempt=0;
+ if((location.pathname||'').endsWith('/network/recovery'))document.getElementById('launcherlink').href='../';
+ function reopen(){if((location.pathname||'').endsWith('/network/recovery'))location.replace('../');else location.reload();}
+ function finish(message){attempt++;clearTimeout(deadline);pending='';button.disabled=false;status.textContent=message;}
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{if(pending==='update')reopen();});
+ navigator.serviceWorker.addEventListener('message',event=>{
+  const type=event.data&&event.data.type;
+  if(type==='APP_READY'&&pending==='repair')reopen();
+  if(type==='APP_SAVE_FAILED'&&pending)finish('Saving did not finish. Check your connection and available storage, then retry.');
+  if(type==='APP_OTHER_TABS'&&pending)finish('Close other app tabs or windows, then retry.');
+ });
+ button.addEventListener('click',async()=>{
+  if(button.disabled)return;const epoch=++attempt;button.disabled=true;status.textContent='Checking and saving app files…';pending='checking';
+  deadline=setTimeout(()=>{if(epoch===attempt)finish('Saving did not finish. Reconnect and retry.');},30000);
+  try{
+   const registration=await navigator.serviceWorker.getRegistration((location.pathname||'').endsWith('/network/recovery')?'../':'./');if(!registration)throw Error();
+   try{await registration.update();}catch(error){}
+   const worker=registration.installing;
+   if(worker)await new Promise((resolve,reject)=>{function check(){if(worker.state==='installed'||worker.state==='activated')resolve();else if(worker.state==='redundant')reject(Error());}worker.addEventListener('statechange',check);check();});
+   if(epoch!==attempt||pending!=='checking')return;
+   if(registration.waiting){pending='update';registration.waiting.postMessage({type:'ACTIVATE_UPDATE'});}
+   else if(registration.active){pending='repair';registration.active.postMessage({type:'REPAIR_CACHE'});}
+   else throw Error();
+  }catch(error){if(epoch===attempt)finish('Saving did not finish. Check your connection and available storage, then retry.');}
+ });
+ </script></html>

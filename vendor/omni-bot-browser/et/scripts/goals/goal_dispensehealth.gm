@@ -1,0 +1,53 @@
+// This script contains functionality to allow medic bots to dispense health at spawn
+
+this.Name = "DispenseHealth";
+this.Parent = "LowLevel";
+
+this.LimitToClass(CLASS.MEDIC);
+this.LimitToNoTarget();
+this.LimitToNoEntityFlag(ENTFLAG.MOUNTED);
+
+// This callback is called when the bot SPAWNS or is REVIVED.
+// NOTE: This function won't be called if the bot doesn't match the allowed classes set up above.
+this.OnSpawn = function()
+{
+	if (Map.DontDispenseHealth){ return; }
+
+	if (Map.DispenseHealthTime)
+		{ sleep(Map.DispenseHealthTime); }
+	else
+		{ sleep(3); }
+
+	this.Priority = 1;
+};
+
+this.Enter = function()
+{
+	// This goal is going to be manipulating the bots aim, so create an aim request to do so.
+	this.AddAimRequest(Priority.High, "movedirection");
+	this.PacksThrown = 0;
+};
+
+this.Update = function()
+{
+	this.AddWeaponRequest(WEAPON.MEDKIT);
+	this.BlockForWeaponChange(WEAPON.MEDKIT);
+
+	while(this.PacksThrown < 2 &&
+		this.Bot.GetCurrentWeapon() == WEAPON.MEDKIT &&
+		this.Bot.IsWeaponCharged(WEAPON.MEDKIT))
+	{
+		this.Bot.HoldButton(BTN.ATTACK1, 0.25);
+		sleep(0.5);
+	}
+
+	this.Finished();
+};
+
+this.Events[EVENT.WEAPON_FIRE] = function(weaponId)
+{
+	if(weaponId == WEAPON.MEDKIT)
+	{
+		this.PacksThrown += 1;
+	}
+};

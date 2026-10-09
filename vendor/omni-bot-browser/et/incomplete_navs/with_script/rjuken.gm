@@ -1,0 +1,411 @@
+//==========================================================================================
+//
+// Rjuken Dam - rjuken.gm
+//
+// Who		When			What
+//------------------------------------------------------------------------------------------
+// Mateos	08 August 2025	Initial Script
+//
+//==========================================================================================
+//
+
+/*
+ * Grates (pipes in water)
+ * #1 (North-East) => Leads to the ladder after Explosives #2 room
+ * #2 (North-West) => Dead end?
+ * #3 (South-East) => Leads to between Axis Spawn front and Explosives #2 room
+ * #4 (South-West) => Some ladders leading to turbines room ceiling
+ */
+
+/*
+ * Objective
+ * Build both Explosives (disables their planting; 8s after => Top Dam flag is forced on Axis)
+ * Blow up Electric Fence Controls
+ * Built Explosive Trigger Primer
+ * 1 min 10s cooldown - Axis can destroy it with either satchel or dynamite ONTOP-ONLY of it...
+ * Trigger the explosion
+ */
+
+global Map =
+{
+	areBothExplosiveCachesBuilt = false,
+	areElectricFenceControlsDestroyed = false,
+
+	liftEntity,
+	liftStatus,
+
+	LiftStatus =
+	{
+		TOP			= 0,
+		MOVING_DOWN	= 1,
+		BOTTOM		= 2,
+		MOVING_UP	= 3
+	},
+
+	Switches =
+	{
+		// /bot waypoint_setproperty paththrough UseSwitch_PT:lift_top_outside
+		lift_top_outside =
+		{
+			AimPosition = Vec3( -145, 190, 230 ), // /bot aim_pos
+			Enabled = false,
+			Priority = 0,
+			Timeout = 9000,
+			WaypointName = "lift_top_outside",
+
+			ExitConditions = // (Optional) Used to continue to press the button until exit conditions are true
+			{
+				f = function( bot )
+				{
+					return Map.liftStatus != Map.LiftStatus.BOTTOM; // Return true to stop pressing the button
+				}
+			},
+
+			Wait = function() // (Optional) Used to have the bot wait a bit for slow moving doors / elevators
+			{
+				return !Map.Is_Lift_Moving(); // Return true to finish the paththrough and go through the door
+			}
+		},
+
+		// /bot waypoint_setproperty paththrough UseSwitch_PT:lift_top_inside
+		lift_top_inside =
+		{
+			AimPosition = Vec3( -350, -50, 200 ), // /bot aim_pos
+			Enabled = true,
+			Priority = 0,
+			Timeout = 6000,
+			WaypointName = "lift_top_inside",
+
+			Wait = function()
+			{
+				return Map.liftStatus == Map.LiftStatus.BOTTOM;
+			}
+		},
+
+		// /bot waypoint_setproperty paththrough UseSwitch_PT:lift_bottom_outside
+		lift_bottom_outside =
+		{
+			AimPosition = Vec3( -580, 190, -955 ), // /bot aim_pos
+			Enabled = true,
+			Priority = 0,
+			Timeout = 9000,
+			WaypointName = "lift_bottom_outside",
+
+			ExitConditions = // (Optional) Used to continue to press the button until exit conditions are true
+			{
+				f = function( bot )
+				{
+					return Map.liftStatus != Map.LiftStatus.TOP; // Return true to sbottom pressing the button
+				}
+			},
+
+			Wait = function() // (Optional) Used to have the bot wait a bit for slow moving doors / elevators
+			{
+				return !Map.Is_Lift_Moving(); // Return true to finish the paththrough and go through the door
+			}
+		},
+
+		// /bot waypoint_setproperty paththrough UseSwitch_PT:lift_bottom_inside
+		lift_bottom_inside =
+		{
+			AimPosition = Vec3( -350, -50, -935 ), // /bot aim_pos
+			Enabled = false,
+			Priority = 0,
+			Timeout = 6000,
+			WaypointName = "lift_bottom_inside",
+
+			Wait = function()
+			{
+				return Map.liftStatus == Map.LiftStatus.TOP;
+			}
+		}
+	},
+
+	Is_Lift_Moving = function()
+	{
+		return Map.liftStatus == Map.LiftStatus.MOVING_DOWN || Map.liftStatus == Map.LiftStatus.MOVING_UP;
+	},
+
+	Allied_Command_Post_Built = function()
+	{
+		Util.MapDebugPrint( "Allied_Command_Post_Built", true );
+	},
+
+	Axis_Command_Post_Built = function()
+	{
+		Util.MapDebugPrint( "Axis_Command_Post_Built", true );
+	},
+
+	Both_Explosive_Caches_Built = function()
+	{
+		Map.areBothExplosiveCachesBuilt = true;
+
+		Map.Manage_Fence_Way();
+
+		Util.MapDebugPrint( "Both_Explosive_Caches_Built" );
+	},
+
+	Electric_Fence_Controls_Built = function()
+	{
+		Map.areElectricFenceControlsDestroyed = false;
+
+		Map.Manage_Fence_Way();
+
+		Util.MapDebugPrint( "Electric_Fence_Controls_Built" );
+	},
+
+	Explosive_Trigger_Primer_Built = function()
+	{
+		// TODO: Make bots camp around it (either to protect it or covert its destruction)
+		Util.MapDebugPrint( "Explosive_Trigger_Primer_Built" );
+	},
+
+	Entry_Door_Built = function()
+	{
+		Util.MapDebugPrint( "Entry_Door_Built", true );
+	},
+
+	Grate_1_Repair_Built = function()
+	{
+		Util.MapDebugPrint( "Grate_1_Repair_Built", true );
+	},
+
+	Grate_3__Repair_Built = function()
+	{
+		Util.MapDebugPrint( "Grate_3__Repair_Built", true );
+	},
+
+	Grate_4__Repair_Built = function()
+	{
+		Util.MapDebugPrint( "Grate_4__Repair_Built", true );
+	},
+
+	Grate__2_Repair_Built = function()
+	{
+		Util.MapDebugPrint( "Grate__2_Repair_Built", true );
+	},
+
+	Allied_Command_Post_Destroyed = function()
+	{
+		Util.MapDebugPrint( "Allied_Command_Post_Destroyed", true );
+	},
+
+	Axis_Command_Post_Destroyed = function()
+	{
+		Util.MapDebugPrint( "Axis_Command_Post_Destroyed", true );
+	},
+
+	Electric_Fence_Controls_Destroyed = function()
+	{
+		Map.areElectricFenceControlsDestroyed = true;
+
+		Map.Manage_Fence_Way();
+
+		Util.MapDebugPrint( "Electric_Fence_Controls_Destroyed" );
+	},
+
+	Explosive_Trigger_Primer_Destroyed = function()
+	{
+		Util.MapDebugPrint( "Explosive_Trigger_Primer_Destroyed", true );
+	},
+
+	Entry_Door_Destroyed = function()
+	{
+		Util.MapDebugPrint( "Entry_Door_Destroyed", true );
+	},
+
+	Grate_1_Repair_Destroyed = function()
+	{
+		Util.MapDebugPrint( "Grate_1_Repair_Destroyed", true );
+	},
+
+	Grate_3__Repair_Destroyed = function()
+	{
+		Util.MapDebugPrint( "Grate_3__Repair_Destroyed", true );
+	},
+
+	Grate_4__Repair_Destroyed = function()
+	{
+		sleep( .1 );
+		Wp.CheckBlockable();
+
+		SetAvailableMapGoals( TEAM.ALLIES, true, {
+			"PLANT_Explosive_1",
+			"PLANT_Dam_Explosives_2",
+			"PLANT_Electric_Fence_Controls"
+		});
+
+		Util.MapDebugPrint( "Grate_4__Repair_Destroyed" );
+	},
+
+	Grate__2_Repair_Destroyed = function()
+	{
+		Util.MapDebugPrint( "Grate__2_Repair_Destroyed", true );
+	},
+
+	topdamflag_Axis_Captured = function()
+	{
+		Util.MapDebugPrint( "topdamflag_Axis_Captured", true );
+	},
+
+	topdamflag_Allies_Captured = function()
+	{
+		Util.MapDebugPrint( "topdamflag_Allies_Captured", true );
+	},
+
+	Manage_Fence_Way = function()
+	{
+		isFenceWayClear = Map.areBothExplosiveCachesBuilt && Map.areElectricFenceControlsDestroyed;
+
+		Wp.SetWaypointFlag( "electric_fence", "closed", !isFenceWayClear );
+		sleep( .1 );
+		Wp.CheckBlockable();
+
+		SetAvailableMapGoals( TEAM.ALLIES, isFenceWayClear, "BUILD_Explosive_Trigger_Primer" );
+	},
+
+	Explosive_Trigger_Primed = function()
+	{
+		SetAvailableMapGoals( TEAM.ALLIES, true, "SWITCH_Explosive_Trigger" );
+
+		Util.MapDebugPrint( "Explosive_Trigger_Primed" );
+	},
+
+	// Top pos:    (-376, 67,  248)
+	// Bottom pos: (-376, 67, -920)
+	// Travel time: almost 20 seconds...
+	Lift_Moving = function( trigger )
+	{
+		// Triggered twice (2 different entities): filter
+		if ( trigger.Entity != Map.liftEntity ) { return; }
+
+		vel = ToVector( trigger.Action );
+		if ( vel.z < 0 )
+		{
+			Util.MapDebugPrint( "Lift goes down", true );
+
+			Map.liftStatus = Map.LiftStatus.MOVING_DOWN;
+			Map.Switches.lift_top_outside.Enabled = true;
+			Map.Switches.lift_top_inside.Enabled = false;
+
+			sleep( 20 );
+
+			Util.MapDebugPrint( "Down", true );
+
+			Map.liftStatus = Map.LiftStatus.BOTTOM;
+
+			sleep( 2 ); // Wait for bots to exit lift
+
+			Map.Switches.lift_bottom_outside.Enabled = false;
+			Map.Switches.lift_bottom_inside.Enabled = true;
+		}
+		else
+		{
+			Util.MapDebugPrint( "Lift goes up", true );
+
+			Map.liftStatus = Map.LiftStatus.MOVING_UP;
+			Map.Switches.lift_bottom_outside.Enabled = true;
+			Map.Switches.lift_bottom_inside.Enabled = false;
+
+			sleep( 20 );
+
+			Util.MapDebugPrint( "Up", true );
+
+			Map.liftStatus = Map.LiftStatus.TOP;
+
+			sleep( 2 ); // Wait for bots to exit lift
+
+			Map.Switches.lift_top_outside.Enabled = false;
+			Map.Switches.lift_top_inside.Enabled = true;
+		}
+	}
+};
+
+global OnMapLoad = function()
+{
+	OnTrigger( "Allied Command Post constructed. Charge speed increased!", Map.Allied_Command_Post_Built);
+	OnTrigger( "Axis Command Post constructed. Charge speed increased!", Map.Axis_Command_Post_Built);
+	OnTrigger( "Allies have built both explosive caches!", Map.Both_Explosive_Caches_Built);
+	OnTrigger( "Electric fence controls have been built!", Map.Electric_Fence_Controls_Built);
+	OnTrigger( "The Allies have started the explosive trigger primer!", Map.Explosive_Trigger_Primer_Built );
+	OnTrigger( "Axis team has built the entry door!", Map.Entry_Door_Built);
+	OnTrigger( "Grate #1 has been rebuilt!", Map.Grate_1_Repair_Built);
+	OnTrigger( "Grate #3 has been rebuilt!", Map.Grate_3__Repair_Built);
+	OnTrigger( "Grate #4 has been rebuilt!", Map.Grate_4__Repair_Built);
+	OnTrigger( "Grate #2 has been rebuilt!", Map.Grate__2_Repair_Built);
+
+	OnTrigger( "Axis team has destroyed the Allied Command Post!", Map.Allied_Command_Post_Destroyed);
+	OnTrigger( "Allied team has destroyed the Axis Command Post!", Map.Axis_Command_Post_Destroyed);
+	OnTrigger( "Electric fence controls have been destroyed!", Map.Electric_Fence_Controls_Destroyed);
+	OnTrigger( "The trigger primer has been damaged!", Map.Explosive_Trigger_Primer_Destroyed );
+	OnTrigger( "Allied team has destroyed the entry doors!", Map.Entry_Door_Destroyed);
+	OnTrigger( "Grate #1 has been damaged!", Map.Grate_1_Repair_Destroyed);
+	OnTrigger( "Grate #3 has been damaged!", Map.Grate_3__Repair_Destroyed);
+	OnTrigger( "Grate #4 has been damaged!", Map.Grate_4__Repair_Destroyed);
+	OnTrigger( "Grate #2 has been damaged!", Map.Grate__2_Repair_Destroyed);
+
+	OnTrigger( "Axis reclaim the top of the dam!", Map.topdamflag_Axis_Captured);
+	OnTrigger( "Allies capture the the top of the dam!", Map.topdamflag_Allies_Captured);
+
+	OnTrigger( "The Allies have primed the trigger and are ready to blow the dam!", Map.Explosive_Trigger_Primed );
+
+	OnTrigger( "lift_goto", Map.Lift_Moving );
+
+	Util.RemoveGoal( "BUILD_Entry_Door" );
+	Util.RemoveGoal( "PLANT_Entry_Door_Construction" );
+
+	Util.DisableGoal( ".*", true );
+	Util.EnableGoal( { "BUILD_Command_Post", "CHECKPOINT_topdamflag", "PLANT_Command_Post" } );
+
+	SetAvailableMapGoals( TEAM.AXIS, true, {
+		//"BUILD_Entry_Door_Construction"
+	});
+
+	SetAvailableMapGoals( TEAM.ALLIES, true, {
+		"BUILD_Dam_Explosives_2",
+		"BUILD_Explosive_1",
+		"PLANT_Electric_Fence_Controls",
+		"PLANT_Entry_Door",
+		//"PLANT_Grate_4__Repair" // TODO: Bot nav under water... It does not get to the bottom waypoint
+	});
+
+	// ---
+
+	// We run a trace because ETLegacy has a different way to order entities...
+	start = Vec3( -375, 70, 375 );
+	end   = Vec3( -375, 70,  90 );
+	tr    = TraceLine( start, end, null, TRACE.SHOT, 0, false );
+	if ( tr.fraction < 1 )
+	{
+		Map.liftEntity = tr.entity;
+		Util.MapDebugPrint( "Lift entity found, ID: " + GetGameIdFromEntity( Map.liftEntity ), true );
+	}
+	else
+	{
+		Util.MapDebugPrint( "Lift entity not found!", 2 );
+	}
+
+	Map.liftStatus = Map.LiftStatus.TOP;
+
+	// ---
+
+	Wp.SetWaypointFlag( "electric_fence", "closed", true );
+
+	Util.MapDebugPrint( "Omni-bot map script for " + GetMapName() + " executed." );
+};
+
+global OnBotJoin = function(bot)
+{
+};
+
+global InitializeRoutes = function()
+{
+	MapRoutes =
+	{
+		PLANT_Electric_Fence_Controls =
+		{
+		}
+	};
+
+	Util.Routes( MapRoutes );
+};

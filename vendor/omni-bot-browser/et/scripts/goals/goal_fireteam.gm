@@ -1,0 +1,567 @@
+// this script is a work in progress, but is fully functional
+// Fireteam members will follow a human fireteam leader by default
+// Leaders can give bot commands via fireteam chat or the fireteam voice chat
+/*
+	camp <slot number> - the bot at the given slot number will camp at leaders current position / facing
+	camp - same as above but all bots will do it (not recommended)
+	formation <front | random> - bots that get close enough while following will offset to whatever the current formation is
+	release <slot number> - sets the goal priority to 0 for the given bot
+	release - same as above but for all bots
+	num - each bot will say their slot number since the ET overlay is retarded
+	follow <slot number> the given bot will be set to the default state of following the leader
+	follow - same as above but for all bots
+*/
+
+// NOTE: this goal relies on an omni-bot.cfg stored var in order to run. /bot ft_controls 1 to enable 0 to disable
+
+this.Name = "FireTeam";
+this.Parent = "HighLevel";
+this.AlwaysRecieveEvents = true;
+this.Debug = false;
+
+this.FireTeamEnabled = ConfigGet("FireTeam","enabled", 0);
+
+this.States =
+{
+	FT_NONE     = 0,
+	FT_FOLLOW   = 1,
+	FT_RELEASED = 2,
+	FT_CAMP     = 3,
+
+	// class related states
+	FT_MG42     = 4, // Camp
+	FT_MORTAR_TARGET    = 5, // use mortar ?
+
+	FT_DYNAMITE = 6,
+	FT_REPAIR   = 7,
+	FT_LANDMINE = 8, // plant mine
+
+	FT_HEALTH   = 9, // deliver health packs
+
+	FT_AMMO     = 10, // deliver ammo packs
+	FT_AIRSTRIKE= 11,
+	FT_ARTY     = 12,
+
+	FT_SMOKE    = 13,
+	FT_SATCHEL  = 14,
+	FT_OPEN_TEAM_DOOR= 15,
+
+	// all classes
+	FT_SPEC_MINES= 16,
+	FT_GRENADE   = 17,
+	FT_ESCORT    = 18,
+};
+
+this.Initialize = function()
+{
+	// populate with ft info
+	this.FireTeam = {};
+
+	// initialize vars
+	this.DefaultPriority = 0.7;
+	this.CommandPriority = this.DefaultPriority;
+	this.TargetPosition = Vec3(0,0,0);
+
+	this.FireTeamState = this.States.FT_NONE;
+	this.FireTeamFormation = "random";
+};
+
+this.GetPriority = function()
+{
+	for(;;)
+	{
+		if (!this.FireTeamEnabled) {
+			this.Priority = 0;
+		}
+		else
+		{
+			// this is needed to catch when leader leaves. add an event?
+			if (this.Bot.IsInFireTeam())
+			{
+				this.UpdateFireTeamInfo();
+			}
+
+			// TODO: fixme. this will break when GetPriority thread is killed when update activates
+			if (!this.IsActive())
+			{
+				if(this.Bot.IsInFireTeam())
+				{
+					this.Priority = this.CommandPriority;
+				}
+				else
+				{
+					this.Priority = 0;
+				}
+			}
+
+			// if a bot becomes leader, just disband the team for now
+			if (this.FireTeamNum && this.FireTeam[this.FireTeamNum].Leader == this.Bot.GetGameEntity())
+			{
+				this.FireTeamDisband();
+				this.Priority = 0;
+			}
+		}
+
+		sleep(1);
+	}
+};
+
+this.Enter = function()
+{
+	this.OnTarget = false;
+
+	if (this.FireTeamState == this.States.FT_FOLLOW)
+	{
+		if (this.DynamicGotoThread)
+		{
+			this.KillThread(this.DynamicGotoThread);
+		}
+		this.DynamicGotoThread = this.ForkThread(this.DynamicGoto);
+	}
+
+	if (this.FireTeamState != this.States.FT_CAMP)
+	{
+		this.camp_pos = null;
+		this.camp_facing = null;
+	}
+
+	// Set up some finish criteria
+	this.AddFinishCriteria(this.TargetEntity,"hasentflag",ENTFLAG.LIMBO);
+};
+
+this.Update = function()
+{
+	if (this.FireTeamState == this.States.FT_FOLLOW)
+	{
+		this.Follow();
+	}
+	else if (this.FireTeamState == this.States.FT_CAMP)
+	{
+		this.Camp();
+	}
+	else if (this.FireTeamState == this.States.FT_RELEASED)
+	{
+		// shouldn't get here
+	}
+	else
+	{
+		if (this.Debug)
+		{
+			this.Bot.Say("^1INVALID STATE IN FIRETEAM GOAL!");
+		}
+
+		// reset to default behavior so the bot won't get stuck in an infinite update loop
+		this.FireTeamState = this.States.FT_FOLLOW;
+		this.Finished();
+	}
+};
+
+this.Exit = function()
+{
+	if (this.DynamicGotoThread)
+	{
+		this.KillThread(this.DynamicGotoThread);
+	}
+
+	this.TargetPosition = Vec3(0,0,0);
+};
+
+///////////////////////////////////////////////////////////////////////////////////
+
+this.UpdateFireTeamInfo = function()
+{
+	this.ftinfo = this.Bot.FireTeamGetInfo();
+	if (this.ftinfo)
+	{
+		this.FireTeam[ this.ftinfo.FireTeamNum ] = this.ftinfo;
+		this.FireTeamNum = this.ftinfo.FireTeamNum;
+	}
+	else
+	{
+		this.Finished();
+	}
+};
+
+this.GetSlotNumber = function()
+{
+	slot = 0;
+
+	foreach (id and ent in this.FireTeam[this.FireTeamNum].Members)
+	{
+		if (this.Bot.GetGameEntity() == ent)
+		{
+			slot = id;
+		}
+	}
+
+	return slot;
+};
+
+// from DrEvil's meatshield goal
+this.FormationFront = function()
+{
+	ft = this.FireTeam[this.FireTeamNum];
+	lp = GetEntPosition(ft.Leader);
+	lf = GetEntFacing(ft.Leader);
+	dest = lp + lf * 150 + CrossProduct(lf,Vec3(0,0,1)) * ((this.GetSlotNumber() - 0.5 * tableCount(ft.Members)) * 64);
+
+	if(this.Bot.DistanceTo(dest) > 1024)
+	{
+		this.Goto(dest);
+	}
+	else
+	{
+		this.Bot.MoveTowards(dest);
+	}
+
+	this.AddAimRequest(Priority.Low, "facing", GetEntFacing(ft.Leader));
+	yield();
+};
+
+this.FormationRandom = function()
+{
+	//choose a random Offset
+	pos = this.TargetPosition + Util.GetRandomTableValue({
+		Vec3(128,128,0),
+		Vec3(-128,-128,0),
+		Vec3(-128,128,0),
+		Vec3(128,-128,0),
+		Vec3(64,64,0),
+		Vec3(-64,-64,0),
+		Vec3(-64,64,0),
+		Vec3(64,-64,0),
+	});
+
+	// stand at an offset and face the direction the leader is if leader is not moving
+	leader = this.FireTeam[this.FireTeamNum].Leader;
+	if(!GetEntVelocity(leader).IsZero() && this.Bot.HasLineOfSightTo(pos))
+	{
+		this.ReleaseAimRequest();
+		this.Goto(pos);
+	}
+	else
+	{
+		this.AddAimRequest(Priority.Low, "facing", GetEntFacing(leader));
+		this.Goto(this.Bot.GetPosition());
+	}
+};
+
+this.DynamicGoto = function()
+{
+	this.OnTarget = false;
+
+	if(this.Goto(this.TargetPosition, 128) == EVENT.PATH_SUCCESS)
+	{
+		this.OnTarget = true;
+	}
+	else
+	{
+		if (this.Debug)
+		{
+			this.Bot.SayTeam("No PATH!");
+		}
+		this.Finished();
+	}
+};
+
+this.Follow = function()
+{
+	entPos = GetEntPosition(this.FireTeam[ this.FireTeamNum ].Leader);
+
+	if(this.TargetPosition.IsZero())
+	{
+		this.TargetPosition = entPos;
+	}
+
+	if (entPos.IsZero())
+	{
+		this.Bot.SayFireTeam("Entity position is  zero!");
+		this.Finished();
+	}
+
+	d = DistanceBetween(entPos,this.TargetPosition);
+
+	if(d > 128 && d < 1000)
+	{
+		this.OnTarget = false;
+		if (this.DynamicGotoThread)
+			{ this.KillThread(this.DynamicGotoThread); }
+		this.TargetPosition = entPos;
+		this.DynamicGotoThread = this.ForkThread(this.DynamicGoto);
+
+		if (d >= 500)
+		{
+			this.Bot.HoldButton(BTN.SPRINT, 5);
+		}
+	}
+
+	if(this.OnTarget)
+	{
+		if (this.FireTeamFormation == "front")
+		{
+			this.FormationFront();
+		}
+		else
+		{
+			this.FormationRandom();
+		}
+	}
+};
+
+this.Camp = function()
+{
+	if (!this.camp_pos)
+	{
+		e = this.FireTeam[ this.FireTeamNum ].Leader;
+		this.camp_pos = GetEntPosition(e);
+		this.camp_facing = GetEntFacing(e);
+	}
+
+	if(this.Goto(this.camp_pos, 64) == EVENT.PATH_SUCCESS)
+	{
+		this.AddAimRequest(Priority.Low, "facing", this.camp_facing);
+		block(0);
+	}
+	else
+	{
+		this.FireTeamState = this.States.FT_FOLLOW;
+	}
+};
+
+this.ProcessChatEvents = function(Who, Msg)
+{
+	tokens = Msg.Tokenize(" ");
+
+	// only let the leader use commands for now
+	if (Who != this.FireTeam[ this.FireTeamNum ].Leader)
+	{
+		return;
+	}
+
+	//check if there is a slot num specified
+	if(tokens[1])
+	{
+		num = ToInt(tokens[1]);
+		if (num > 0)
+		{
+			// just make sure it's updated for now
+			this.ftinfo = this.Bot.FireTeamGetInfo();
+			this.FireTeam[ this.ftinfo.FireTeamNum ] = this.ftinfo;
+
+			// skip all but the slot number
+			if (this.Bot.GetGameEntity() != this.FireTeam[ this.FireTeamNum ].Members[ num ])
+			{
+				return;
+			}
+		}
+	}
+
+	switch(tokens[0]) {
+	case "come": case "follow": case "Follow":
+	{
+		this.CommandPriority = this.DefaultPriority;
+		this.FireTeamState = this.States.FT_FOLLOW;
+		this.Finished(); // so they can exit any existing state
+	}
+	case "go": case "release": case "Move!":
+	{
+		this.CommandPriority = 0;
+		this.FireTeamState = this.States.FT_RELEASED;
+		this.Finished(); // so they can exit any existing state
+	}
+	case "camp":
+	{
+		this.CommandPriority = this.DefaultPriority;
+		this.FireTeamState = this.States.FT_CAMP;
+		this.camp_pos = null;
+		this.camp_facing = null;
+		this.Finished(); // so they can exit any existing state
+	}
+	case "ftl":
+	{
+		this.Bot.SayTeam("Team leader is ", GetEntName(this.FireTeam[ this.FireTeamNum ].Leader));
+	}
+	case "num": case "slot":
+	{
+		// slot number isn't matching the display in menu ...
+		slot = this.GetSlotNumber();
+		this.Bot.SayFireTeam("my slot number is ", slot);
+	}
+	case "formation": // Cover me!
+	{
+		if(tokens[1])
+		{
+			this.FireTeamFormation = tokens[1]; // defaults to random if invalid
+		}
+		else
+		{
+			this.Bot.SayFireTeam("my formation is ", this.FireTeamFormation);
+		}
+	}
+	}
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+this.Events[EVENT.PRIV_CHAT_MSG] = function(Who, Msg)
+{
+	this.ProcessChatEvents(Who, Msg);
+
+	if (this.Debug)
+	{
+		print("Private Chat: ", GetEntName(Who), " said ", Msg);
+	}
+
+};
+
+this.Events[EVENT.FIRETEAM_CHAT_MSG] = function(Who, Msg)
+{
+	this.ProcessChatEvents(Who, Msg);
+
+	if (this.Debug)
+	{
+		print("Fire Team Chat: ", GetEntName(Who), " said ", Msg);
+	}
+};
+
+/*
+this.Events[EVENT.PRIVATE_VOICE] = function(Who, id)
+{
+	switch(id)
+	{
+		case VOICE.COVER_ME:
+		{
+		}
+		case FOLLOW_ME:
+		{
+		}
+		case VOICE.MOVE:
+		{
+		}
+		case VOICE.NEED_BACKUP:
+		{
+		}
+		case VOICE.CLEAR_MINES:
+		{
+		}
+
+		// NoQuarter specific
+		case VOICE.P_ATTACK:{}
+		case VOICE.P_CALLAIRSTRIKE:{}
+		case VOICE.P_CALLARTILLERY:{}
+		case VOICE.P_CHECKFORLANDMINES:{}
+		case VOICE.P_CONSTRUCTOBJECTIVE:{}
+		case VOICE.P_DEPLOYLANDMINES:{}
+		case VOICE.P_DEPLOYMORTAR:{}
+		case VOICE.P_DESTROYOBJECTIVE:{}
+		case VOICE.P_DISARMLANDMINES:{}
+		case VOICE.P_EXPLOREAREA:{}
+		case VOICE.P_FALLBACK:{}
+		case VOICE.P_GOUNDERCOVER:{}
+		case VOICE.P_HEALME:{}
+		case VOICE.P_HEALSQUAD:{}
+		case VOICE.P_INFILTRATE:{}
+		case VOICE.P_PROVIDESNIPERCOVER:{}
+		case VOICE.P_REPAIROBJECTIVE:{}
+		case VOICE.P_RESUPPLYME:{}
+		case VOICE.P_RESUPPLYSQUAD:{}
+		case VOICE.P_REVIVEME:{}
+		case VOICE.P_REVIVETEAMMATE:{}
+		case VOICE.P_SATCHELOBJECTIVE:{}
+
+		default:
+		{
+			if (this.Debug) {
+				print("goal_fireteam: unhandled voice macro:", Util.GetTableKey(VOICE,id), "in EVENT.PRIVATE_VOICE");
+			}
+		}
+	}
+
+	if (this.Debug)
+	{
+		print("Private voice:", Util.GetTableKey(VOICE,id), "from :", GetEntName(Who));
+	}
+
+};
+*/
+
+this.Events[EVENT.FIRETEAM_CREATED] = function(FireTeamNum)
+{
+	if (this.Debug)
+	{
+		print("Fire Team Created:", FireTeamNum);
+	}
+};
+
+this.Events[EVENT.FIRETEAM_DISBANDED] = function()
+{
+	if (this.Debug)
+	{
+		this.Bot.SayTeam("Fire Team disbanded.");
+	}
+
+	this.Finished();
+};
+
+this.Events[EVENT.FIRETEAM_JOINED] = function(TeamLeader)
+{
+	if (this.Debug)
+	{
+		this.Bot.SayTeam("Fire Team joined:", GetEntName(TeamLeader));
+	}
+
+	this.FireTeamState = this.States.FT_FOLLOW;
+	this.UpdateFireTeamInfo();
+};
+
+this.Events[EVENT.FIRETEAM_LEFT] = function()
+{
+	if (this.Debug)
+	{
+		this.Bot.SayTeam("Fire Team left.");
+	}
+
+	this.UpdateFireTeamInfo();
+	this.Finished();
+};
+
+this.Events[EVENT.FIRETEAM_INVITED] = function(TeamLeader)
+{
+	if(this.Debug)
+	{
+		print("Fire Team Invite from:", GetEntName(TeamLeader));
+	}
+
+	this.Bot.VoteYes(); // accept
+};
+
+this.Events[EVENT.FIRETEAM_PROPOSAL] = function(Invitee)
+{
+	if (this.Debug)
+	{
+		this.Bot.Say("Fire Team Proposition:", GetEntName(Invitee));
+	}
+
+	this.Bot.VoteYes(); // accept
+};
+
+this.Events[EVENT.FIRETEAM_WARNED] = function(WarnedBy)
+{
+	if (this.Debug)
+	{
+		print("Fire Team Warned:", GetEntName(WarnedBy));
+	}
+};
+
+////////////////////////////////////////////////////////////////////////
+
+this.Commands["ft_controls"] =
+{
+	Func = function(_params)
+	{
+		if (tableCount(_params))
+		{
+			this.FireTeamEnabled = ToBool(_params[0]);
+		}
+	}
+};

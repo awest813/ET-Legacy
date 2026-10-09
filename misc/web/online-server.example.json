@@ -1,0 +1,13 @@
+{
+  "server": "104.248.140.165",
+  "udpPort": 27960,
+  "webPort": 8081,
+  "relayPort": 8082,
+  "relay": "ws://127.0.0.1:8082/relay",
+  "serverLabel": "ET:Legacy DEV",
+  "autoAssets": true,
+  "downloadBase": "https://download.hirntot.org",
+  "assetSources": {
+    "etmain/goldrush-gals.pk3": "https://et.clan-etc.de/etmain/goldrush-gals.pk3"
+  }
+}

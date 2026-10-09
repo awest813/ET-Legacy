@@ -1,0 +1,76 @@
+const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
+const {webcrypto,createHash} = require('node:crypto');
+const names=['etl.html','etl.js','etl.wasm','etl.data','manifest.webmanifest','icon-192.png','icon-512.png'];
+const entries=names.map(url=>({url,sha256:createHash('sha256').update(`bundle:${url}`).digest('hex')}));
+const source=fs.readFileSync(`${__dirname}/sw.js.in`,'utf8').replace('@PWA_VERSION@','fixture').replace('@PWA_ENTRIES@',entries.map(e=>JSON.stringify(e)).join(',')).replace('@PWA_RECOVERY_JSON@',JSON.stringify(fs.readFileSync(`${__dirname}/pwa/recovery.html`,'utf8')));
+function fixture(failure) {
+ const events={}, storage=new Map(), messages=[], clients=[{postMessage:m=>messages.push(m)}]; let skipped=0, network=0;
+ const caches={async open(key) { if(failure==='storage')throw Error('Storage denied'); if(!storage.has(key)) storage.set(key,new Map()); const map=storage.get(key); return {
+  async put(url,response) { map.set(url,response.clone()); },async match(url) { return map.get(url)?.clone(); }
+ }; },async keys(){return [...storage.keys()];},async delete(key){return storage.delete(key);} };
+ const self={location:{href:'https://game.test/play/sw.js'},addEventListener(n,fn){events[n]=fn;},clients:{async matchAll(){return clients;}},async skipWaiting(){skipped++;}};
+ vm.runInNewContext(source,{self,caches,URL,Response,crypto:webcrypto,Uint8Array,fetch:async url=>{
+  network++; const name=new URL(url).pathname.split('/').pop(); if(failure==='network'&&name==='etl.wasm') throw Error('Disconnected');
+  return new Response(failure==='corrupt'&&name==='etl.wasm'?'changed':`bundle:${name}`,{headers:{'Cross-Origin-Embedder-Policy':'require-corp'}});
+ }});
+ async function dispatch(name,extra={}) {let pending;events[name]({waitUntil(p){pending=p;},...extra});await pending;}
+ async function request(path,extra={}) {let pending;events.fetch({request:{url:new URL(path,'https://game.test/play/').href,method:'GET',mode:'cors',headers:new Headers(),...extra},respondWith(p){pending=p;}});return pending?await pending:null;}
+ return {storage,messages,clients,dispatch,request,get skipped(){return skipped;},get network(){return network;}};
+}
+(async()=>{
+ const f=fixture();f.storage.set('etl-app-%2Fplay%2F-old',new Map());f.storage.set('unrelated',new Map());
+ await f.dispatch('install');assert.equal(f.network,7);await f.dispatch('activate');
+ assert.ok(!f.storage.has('etl-app-%2Fplay%2F-old'));assert.ok(f.storage.has('unrelated'));
+ assert.equal(await (await f.request('./?map=oasis',{mode:'navigate'})).text(),'bundle:etl.html');
+ assert.equal(await (await f.request('etl.data')).text(),'bundle:etl.data');assert.equal(f.network,7,'Engine reads use the coherent cached version');
+ assert.equal((await f.request('etl.wasm')).headers.get('Cross-Origin-Embedder-Policy'),'require-corp');
+ for(const path of ['assets/pak0.pk3','assets/manifest.json','network/config.json','debug.log','https://elsewhere.test/etl.js']) assert.equal(await f.request(path),null);
+ assert.equal(await f.request('etl.wasm',{headers:new Headers({Range:'bytes=0-4'})}),null);
+ assert.equal(await f.request('etl.js',{method:'POST'}),null);assert.equal(await f.request('other',{mode:'navigate'}),null);
+ await f.dispatch('message',{data:{type:'APP_STATUS'},source:f.clients[0]});assert.equal(f.messages.at(-1).type,'APP_READY');
+ f.clients.push({postMessage(){}});await f.dispatch('message',{data:{type:'ACTIVATE_UPDATE'},source:f.clients[0]});
+ assert.equal(f.skipped,0);assert.equal(f.messages.at(-1).type,'APP_OTHER_TABS');
+ f.clients.pop();await f.dispatch('message',{data:{type:'ACTIVATE_UPDATE'},source:f.clients[0]});assert.equal(f.skipped,1);
+ f.storage.get('etl-app-%2Fplay%2F-fixture').delete('https://game.test/play/etl.wasm');
+ await f.dispatch('message',{data:{type:'APP_STATUS'},source:f.clients[0]});assert.equal(f.messages.at(-1).type,'APP_MISSING');
+ assert.equal((await f.request('etl.wasm')).status,503,'Missing cached code does not fall back to another version');
+ const recovery=await f.request('./',{mode:'navigate'});const html=await recovery.text();
+ assert.equal(recovery.status,503);assert.match(html,/Restore offline play/);
+ assert.equal(recovery.headers.get('Cross-Origin-Embedder-Policy'),'require-corp');
+ // Exercise the actual recovery page script with only browser APIs mocked.
+ async function recoveryUI(kind) {
+  const events={},elements={retry:{addEventListener(n,fn){this[n]=fn;}},status:{},launcherlink:{}};
+  const sw={addEventListener(n,fn){events[n]=fn;},async getRegistration(scope){assert.equal(scope,kind==='standalone'?'../':'./');return registration;}};
+  const posts=[],delayed=[],registration={async update(){if(kind==='offline')throw Error('Offline');if(kind==='late')await new Promise(resolve=>delayed.push(resolve));},active:{postMessage(m){posts.push(m);}}};
+  if(kind==='update')registration.waiting={postMessage(m){posts.push(m);}};
+  if(kind==='storage')registration.active.postMessage=()=>{throw Error('Storage denied');};
+  let reloads=0;const timers=new Map();let serial=0;
+  vm.runInNewContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],{
+   document:{getElementById:id=>elements[id]},navigator:{serviceWorker:sw},location:{pathname:kind==='standalone'?'/network/recovery':'/play/',replace(url){assert.equal(url,'../');reloads++;},reload(){reloads++;}},
+   setTimeout(fn){const id=++serial;timers.set(id,fn);return id;},clearTimeout(id){timers.delete(id);}
+  });
+  const clicked=elements.retry.click();if(kind!=='late')await clicked;
+  return {events,e:elements,posts,timers,clicked,delayed,get reloads(){return reloads;}};
+ }
+ let ui=await recoveryUI('offline');assert.equal(ui.posts.at(-1).type,'REPAIR_CACHE');
+ ui.events.message({data:{type:'APP_SAVE_FAILED'}});assert.equal(ui.e.retry.disabled,false);assert.equal(ui.timers.size,0);
+ ui=await recoveryUI('repair');ui.events.message({data:{type:'APP_READY'}});assert.equal(ui.reloads,1);
+ ui=await recoveryUI('standalone');assert.equal(ui.e.launcherlink.href,'../');ui.events.message({data:{type:'APP_READY'}});assert.equal(ui.reloads,1,'Independent repair returns to the launcher instead of reloading the recovery route');
+ ui=await recoveryUI('update');assert.equal(ui.posts.at(-1).type,'ACTIVATE_UPDATE');
+ ui.events.message({data:{type:'APP_READY'}});assert.equal(ui.reloads,0,'Update activation must wait for controller replacement');
+ ui.events.message({data:{type:'APP_OTHER_TABS'}});assert.equal(ui.e.retry.disabled,false);assert.match(ui.e.status.textContent,/other app tabs/);
+ await ui.e.retry.click();ui.events.controllerchange();assert.equal(ui.reloads,1);
+ ui=await recoveryUI('storage');assert.equal(ui.e.retry.disabled,false);assert.match(ui.e.status.textContent,/storage/);
+ ui=await recoveryUI('repair');for(const fn of [...ui.timers.values()])fn();assert.equal(ui.e.retry.disabled,false);
+ ui.events.message({data:{type:'APP_READY'}});assert.equal(ui.reloads,0,'Late repair completion cannot force a timed-out reload');
+ ui=await recoveryUI('late');for(let i=0;i<6;i++)await Promise.resolve();for(const fn of [...ui.timers.values()])fn();
+ const second=ui.e.retry.click();for(let i=0;i<6;i++)await Promise.resolve();ui.delayed[0]();await ui.clicked;
+ assert.equal(ui.posts.length,0,'A timed-out update cannot send commands during a newer attempt');
+ ui.delayed[1]();await second;assert.equal(ui.posts.length,1);
+ await f.dispatch('message',{data:{type:'REPAIR_CACHE'},source:f.clients[0]});assert.equal(f.messages.at(-1).type,'APP_READY');
+ for(const failure of ['network','corrupt']) {const broken=fixture(failure);broken.storage.set('unrelated',new Map());broken.storage.set('etl-app-%2Fplay%2F-old',new Map());await assert.rejects(broken.dispatch('install'));assert.deepEqual([...broken.storage.keys()],['unrelated','etl-app-%2Fplay%2F-old']);}
+ const broken=fixture('network');await broken.dispatch('message',{data:{type:'REPAIR_CACHE'},source:broken.clients[0]});assert.equal(broken.messages.at(-1).type,'APP_SAVE_FAILED');
+ const denied=fixture('storage');await denied.dispatch('message',{data:{type:'APP_STATUS'},source:denied.clients[0]});assert.equal(denied.messages.at(-1).type,'APP_SAVE_FAILED');
+ assert.match(await (await denied.request('./',{mode:'navigate'})).text(),/Restore offline play/);
+ console.log('PWA worker: atomic verified bundle, offline navigation/code, version consistency, live network isolation, scoped cleanup, update-tab guard, eviction and repair passed.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

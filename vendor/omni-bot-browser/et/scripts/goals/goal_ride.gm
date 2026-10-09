@@ -1,0 +1,180 @@
+// This script contains functionality to allow bots to ride vehicles
+this.Name = "RIDE";
+this.Parent = "HighLevel";
+this.SkipGetPriorityWhenActive = true;
+this.NotDelayed = true;
+this.Debug = 0;
+
+this.OnSpawn = function()
+{
+	// don't consider this goal right away, because ET takes a few frames to initialize entities
+	// so vehicles will be alive temporarily at the start of the map for a few frames
+	if (this.NotDelayed) {
+		this.NotDelayed = null;
+		this.DelayGetPriority(3);
+	}
+};
+
+this.GetPriority = function()
+{
+	Util.GetPriority(this,0x541798f /* RIDE */);
+};
+
+this.Enter = function()
+{
+	this.MarkInProgress();
+
+	goal = this.MapGoal;
+	if (!goal.Vehicle) {
+		Util.InvalidGoal(this, "no vehicle defined!");
+	}
+	vehicleGoal = GetGoal(goal.Vehicle);
+	if (!vehicleGoal) {
+		Util.InvalidGoal(this, "invalid vehicle defined!");
+	}
+	this.VehicleEnt = vehicleGoal.GetEntity();
+
+	if (!goal.SeatRadius || goal.SeatRadius < 60) {
+		goal.SeatRadius = 60;
+	}
+
+	this.OnTarget = false;
+	this.DynamicGotoThread = this.ForkThread(this.DynamicGoto);
+};
+
+this.Exit = function()
+{
+	if (this.DynamicGotoThread)
+		{ this.KillThread(this.DynamicGotoThread); }
+
+	if (this.CombatMovementDisabled) {
+		this.Bot.DisableCombatMovement = false;
+		this.CombatMovementDisabled = false;
+	}
+};
+
+this.DynamicGoto = function()
+{
+	offsetCount = tableCount(this.MapGoal.BoardPositions);
+
+	// randomly select a start index if one isn't defined or invalid
+	startIndex = this.MapGoal.StartIndex;
+	if (!IsInt(startIndex) || startIndex < 0 || startIndex >= offsetCount) {
+		startIndex = RandInt(0, offsetCount - 1);
+		if (this.Debug) { print(this.MapGoal.GetName(), "selected random start index of", startIndex); }
+	}
+	else {
+		if (this.Debug) { print(this.MapGoal.GetName(), "user defined start index of", startIndex); }
+	}
+
+	// loop through from the start index until we get a good path
+	for (i = 0; i < offsetCount; ++i)
+	{
+		ind = (startIndex + i) % offsetCount;
+
+		// if it's excluded, skip it
+		if (this.MapGoal.ExcludeIndexes && !IsNull(Util.GetTableKey(this.MapGoal.ExcludeIndexes, ind))) {
+			if (this.Debug) { print(this.MapGoal.GetName(), "skipping index", ind); }
+			continue;
+		}
+
+		// and finally check and see if the bot can get there
+		this.BoardOffset = this.MapGoal.BoardPositions[ind];
+		this.BoardPosition = GetEntityWorldSpace(this.VehicleEnt, this.BoardOffset);
+		if (this.Goto(this.BoardPosition, 32) != EVENT.PATH_FAILED) {
+			// disable combat movement so they can board better
+			this.CombatMovementDisabled = true;
+			this.Bot.DisableCombatMovement = true;
+			this.OnTarget = true;
+			return;
+		}
+		if (this.Debug) { print(this.MapGoal.GetName(), "path failed for index", ind); }
+	}
+
+	Util.PathFailed(this);
+	this.Finished();
+};
+
+this.Update = function()
+{
+	while (!this.OnTarget)
+	{
+		sleep(0.5);
+
+		// update the board position
+		if (GetEntityWorldSpace(this.VehicleEnt, this.BoardOffset) != this.BoardPosition)
+		{
+			this.Bot.HoldButton(BTN.SPRINT, 1);
+			if (this.Debug) { print(this.MapGoal.GetName(), "sprint"); }
+			this.KillThread(this.DynamicGotoThread);
+			this.DynamicGotoThread = this.ForkThread(this.DynamicGoto);
+			sleep(0.5);
+		}
+	}
+
+	seat = Util.GetRandomTableValue(this.MapGoal.Seats);
+
+	// Attempt to board the vehicle
+	for (timeout = 0; ; ++timeout)
+	{
+		pos = GetEntityWorldSpace(this.VehicleEnt, seat);
+		if (this.Bot.MoveTowards(pos)) { break; }
+
+		this.AddAimRequest(Priority.Medium, "position", pos);
+
+		if (timeout == 100) { this.Finished(); }
+
+		if (timeout > 3 && this.Bot.GetPosition().z < pos.z)
+		{
+			this.Bot.PressButton(BTN.JUMP);
+		}
+
+		yield();
+	}
+
+	// it's riding, so mark in use
+	this.MarkInUse();
+
+	// Ride cowboy ride
+	for (timeout = 0; timeout < 600; ++timeout)
+	{
+		pos = GetEntityWorldSpace(this.VehicleEnt, seat);
+		this.Bot.MoveTowards(pos);
+
+		switch (this.MapGoal.Stance)
+		{
+			case "crouch":
+			{
+				this.Bot.PressButton(BTN.CROUCH);
+			}
+			case "prone":
+			{
+				this.Bot.PressButton(BTN.PRONE);
+			}
+		}
+
+		if (this.Bot.DistanceTo(pos) > this.MapGoal.SeatRadius)
+		{
+			if (this.Debug) {
+				print("outside radius: current dist", this.Bot.DistanceTo(pos), "seat radius", this.MapGoal.SeatRadius);
+			}
+			break;
+		}
+
+		facing = GetEntVelocity(this.VehicleEnt);
+		if (facing && !facing.IsZero())
+		{
+			timeout = 0;
+		}
+		else
+		{
+			facing = GetEntFacing(this.VehicleEnt);
+		}
+
+		this.AddAimRequest(Priority.Low, "facing", facing);
+
+		yield();
+	}
+
+	this.Finished();
+};

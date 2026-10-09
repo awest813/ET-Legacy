@@ -1,0 +1,116 @@
+// This script contains functionality to allow soldiers to use mobile MG42 at given position
+this.Name = "MOBILEMG42";
+this.Parent = "HighLevel";
+this.SkipGetPriorityWhenActive = true;
+
+this.LimitToWeapon(WEAPON.MOBILE_MG42);
+
+this.GetPriority = function()
+{
+	Util.GetPriority(this,0xbe8488ed /* MOBILEMG42 */, 0, WEAPON.MOBILE_MG42);
+};
+
+this.Enter = function()
+{
+	this.MarkInProgress();
+
+	// finish it once they run out of ammo
+	this.AddFinishCriteria(this.Bot.GetGameEntity(),"not weaponhasammo", WEAPON.MOBILE_MG42_SET, 0);
+};
+
+
+this.Update = function()
+{
+	Util.RouteTo(this);
+
+	// disable combat movement
+	if (!this.Bot.DisableCombatMovement)
+	{
+		this.CombatMovementDisabled = true;
+		this.Bot.DisableCombatMovement = true;
+	}
+
+	// note: they can only select one randomly each time they activate the goal
+	// this is because there is no guarantee that they are able to cycle through each one
+	// given the limits of the weapon while it is set.
+	this.AimVector = Util.GetRandomTableValue(this.MapGoal.AimVectors).Normalize();
+	this.AddAimRequest(Priority.High, "facing", this.AimVector);
+	goalPos = this.MapGoal.GetPosition();
+	this.Bot.MoveTowards(goalPos, 20);
+	this.OnGoal = true;
+
+	this.AddWeaponRequest(WEAPON.MOBILE_MG42);
+	this.BlockForWeaponChange(WEAPON.MOBILE_MG42);
+
+	this.Bot.HoldButton(BTN.PRONE, 9999);
+
+	for (i=0; i<30 && (this.Bot.GetFacing().DotProduct(this.AimVector) < 0.9 || this.Bot.DistanceTo(goalPos) > 30); ++i)
+	{
+		sleep(0.1);
+	}
+
+	this.AddWeaponRequest(WEAPON.MOBILE_MG42_SET);
+	this.Bot.MoveTowards(this.Bot.GetPosition()); //stop crawling
+	this.BlockForWeaponChange(WEAPON.MOBILE_MG42_SET);
+
+	// replace the aim request with a low priority one so the targeting system can take over
+	this.AddAimRequest(Priority.Low, "facing", this.AimVector);
+
+	sleep(2);
+	this.Bot.MoveTowards(this.Bot.GetPosition());
+	sleep(1);
+	if (this.Bot.HasEntityFlag(ENTFLAG.PRONE))
+	{
+		sleep(RandFloat(this.MapGoal.MinCampTime, this.MapGoal.MaxCampTime) - 3);
+	}
+
+	this.BlackboardDelay(5);
+	this.Finished();
+};
+
+this.IsOutOfRange = function(ent)
+{
+	entPos = GetEntPosition(ent);
+	if (!entPos)
+	{
+		return false;
+	}
+
+	v1 = (entPos - this.Bot.GetPosition()).Normalize();
+	return v1.DotProduct(this.AimVector) < 0.65;
+};
+
+this.Events[EVENT.FEEL_PAIN] = function(ent)
+{
+	// ignore non-player ents
+	if (this.FeelPainLocked || !this.OnGoal || !ent || GetGameIdFromEntity(ent) > 63)
+	{
+		return;
+	}
+
+	if (!this.Bot.IsAllied(ent) && this.IsOutOfRange(ent))
+	{
+		this.Bot.HoldButton(BTN.JUMP, 2);
+		this.BlackboardDelay(7);
+		this.Finished();
+	}
+
+	// throttle it since this event can be fired in rapid succession
+	// we'll lose some precision, but this isn't critical functionality
+	this.FeelPainLocked = true;
+	sleep(1);
+	this.FeelPainLocked = false;
+};
+
+this.Exit = function()
+{
+	if (this.CombatMovementDisabled) {
+		this.Bot.DisableCombatMovement = false;
+		this.CombatMovementDisabled = false;
+	}
+	this.Bot.ReleaseButton(BTN.PRONE);
+	this.ReleaseWeaponRequest();
+
+	this.FeelPainLocked = false;
+	this.OnGoal = false;
+};

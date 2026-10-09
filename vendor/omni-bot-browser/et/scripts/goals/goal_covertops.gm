@@ -1,0 +1,224 @@
+// This script contains functionality to allow covertops to steal uniforms or use the binoculars to spot mines
+this.Name = "CovertOps";
+this.Parent = "HighLevel";
+this.AlwaysRecieveEvents = true;
+this.SkipGetPriorityWhenActive = true;
+this.Debug = 0;
+this.LimitToClass(CLASS.COVERTOPS);
+
+this.TargetOffsets =
+{
+	Vec3(24,24,0),
+	Vec3(-24,-24,0),
+	Vec3(24,-24,0),
+	Vec3(-24,24,0),
+};
+
+this.GetPriority = function()
+{
+	if (Map.SnipeMap) {
+		this.AlwaysRecieveEvents = false;
+		block(0);
+	}
+	if (this.HasBinoculars)
+	{
+		this.ReleaseAimRequest();
+		this.ReleaseWeaponRequest();
+		this.HasBinoculars = false;
+	}
+
+	for(;;)
+	{
+		sleep(4);
+		if (this.Bot.HasAnyEntityFlag(ENTFLAG.MOUNTED, ENTFLAG.CARRYINGGOAL, ENTFLAG.INWATER, ENTFLAG.DISGUISED)
+			|| this.Bot.HasTarget()){ continue; }
+
+		if (!RandInt(0,5) && !this.Bot.GetVelocity().IsZero())
+		{
+			if (this.Debug) { this.Bot.Say("using binoculars"); }
+			this.HasBinoculars = true;
+			this.AddWeaponRequest(Priority.Medium, WEAPON.BINOCULARS);
+			this.AddAimRequest(Priority.Low, "facing", this.Bot.GetVelocity()); //don't look around
+			sleep(0.5);
+			if (this.Bot.GetCurrentWeapon() == WEAPON.BINOCULARS)
+			{
+				this.Bot.HoldButton(BTN.ATTACK1, 3);
+				for (t=0; t < 3 && !this.Bot.HasTarget(); ++t) {
+					sleep(1);
+				}
+			}
+			this.ReleaseAimRequest();
+			this.ReleaseWeaponRequest();
+			this.HasBinoculars = false;
+		}
+		else if (this.Bot.GetAllEnemy(CAT.PLAYER, 0, Util.QueryTable))
+		{
+			foreach (ent in Util.QueryTable) {
+				if (Util.GetEntHealth(ent) <= 0 && this.Bot.DistanceTo(ent) < 900) {
+					if (this.Debug) { this.Bot.Say("found corpse"); }
+					this.FoundBody(ent);
+					break;
+				}
+			}
+		}
+	}
+};
+
+this.Enter = function()
+{
+	this.AddFinishCriteria(this.TargetEntity,"deleted");
+};
+
+this.Update = function()
+{
+	Bot = this.Bot;
+	if (this.Debug) { Bot.Say("going to gib"); }
+	ent = this.TargetEntity;
+	prevPos = null;
+
+	for(;;)
+	{
+		//get target position only if player has not yet respawned.
+		//body is not DEAD but PRONE if cvar omnibot_flags is 16
+		if (GetEntFlags(ent, ENTFLAG.DEAD, ENTFLAG.LIMBO, ENTFLAG.PRONE)) {
+			position = GetEntPosition(ent);
+		}
+		if (!position) {
+			this.Finished();
+		}
+		if (prevPos && DistanceBetween(prevPos, position) < 50) {
+			break;
+		}
+		prevPos = position;
+
+		offsets = tableDuplicate(this.TargetOffsets);
+		foreach (id and offset in this.TargetOffsets) {
+			offsets[id] += position;
+		}
+		if (this.Goto(offsets, 64) != EVENT.PATH_SUCCESS
+			//Finish if there are enemies (except the dead body if cvar omnibot_flags is 16)
+			|| Bot.HasTarget() && (Bot.GetTarget() != ent || Util.GetEntHealth(ent) > 0)) {
+			this.Finished();
+		}
+	}
+
+	if (!GetEntFlags(ent, ENTFLAG.LIMBO) && Util.GetEntHealth(ent) <= 0)
+	{
+		if (this.Debug) { Bot.Say("gibbing"); }
+
+		// crouch time must be lower than gib timeout because body sometimes can't be gibbed if covertops is crouched
+		Bot.HoldButton(BTN.CROUCH, 2);
+
+		this.AddAimRequest(Priority.High, "position", position + Vec3(0,0,-12));
+		this.AddWeaponRequest(WEAPON.KNIFE);
+		// cs: weapon request for knife appears to be failing in some cases
+		sleep(0.25);
+
+		Bot.MoveTowards(position + Vec3(12,12,0));
+
+		for (t = 0; !GetEntFlags(ent, ENTFLAG.LIMBO); ++t) {
+			if (t > 70) { //timeout
+				if (this.Debug) { Bot.Say("failed to gib"); }
+				this.Finished();
+			}
+			Bot.PressButton(BTN.ATTACK1);
+			yield();
+		}
+
+		this.ReleaseWeaponRequest();
+	}
+	yield();
+
+	if (!Bot.HasTarget())
+	{
+		ent = ETUtil.FindUsableCorpse(Bot, 100);
+		if (ent) {
+			position = GetEntPosition(ent);
+		} else if (GetModName() != "nitmod") { //FindUsableCorpse doesn't work in N!tmod
+			if (this.Debug) { Bot.Say("there is no corpse"); }
+			this.Finished();
+		}
+		if (this.Debug) { Bot.Say("stealing uniform"); }
+		Bot.HoldButton(BTN.CROUCH, BTN.USE, 99);
+		this.AddAimRequest(Priority.High, "position", position + Vec3(0,0,-12));
+		Bot.MoveTowards(position + Vec3(24,24,0));
+
+		for (t = 0; !Bot.HasEntityFlag(ENTFLAG.DISGUISED); ++t) {
+			if (t > 120) { //timeout
+				if (this.Debug) { Bot.Say("failed to steal uniform"); }
+				this.Finished();
+			}
+			yield();
+		}
+		if (this.Debug) { Bot.Say("in disguise"); }
+	}
+
+	this.Finished();
+};
+
+
+this.Exit = function()
+{
+	this.Bot.ReleaseButton(BTN.CROUCH, BTN.USE);
+};
+
+this.Events[EVENT.KILLEDSOMEONE] = function(victim)
+{
+	if (this.Bot && !this.Bot.HasAnyEntityFlag(ENTFLAG.MOUNTED, ENTFLAG.CARRYINGGOAL, ENTFLAG.DISGUISED)
+		&& this.Bot.GetTeam() != GetEntTeam(victim)) {
+		this.FoundBody(victim);
+	}
+};
+
+this.FoundBody = function(ent)
+{
+	prevPos = GetEntPosition(ent);
+	if (prevPos && this.Bot.DistanceTo(prevPos) < 1000)
+	{
+		// wait till it settles before go to target
+		// Can't wait for zero velocity, because the velocity of dead body is not zero vector !
+		for (timeout = 0; timeout < 25; ++timeout)
+		{
+			sleep(0.2);
+			pos = GetEntPosition(ent);
+			if (!pos || !this.Bot){ return; }
+			if (pos == prevPos)
+			{
+				if (this.Debug) {
+					this.Bot.Say("waited ", timeout * 0.2, " seconds for target to settle");
+				}
+				if (GetModName() == "nitmod" && (GetCvar("g_headshot") & 2))
+				{
+					sleep(0.65 - timeout*0.2);
+					if(GetEntFlags(ent, ENTFLAG.LIMBO) || !this.Bot){
+						//exploding headshot in N!tmod
+						return;
+					}
+				}
+				if (!this.IsActive())
+				{
+					this.TargetEntity = ent;
+					this.Priority = 1;
+				}
+				return;
+			}
+			prevPos = pos;
+		}
+		if (this.Debug) {
+			this.Bot.Say("cannot gib, target velocity ", GetEntVelocity(ent));
+		}
+	}
+};
+
+this.Events[EVENT.FEEL_PAIN] = function()
+{
+	if (this.Bot && this.IsActive()) {
+		this.Finished();
+	}
+	if (this.HasBinoculars) {
+		this.ReleaseAimRequest();
+		this.ReleaseWeaponRequest();
+		this.Bot.ReleaseButton(BTN.ATTACK1);
+		this.HasBinoculars = false;
+	}
+};

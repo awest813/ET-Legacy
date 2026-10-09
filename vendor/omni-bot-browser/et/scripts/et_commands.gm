@@ -1,0 +1,284 @@
+///////////////////////////////////////////////////////////////////////////////
+
+Commands["aim_debug_reload"] =
+{
+	Func = function( _params )
+	{
+		foreach ( bot in BotTable )
+			{ bot.ReloadProfile(); }
+	},
+
+	Help =
+	{
+		"Aim Debug Reload, reloads each bots profile",
+		"Usage: /bot aim_debug_reload",
+	},
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+Commands["cvp"] =
+{
+	Func = function( _params )
+	{
+		ETUtil.CheckVehiclePath( _params );
+	},
+
+	Help =
+	{
+		"Check Vehicle Path, test bots ability to repair the vehicle along its entire path",
+		"Usage: /bot cvp <goalname> <optional seconds>",
+		"       goalname should be set to the BUILD goal of the vehicle",
+		"       seconds can be optionally set to adjust the interval between the vehicle being damaged",
+		"       run the command again to turn it off",
+	},
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+Commands["bvp"] =
+{
+	Func = function( _params )
+	{
+		ETUtil.BuildVehiclePath( _params );
+	},
+
+	Help =
+	{
+		"Build Vehicle Path, damages a vehicle to assist the waypointer in creating the vehicle path",
+		"Usage: /bot bvp <goalname> <optional seconds>",
+		"       goalname should be set to the MOVER or BUILD goal of the vehicle",
+		"       seconds can be optionally set to adjust the interval between the vehicle being damaged",
+		"       run the command again to turn it off",
+	},
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+Commands["tracearty"] =
+{
+	Func = function( _params )
+	{
+		if ( _params[0] == "all" )
+		{
+			ETUtil.TraceAllArty();
+		}
+		else
+		{
+			ETUtil.TraceArty(_params[ 0 ]);
+		}
+	},
+
+	Help =
+	{
+		"Runs a trace to find arty targets from closest arty goal",
+	},
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+Commands["plantstart"] =
+{
+	Func = function()
+	{
+		if ( !Util.CheatsEnabled() ) {
+			return;
+		}
+
+		positions = {};
+		// get a table of the plant goals in the map,
+		// store waypoint positions so that we don't have to noclip out of the goal
+		foreach( goal in Util.GoalTable("PLANT_.*") ) {
+			pos = Vec3();
+			way = Wp.GetClosestWaypoint(goal.GetPosition());
+			if(way){ pos = way.position; }
+			positions[ goal.GetName() ] = pos;
+		}
+
+		// render the plant goals
+		ExecCommand("draw_goals on PLANT_.*");
+
+		// loop through and warp to the waypoints near plant goals
+		ind = 0;
+		total = tableCount(positions);
+		foreach ( id and waypos in positions ) {
+			++ind;
+			EchoToScreen(10, "^1at plant goal "+ ind + " of " + total + "\n^2" + id);
+			s = "setviewpos " + waypos.x + " " + waypos.y + " " + waypos.z + " " + " 0";
+			ExecCommandOnClient(GetLocalEntity(), s);
+			if (block("nextplant", "stopplant") == "stopplant") { break; }
+		}
+
+		if ( ind == 0 ) {
+			print("no plant goals in this map");
+		}
+		else {
+			print("finished iterating through plant goals");
+		}
+	},
+
+	Help =
+	{
+		"start iterating through the plant goals in the map. helper for adding cover spots",
+	},
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+Commands["plantnext"] =
+{
+	Func = function( _params )
+	{
+		if (_params[0] && _params[0] == "stop") {
+			signal("stopplant");
+		}
+		else {
+			signal("nextplant");
+		}
+	},
+
+	Help =
+	{
+		"sends a signal to advance to the next plant goal position. waypoint tool for adding cover spots",
+	},
+};
+
+///////////////////////////////////////////////////////////////////////////////
+// guess i coulda made one command that took a query string. oh well, sue me
+Commands["campstart"] =
+{
+	Func = function( _params )
+	{
+		if ( !Util.CheatsEnabled() ) {
+			return;
+		}
+
+		// get a table of the camp type goals in the map
+		foreach ( goal in Util.GoalTable({ 0xa9ef3654 /* CAMP */, 0x4fed19c1 /* DEFEND */, 0x4595b8fd /* ATTACK */, 0xe8fbadc0 /* SNIPE */ }) )
+		{
+			goalPos = goal.GetPosition();
+			goalName = goal.GetName();
+			ExecCommand("draw_goals on " + goalName);
+			if ( goal.AimVectors ) {
+				EchoToScreen(3, "^3" + goalName + " has " + tableCount(goal.AimVectors) + " facings");
+			}
+			else {
+				EchoToScreen(3, "^1" + goalName + " has no facings!");
+			}
+			z = goalPos.z + 24; // up a bit to avoid clip
+			s = "setviewpos " + goalPos.x + " " + goalPos.y + " " + z + " " + " 0";
+			ExecCommandOnClient(GetLocalEntity(), s);
+			yield();yield();
+			ExecCommand("goal_edit");
+			if (block("nextcamp", "stopcamp") == "stopcamp") { break; }
+			ExecCommand("goal_finish");
+			ExecCommand("draw_goals off " + goalName);
+		}
+
+		print("finished iterating through camp goals");
+	},
+
+	Help =
+	{
+		"start iterating through the camp goals in the map. helper for adding facings",
+		"note: when warped, it will automatically select the goal",
+		"binding a key to /bot goal_setproperty facing 99 will make things fast!",
+	},
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+Commands["campnext"] =
+{
+	Func = function( _params )
+	{
+		if (_params[0] && _params[0] == "stop") {
+			signal("stopcamp");
+		}
+		else {
+			signal("nextcamp");
+		}
+	},
+
+	Help =
+	{
+		"sends a signal to advance to the next camp goal position. waypoint tool for adding camp facings",
+	},
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+Commands["difficulty"] =
+{
+	Func = function( _params )
+	{
+		if(tableCount(_params))
+		{
+			ConfigSet("Difficulty","CurrentDifficulty", Clamp( ToInt(_params[0], 4), -1, 6 ) );
+		}
+
+		print("Difficulty:", ConfigGet("Difficulty","CurrentDifficulty", 4));
+	},
+
+	Help =
+	{
+		"Sets the bots difficulty (-1...6), -1 is random, default 4",
+	},
+};
+
+////////////////////////////////////////////////////////////////////
+
+Commands["resetxp"] =
+{
+	Func = function( _params )
+	{
+		resetXP = ToInt(_params[0], 1);
+		ConfigSet("XP","Reset", resetXP);
+		if(resetXP > 0){
+			print("reset xp enabled");
+		}else{
+			print("reset xp disabled");
+		}
+	},
+
+	Help =
+	{
+		"enables bots resetting xp. use -1 to disable",
+	},
+};
+
+Commands["maxxp"] =
+{
+	Func = function( _params )
+	{
+		if(tableCount(_params))
+		{
+			ConfigSet("XP","Max", ToInt(_params[0], 10000));
+		}
+		print("max xp:", ConfigGet("XP","Max", 10000));
+	},
+
+	Help =
+	{
+		"max xp before bots should reset",
+	},
+};
+
+////////////////////////////////////////////////////////////////////////
+
+Commands["ft_controls"] =
+{
+	Func = function(_params)
+	{
+		if(tableCount(_params))
+		{
+			ConfigSet("FireTeam","enabled", ToBool(_params[0]));
+		}
+		print("fireteam controls set to",  ConfigGet("FireTeam","enabled", 0));
+	},
+
+	Help =
+	{
+		"Fireteam Controls, enable or disable",
+	}
+};

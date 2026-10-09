@@ -1,0 +1,3 @@
+this.SetBaseGoalType("mapgoal_ammocabinet.gm");
+this.GoalType = "HEALTHCAB";
+this.DefaultPriority = 0.75;

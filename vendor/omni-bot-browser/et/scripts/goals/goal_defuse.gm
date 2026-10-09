@@ -1,0 +1,101 @@
+// This script contains functionality to allow engineers to defuse dynamites
+this.Name = "DEFUSE";
+this.Parent = "HighLevel";
+this.SkipGetPriorityWhenActive = false; // cs: let them abort for higher priority defuses
+
+this.LimitToWeapon(WEAPON.PLIERS);
+
+this.GetPriority = function()
+{
+	// cs: GetPriority seems to be called the same frame as this.Finished(). need to wait a frame
+	//     so all the vars can be cleaned up. this.MapGoal is not null for example if goal is
+	//     aborted for a higher priority one; which causes evaluation for the new goal to happen twice
+	yield();
+
+	for(;;)
+	{
+		if (this.QueryGoals(Util.QueryTable, 0x1899efc7 /* DEFUSE */))
+		{
+			// always go for the closest one of the highest priority
+			dist = null;
+			closestGoal = null;
+			priority = 0;
+
+			foreach (goal in Util.QueryTable)
+			{
+				evalDist = this.Bot.DistanceTo(goal.GetEntity());
+				evalPriority = goal.GetGoalPriority(this.Bot);
+
+				if (!dist || (evalDist < dist && evalPriority >= priority)) {
+					dist = evalDist;
+					closestGoal = goal;
+					priority = evalPriority;
+				}
+			}
+
+			if (closestGoal && closestGoal != this.MapGoal) {
+				// cs: goals of the same type are not natively being aborted even for higher priority goals
+				//     but i think that they should be.
+				if (this.IsActive()) {
+					dyno = this.MapGoal.GetEntity();
+					// don't abort current goal if new dynamite is near previous dynamite
+					if (!EntityIsValid(dyno) || Abs(this.Bot.DistanceTo(dyno) - dist) > 400) {
+						this.Finished();
+					}
+				} else {
+					this.MapGoal = closestGoal;
+					this.Priority = priority;
+				}
+			}
+		}
+
+		sleep(2);
+	}
+};
+
+this.Enter = this.MarkInProgress;
+
+this.Update = function()
+{
+	entity = this.MapGoal.GetEntity();
+	Util.RouteTo(this, 64);
+
+	pos = GetEntPosition(entity);
+	this.AddAimRequest(Priority.High, "position", pos);
+	this.AddWeaponRequest(WEAPON.PLIERS);
+	this.BlockForWeaponChange(WEAPON.PLIERS);
+
+	prone = false;
+	if (this.Bot.GetEyePosition().z - pos.z > 48) {
+		if (this.MapGoal.Stance == "prone"){
+			prone = true;
+			this.Bot.HoldButton(BTN.PRONE, 99);
+		}else{
+			this.Bot.HoldButton(BTN.CROUCH, 99);
+		}
+	}
+
+	for(;;)
+	{
+		pos = GetEntPosition(entity);
+		if (!pos) { break; } // goal deleted with entity
+		z = 12;
+		if (prone){ z = 0; }
+		this.AddAimRequest(Priority.High, "position", pos + Vec3(0,0,z));
+
+		if (this.Bot.DistanceTo(pos) > 64 && !prone) {
+			this.Bot.MoveTowards(pos);
+		}
+
+		this.Bot.HoldButton(BTN.ATTACK1, 0.25);
+		yield();
+	}
+
+	this.Finished();
+};
+
+this.Exit = function()
+{
+	this.Bot.ReleaseButton(BTN.CROUCH, BTN.PRONE);
+	this.MapGoal = null;
+};

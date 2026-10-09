@@ -1,0 +1,107 @@
+// This script contains functionality to allow engineers to use land-mines
+this.Name = "PLANTMINE";
+this.Parent = "HighLevel";
+this.SkipGetPriorityWhenActive = true;
+this.LimitToWeapon(WEAPON.LANDMINE);
+
+this.Initialize = function()
+{
+	// check number of team landmines so we can finish if too many landmines are placed
+	this.LimitTo(this.CheckNumMines, 2);
+};
+
+this.CheckNumMines = function()
+{
+	return this.Bot.TeamLandminesAvailable() > 0;
+};
+
+this.GetPriority = function()
+{
+	Util.GetPriority(this,0xf2dffa59 /* PLANTMINE */, WEAPON.LANDMINE);
+};
+
+this.Enter = this.MarkInProgress;
+
+this.Exit = function()
+{
+	this.Bot.DoNotKill = null;
+};
+
+this.PositionToBot = function(pos, distance)
+{
+	v = this.Bot.GetPosition() - pos;
+	return Vec3(v.x, v.y, 0).Normalize() * distance + pos;
+};
+
+this.Update = function()
+{
+	Util.RouteTo(this);
+
+	if(this.Bot.HasTarget())
+	{
+		this.BlackboardDelay(7);
+		this.Finished();
+	}
+
+	//wait for charge
+	while (!this.Bot.IsWeaponCharged(WEAPON.LANDMINE)){ sleep(0.2); }
+
+	//abort goal if there is somebody or some corpse
+	goalPos = this.MapGoal.GetPosition();
+	tr = TraceLine(this.Bot.GetEyePosition(), goalPos, null, TRACE.SHOT, this.Bot.GetGameEntity(), false);
+	if (tr.entity) {
+		c = GetEntClass(tr.entity);
+		if (c && (c==CLASS.CORPSE || c < CLASS.ANYPLAYER)) {
+			this.BlackboardDelay(10);
+			this.Finished();
+		}
+	}
+
+	this.ExplosiveEntity = null;
+	this.Bot.DoNotKill = true;
+
+	//move to the position
+	this.Bot.MoveTowards(this.PositionToBot(goalPos, 40));
+	this.AddAimRequest(Priority.High, "position");
+	this.AimVector = goalPos;
+
+	//switch to landmine
+	this.AddWeaponRequest(WEAPON.LANDMINE);
+	block(EVENT.AIM_SUCCESS);
+	this.BlockForWeaponChange(WEAPON.LANDMINE);
+
+	//throw landmine
+	dowhile(!this.ExplosiveEntity)
+	{
+		this.Bot.PressButton(BTN.ATTACK1);
+		sleep(0.2);
+	}
+
+	//arm the landmine
+	this.AddWeaponRequest(WEAPON.PLIERS);
+	this.BlockForWeaponChange(WEAPON.PLIERS);
+
+	while (this.Bot.GetExplosiveState(this.ExplosiveEntity) == 1)
+	{
+		minePosition = GetEntPosition(this.ExplosiveEntity);
+		this.AddAimRequest(Priority.Medium, "position", minePosition);
+		this.Bot.MoveTowards(this.PositionToBot(minePosition, 32));
+		this.Bot.PressButton(BTN.CROUCH, BTN.ATTACK1);
+		yield();
+	}
+
+	if (!EntityIsValid(this.ExplosiveEntity)) {
+		this.BlackboardDelay(15);
+		Util.ScriptDebugPrint(this.MapGoal.GetName(), "timedout");
+	}
+
+	this.Finished();
+};
+
+this.Events[EVENT.WEAPON_FIRE] = function(weapon, entity)
+{
+	if (weapon == WEAPON.LANDMINE)
+	{
+		this.ExplosiveEntity = entity;
+	}
+};

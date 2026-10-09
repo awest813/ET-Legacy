@@ -1,0 +1,304 @@
+//==========================================================================================
+//
+//  tallard_castle_beta4.gm
+//
+// Who   	When		What
+//------------------------------------------------------------------------------------------
+// palota	13 August 2025	Initial Script
+//
+//==========================================================================================
+//
+
+global Map =
+{
+	SaveCampTime=0,
+	entrance = 0,
+	wall = 1,
+	ladder = 0,
+	
+	cp_Allies_Captured = function()
+	{
+		Map.CastleAccess();
+		SetAvailableMapGoals(TEAM.AXIS, false, {
+			"DEFEND_place.*",
+			"MOUNTMG42_mg42_house",
+		});
+		SetAvailableMapGoals(TEAM.AXIS, true, {
+			"DEFEND_relic.*",
+			"SNIPE_relic.*",
+		});
+		Util.SetGoalRange("CHECKPOINT.*", 0);
+		Util.SetMaxUsersInProgress(3, "CHECKPOINT.*");
+		
+		Util.MapDebugPrint("cp_Allies_Captured");
+	},
+
+	cp_Axis_Captured = function()
+	{
+		SetAvailableMapGoals(TEAM.AXIS, true, {
+			"DEFEND_place.*",
+			"MOUNTMG42_mg42_house",
+		});
+		Util.SetGoalRange("CHECKPOINT.*", 2000);
+		Util.SetMaxUsersInProgress(9, "CHECKPOINT.*");
+
+		Util.MapDebugPrint("cp_Axis_Captured");
+	},
+
+
+	moats_bridge_Built = function()
+	{
+		Util.MapDebugPrint("moats_bridge_Built");
+	},
+
+	moats_bridge_Destroyed = function()
+	{
+		Util.MapDebugPrint("moats_bridge_Destroyed");
+	},
+
+	CastleAccess = function()
+	{
+		SetAvailableMapGoals(TEAM.ALLIES, Map.entrance || Map.wall || Map.ladder, {
+			"ATTACK_relic.*",
+			"ATTACK_armor.*",
+			"PLANT_Relic_Armour",
+			"PLANT_relic_protection",
+		});
+	},
+
+	assault_ladder_Built = function()
+	{
+		Wp.CheckBlockable();
+		Map.ladder=1;
+		Map.CastleAccess();
+		Util.MapDebugPrint("assault_ladder_Built");
+	},
+
+	assault_ladder_Destroyed = function()
+	{
+		Map.ladder=0;
+		Map.CastleAccess();
+		Util.MapDebugPrint("assault_ladder_Destroyed");
+	},
+
+	wood_wall_Built = function()
+	{
+		Map.wall=0;
+		Map.CastleAccess();
+		Util.MapDebugPrint("wood_wall_Built");
+	},
+
+	wood_wall_Destroyed = function()
+	{
+		Wp.CheckBlockable();
+		Map.wall=1;
+		Map.CastleAccess();
+		Util.MapDebugPrint("wood_wall_Destroyed");
+	},
+
+	_the_castle_main_entrance_Destroyed = function()
+	{
+		sleep(0.1);
+		Wp.CheckBlockable();
+		Map.entrance=1;
+		Map.CastleAccess();
+		SetAvailableMapGoals(TEAM.ALLIES, false, "ATTACK_entrance.*");
+		Util.SetGoalRange("FLAG.*", AABB());
+		Util.MapDebugPrint("_the_castle_main_entrance_Destroyed");
+	},
+
+
+	relic_protection_Built = function()
+	{
+		SetAvailableMapGoals(TEAM.ALLIES, false, "FLAG_relic_1");
+		Util.MapDebugPrint("relic_protection_Built");
+	},
+
+	relic_protection_Destroyed = function()
+	{
+		SetAvailableMapGoals(TEAM.ALLIES, true, "FLAG_relic_1");
+		Util.MapDebugPrint("relic_protection_Destroyed");
+	},
+
+	Relic_Armour_Destroyed = function()
+	{
+		SetAvailableMapGoals(TEAM.ALLIES, true, "FLAG_relic");
+		SetGoalPriority("ATTACK_armor.*", 0);
+		Util.MapDebugPrint("Relic_Armour_Destroyed");
+	},
+
+	relic_Taken = function()
+	{
+		Util.MapDebugPrint("relic_Taken");
+	},
+
+	relic_1_Taken = function()
+	{
+		Util.MapDebugPrint("relic_1_Taken");
+	},
+
+	relic_Returned = function()
+	{
+		Util.MapDebugPrint("relic_Returned");
+	},
+
+	relic_1_Returned = function()
+	{
+		Util.MapDebugPrint("relic_1_Returned");
+	},
+
+	relic_Secured = function()
+	{
+		Util.MapDebugPrint("relic_Secured");
+	},
+
+	relic_1_Secured = function()
+	{
+		Util.MapDebugPrint("relic_1_Secured");
+	},
+
+};
+
+global OnMapLoad = function()
+{
+	OnTrigger("The moat's bridge has been constructed.", Map.moats_bridge_Built);
+	OnTrigger("The moat's bridge has been destroyed.", Map.moats_bridge_Destroyed);
+	OnTrigger("The assault ladder has been constructed.", Map.assault_ladder_Built);
+	OnTrigger("The assault ladder has been destroyed.", Map.assault_ladder_Destroyed);
+	OnTrigger("The wood wall has been constructed !", Map.wood_wall_Built);
+	OnTrigger("The wood wall has been destroyed.", Map.wood_wall_Destroyed);
+	OnTrigger("The Tallard Castle's main entrance has been blown !", Map._the_castle_main_entrance_Destroyed);
+	OnTrigger("The relic's armour has been blown !", Map.Relic_Armour_Destroyed);
+	OnTrigger("The relic protection has been constructed !", Map.relic_protection_Built);
+	OnTrigger("The relic protection has been destroyed, rebuild it !", Map.relic_protection_Destroyed);
+	OnTrigger("The first relic has been stolen !", Map.relic_Taken);
+	OnTrigger("The second relic has been stolen !", Map.relic_1_Taken);
+	OnTrigger("Flag returned ", Map.relic_Returned);
+	OnTrigger("Flag returned ", Map.relic_1_Returned);
+	OnTrigger("Allied team has secured the first relic !", Map.relic_Secured);
+	OnTrigger("Allied team has secured the second relic !", Map.relic_1_Secured);
+	OnTrigger("Axis capture the place !", Map.cp_Axis_Captured);
+	OnTrigger("Allies capture the place !", Map.cp_Allies_Captured);
+
+	OnTriggerRegion(AABB(-2383.622,538.345,3509.097,3341.109,792.988,4394.639), RegionTrigger.DisableCombatMovement); //hill
+	OnTriggerRegion(AABB(2023.126,867.636,4425.125,2767.609,3022.665,4672.699), RegionTrigger.DisableCombatMovement); //moat bridge
+	OnTriggerRegion(AABB(709.114,1063.125,4456.359,1296.875,1731.062,4785.927), RegionTrigger.DisableCombatMovement); //wood in castle
+		
+	Util.DisableGoal(".*", true);
+	Util.EnableGoal({
+		"AMMOCAB.*",
+		"HEALTHCAB.*",
+		"CHECKPOINT_cp",
+	});
+	SetAvailableMapGoals(TEAM.AXIS, true, {
+		"DEFEND_place.*",
+		"BUILD_relic_protection",
+		"BUILD_wood_wall",
+		"PLANT_assault_ladder",
+		"PLANT_moats_bridge",
+		"MOUNTMG42_mg42_house",
+		"REPAIRMG42_mg42_house",
+	});
+	SetAvailableMapGoals(TEAM.ALLIES, true, {
+		"ATTACK_entrance.*",
+		"BUILD_assault_ladder",
+		"BUILD_moats_bridge",
+		"PLANT_wood_wall",
+		"PLANT__the_castle_main_entrance",
+		"FLAG_relic_1",
+		"CAPPOINT_truck",
+	});
+
+	SetGoalPriority("CHECKPOINT.*", 0.85, TEAM.ALLIES);
+	SetGoalPriority("BUILD.*", 0.81, TEAM.ALLIES);
+	SetGoalPriority("ATTACK_entrance.*", 0.4);
+	
+	Util.SetGoalRange("FLAG.*", AABB(-1175,1063,4059,2000,2940,5158)); //inside castle
+	
+	//Util.SetMaxUsers(1, "MOUNTMG42.*");
+
+	//SetMapGoalProperties("MOUNTMG42.*", {MinCampTime=15, MaxCampTime=90});
+
+
+	Util.MapDebugPrint("Omni-bot map script for " + GetMapName() + " executed.");
+};
+
+global OnBotJoin = function(bot)
+{
+	bot.TargetBreakableDist = 90;
+};
+
+global InitializeRoutes = function()
+{
+	MapRoutes =
+	{
+		CHECKPOINT_cp =
+		{
+			ROUTE_allied_first_spawn =
+			{
+				ROUTE_3routes =
+				{
+					ROUTE_separation_rapide_flag =
+					{
+					},
+					ROUTE_fuckroute =
+					{
+						ROUTE_fuckroute_rapide =
+						{
+							ROUTE_rapide_flag =
+							{
+							},
+						},
+					},
+					ROUTE_route_mg =
+					{
+					},
+				},
+			}
+		},
+		FLAG_relic =
+		{
+			ROUTE_allied_first_spawn =
+			{
+				ROUTE_3routes =
+				{
+					ROUTE_separation_rapide_flag =
+					{
+						ROUTE_fuckroute_rapide =
+						{
+							ROUTE_rapide_bas =
+							{
+								ROUTE_rapide_haut =
+								{
+									ROUTE_haut_colline={},
+									ROUTE_monte_chemin =
+									{
+										ROUTE_plaine={},
+									},
+								},
+							},
+						},
+					},
+					ROUTE_fuckroute =
+					{
+						ROUTE_fuckroute_rapide=
+						{
+							ROUTE_rapide_bas=
+							{
+								ROUTE_rapide_haut =
+								{
+									ROUTE_haut_colline={},
+									ROUTE_monte_chemin =
+									{
+										ROUTE_plaine={},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+		},
+	};
+	Util.Routes(MapRoutes);
+};

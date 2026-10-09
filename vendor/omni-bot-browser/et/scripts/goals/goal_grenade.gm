@@ -1,0 +1,154 @@
+// This script contains functionality to allow bots to toss grenades from given position
+this.Name = "GRENADE";
+this.Parent = "HighLevel";
+this.SkipGetPriorityWhenActive = true;
+
+this.Enter = this.MarkInProgress;
+
+this.Exit = function()
+{
+	if (this.MapGoal.Stance == "crouch")
+	{
+		this.Bot.ReleaseButton(BTN.CROUCH);
+	}
+};
+
+this.GetPriority = function()
+{
+	for(;;)
+	{
+		this.Priority = 0;
+		if (Util.HasAmmoForWeapon(this.Bot, WEAPON.ALLY_GRENADE) || Util.HasAmmoForWeapon(this.Bot, WEAPON.AXIS_GRENADE))
+		{
+			if (this.QueryGoals(Util.QueryTable,0xd988d8fd /* GRENADE */))
+			{
+				foreach (goal in Util.QueryTable)
+				{
+					if (goal.HasEntity)
+					{
+						ent = goal.TraceEntity;
+						if (!ent && goal.TargetGoal)
+						{
+							g = GetGoal(goal.TargetGoal);
+							if (g) {
+								ent = g.GetEntity();
+							}
+						}
+						if (!EntityIsValid(ent) || !goal.IgnoreDead && GetEntFlags(ent, ENTFLAG.DEAD))
+						{
+							continue;
+						}
+					}
+
+					this.MapGoal = goal;
+					this.Priority = goal.GetGoalPriority(this.Bot);
+					break;
+				}
+			}
+		}
+
+		sleep(2);
+	}
+};
+
+this.Update = function()
+{
+	goal = this.MapGoal;
+	if (goal.HasEntity)
+	{
+		entity = goal.TraceEntity;
+		if (!entity)
+		{
+			g = GetGoal(goal.TargetGoal);
+			if (g)
+			{
+				entity = g.GetEntity();
+			}
+			if (!entity)
+			{
+				this.Finished();
+			}
+		}
+		if (goal.IgnoreDead) {
+			this.AddFinishCriteria(entity, "deleted");
+		}
+		else {
+			this.AddFinishCriteria(entity, "hasentflag", ENTFLAG.DEAD);
+		}
+	}
+	this.AutoFinishOnUnAvailable = true;
+
+	Util.RouteTo(this);
+
+	if (this.Bot.GetTeam() == TEAM.ALLIES)
+	{
+		weapon = WEAPON.ALLY_GRENADE;
+	}
+	else
+	{
+		weapon = WEAPON.AXIS_GRENADE;
+	}
+	if (!Util.HasAmmoForWeapon(this.Bot, weapon))
+	{
+		this.Finished();
+	}
+
+	if (goal.Stance == "crouch")
+	{
+		this.Bot.HoldButton(BTN.CROUCH, 999);
+	}
+	this.AddAimRequest(Priority.High, "facing", goal.Facing);
+	this.AddWeaponRequest(weapon);
+	this.BlockForWeaponChange(weapon);
+	sleep(0.35); //NoQuarter needs longer sleep than other mods
+	this.Priority = 2.0; // don't let other goals interrupt it
+
+	if (MAP_TALK && this.Bot.GetNearestAlly(CAT.PLAYER) && RandInt(0,5) < 2)
+	{
+		this.Bot.SayVoice(VOICE.FIRE_IN_THE_HOLE);
+	}
+
+	for (count = 1; ; ++count)
+	{
+		this.ClearFinishCriteria();
+		this.AutoFinishOnUnAvailable = false;
+
+		prime = goal.PrimeGrenade;
+		if (prime > 1)
+		{
+			if (prime > 3) { prime = 3; }
+			this.Bot.HoldButton(BTN.ATTACK1, prime);
+			sleep(prime);
+		}
+		else
+		{
+			this.Bot.PressButton(BTN.ATTACK1);
+		}
+		sleep(0.4);
+
+		if (goal.Count && count >= goal.Count)
+		{
+			this.BlackboardDelay(30);
+			break;
+		}
+		if (!Util.HasAmmoForWeapon(this.Bot, weapon))
+		{
+			break;
+		}
+
+		if (entity)
+		{
+			if (goal.IgnoreDead) {
+				this.AddFinishCriteria(entity, "deleted");
+			}
+			else {
+				this.AddFinishCriteria(entity, "hasentflag", ENTFLAG.DEAD);
+			}
+		}
+		this.AutoFinishOnUnAvailable = true;
+
+		sleep(1.5);
+	}
+
+	this.Finished();
+};

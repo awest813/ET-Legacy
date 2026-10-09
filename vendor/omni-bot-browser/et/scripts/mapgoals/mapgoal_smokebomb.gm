@@ -1,0 +1,2 @@
+this.SetBaseGoalType("mapgoal_airstrike.gm");
+this.GoalType = "SMOKEBOMB";

@@ -1,0 +1,19 @@
+this.SetBaseGoalType("mapgoal_camp.gm");
+this.GoalType = "Snipe";
+this.MaxUsers_InProgress(1);
+
+//////////////////////////////////////////////////////////////////////////
+this.BaseUpgradeVersion = this.UpgradeVersion;
+this.UpgradeVersion = function(Props)
+{
+	// old maps had all snipe goals limited to FG42,K43,GARAND and it did not work in ETNam or ETBlight mods,
+	// that's why we ignore Weapons property unless it has less than 3 weapons
+	if ((!Props.Weapons || tableCount(Props.Weapons)==0 || tableCount(Props.Weapons) > 2) && Util.IndexedSniperWeapons)
+	{
+		// fill in all the known sniper weapons by default
+		Props.Weapons = tableDuplicate(Util.IndexedSniperWeapons);
+	}
+
+	// call base goal upgrade. cs: do this last so LimitToWeapon includes all weapons.
+	this.BaseUpgradeVersion(Props);
+};

@@ -1,0 +1,71 @@
+/* The entire engine bundle is verified before activation. Packs live in IDBFS. */
+'use strict';
+const VERSION = '@PWA_VERSION@';
+const CORE = [@PWA_ENTRIES@];
+const base = new URL('./', self.location.href);
+const PREFIX = 'etl-app-' + encodeURIComponent(base.pathname) + '-';
+const CACHE = PREFIX + VERSION;
+const absolute = path => new URL(path, base).href;
+async function installBundle(repair = false) {
+ const cache = await caches.open(CACHE);
+ try {
+  for (const entry of CORE) {
+   const response = await fetch(absolute(entry.url), {cache:'reload', credentials:'same-origin'});
+   if (!response.ok || response.status !== 200 || response.type === 'opaque' || response.redirected) throw Error('App download failed');
+   const bytes = await response.clone().arrayBuffer();
+   const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2,'0')).join('');
+   if (hash !== entry.sha256) throw Error('App bundle changed during download');
+   await cache.put(absolute(entry.url), response);
+  }
+ } catch (error) { if (!repair) await caches.delete(CACHE); throw error; }
+}
+async function status(client) {
+ try {
+  const cache = await caches.open(CACHE);
+  const entries = await Promise.all(CORE.map(entry => cache.match(absolute(entry.url))));
+  client.postMessage({type:entries.every(Boolean) ? 'APP_READY' : 'APP_MISSING', version:VERSION});
+ } catch (error) { client.postMessage({type:'APP_SAVE_FAILED', version:VERSION}); }
+}
+function recoveryPage() {
+ // This small page can repair an evicted bundle even when the launcher itself is missing.
+ return new Response(@PWA_RECOVERY_JSON@, {status:503, headers:{'Content-Type':'text/html; charset=utf-8', 'Cross-Origin-Opener-Policy':'same-origin', 'Cross-Origin-Embedder-Policy':'require-corp', 'Cache-Control':'no-store'}});
+}
+self.addEventListener('install', event => event.waitUntil(installBundle()));
+self.addEventListener('activate', event => event.waitUntil((async () => {
+ // A waiting update activates only after old tabs close or an explicit reload.
+ const clients = await self.clients.matchAll({type:'window', includeUncontrolled:true});
+ clients.forEach(client => client.postMessage({type:'APP_READY', version:VERSION}));
+ for (const key of await caches.keys()) if (key.startsWith(PREFIX) && key !== CACHE) await caches.delete(key);
+ // The first install takes control on the next navigation, preserving in-flight startup.
+})()));
+self.addEventListener('message', event => {
+ if (event.data && event.data.type === 'ACTIVATE_UPDATE') event.waitUntil((async () => {
+  const clients = await self.clients.matchAll({type:'window', includeUncontrolled:true});
+  if (clients.length > 1) { if (event.source) event.source.postMessage({type:'APP_OTHER_TABS'}); return; }
+  await self.skipWaiting();
+ })());
+ if (event.data && event.data.type === 'APP_STATUS' && event.source) event.waitUntil(status(event.source));
+ if (event.data && event.data.type === 'REPAIR_CACHE' && event.source) event.waitUntil((async () => {
+  try { await installBundle(true); await status(event.source); }
+  catch (e) { event.source.postMessage({type:'APP_SAVE_FAILED'}); }
+ })());
+});
+self.addEventListener('fetch', event => {
+ const request = event.request, url = new URL(request.url);
+ if (request.method !== 'GET' || url.origin !== base.origin || request.headers.has('range')) return;
+ const navigation = request.mode === 'navigate' && (url.pathname === base.pathname || url.pathname === new URL('etl.html',base).pathname);
+ const entry = navigation ? CORE[0] : CORE.find(item => new URL(item.url,base).pathname === url.pathname);
+ // Relay configuration, game packs, manifests and unknown paths remain live requests.
+ if (!entry) return;
+ event.respondWith((async () => {
+  try {
+   const cache = await caches.open(CACHE);
+   if (navigation && !(await Promise.all(CORE.map(item => cache.match(absolute(item.url))))).every(Boolean)) return recoveryPage();
+   const cached = await cache.match(absolute(entry.url));
+   if (cached) return cached;
+  } catch (error) { /* Storage denial uses the same recoverable screen. */ }
+  if (navigation) return recoveryPage();
+  // Fail closed rather than mixing unverified new engine files into an old page.
+  return new Response('Offline app files are unavailable. Reconnect and reload to save the app again.', {status:503, headers:{'Content-Type':'text/plain'}});
+ })());
+});

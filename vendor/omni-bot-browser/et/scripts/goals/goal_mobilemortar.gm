@@ -1,0 +1,129 @@
+// This script contains functionality to allow soldiers to use mobile mortar at given position
+this.Name = "MOBILEMORTAR";
+this.Parent = "HighLevel";
+this.SkipGetPriorityWhenActive = true;
+this.LimitToWeapon(WEAPON.MORTAR);
+
+this.Initialize = function()
+{
+	this.UsedIndex = {};
+};
+
+this.GetPriority = function()
+{
+	Util.GetPriority(this,0x74708d7a /* MOBILEMORTAR */, 0, WEAPON.MORTAR, function(goal, bot)
+	{
+		g = bot.GetMapGoalName();
+		return !g || g.Left(6) != "HEALTH";
+	});
+};
+
+this.Enter = function()
+{
+	this.MarkInProgress();
+
+	// finish it once bot runs out of ammo
+	this.AddFinishCriteria(this.Bot.GetGameEntity(),"not weaponhasammo", WEAPON.MORTAR_SET, 0);
+};
+
+
+this.ChooseAimVector = function()
+{
+	//choose random index from MortarAim which was not used yet
+	n = tableCount(this.MapGoal.MortarAim) - 1;
+	if(tableCount(this.UsedIndex) > n){
+		tableClear(this.UsedIndex);
+	}
+	dowhile(this.UsedIndex[index]){
+		index = RandInt(0, n);
+	}
+	this.UsedIndex[index] = true;
+	this.AimIndex = index;
+};
+
+this.Update = function()
+{
+	Util.RouteTo(this);
+
+	for(i=0; this.Bot.HasTarget() && i<20; ++i)
+	{
+		sleep(0.5);
+	}
+
+	this.OnGoal = true;
+	this.AddAimRequest(Priority.High, "facing");
+	this.AimVector = this.MapGoal.GetFacing();
+	block(EVENT.AIM_SUCCESS);
+
+	this.AddWeaponRequest(WEAPON.MORTAR);
+	this.BlockForWeaponChange(WEAPON.MORTAR);
+
+	this.AddWeaponRequest(WEAPON.MORTAR_SET);
+	this.BlockForWeaponChange(WEAPON.MORTAR_SET);
+	
+	this.ChooseAimVector();
+	pos = this.Bot.GetPosition();
+	
+	for(;;)
+	{
+		sleep(1.5);
+
+		if (this.Bot.DistanceTo(pos) > 40)
+		{
+			//return to the goal position if pushed by explosion
+			this.ReleaseWeaponRequest();
+			this.ReleaseAimRequest();
+			return;
+		}
+
+		this.AimVector = this.MapGoal.MortarAim[this.AimIndex];
+		sleep(0.5);
+
+		if (!this.MapGoal.DontShootMortar)
+		{
+			//don't shoot if another player is standing in front of soldier (usually fieldops giving ammo)
+			nearestPlayer = this.Bot.GetNearestAlly(CAT.PLAYER);
+			if (!nearestPlayer || this.Bot.DistanceTo(nearestPlayer) > 150 || !this.Bot.InFieldOfView(GetEntPosition(nearestPlayer), 160.0))
+			{
+				this.Bot.FireWeapon();
+			}
+		}
+	}
+
+	this.Finished();
+};
+
+this.Exit = function()
+{
+	this.FeelPainLocked = false;
+	this.OnGoal = false;
+};
+
+this.Events[EVENT.WEAPON_FIRE] = function(weaponId)
+{
+	if (weaponId == WEAPON.MORTAR_SET && this.MapGoal)
+	{
+		this.ChooseAimVector();
+	}
+};
+
+this.Events[EVENT.FEEL_PAIN] = function(ent)
+{
+	// ignore non-player ents
+	if (this.FeelPainLocked || !this.OnGoal || !ent || GetGameIdFromEntity(ent) > 63)
+	{
+		return;
+	}
+
+	if (!this.Bot.IsAllied(ent) && this.Bot.DistanceTo(ent) < 1500)
+	{
+		this.Bot.HoldButton(BTN.JUMP, 2);
+		this.BlackboardDelay(9);
+		this.Finished();
+	}
+
+	// throttle it since this event can be fired in rapid succession
+	this.FeelPainLocked = true;
+	sleep(1);
+	this.FeelPainLocked = false;
+};

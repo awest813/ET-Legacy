@@ -1,0 +1,78 @@
+this.GoalType = "PLANTMINE";
+this.Version = 1;
+this.DefaultPriority = 0.79;
+this.MinRadius = 32;
+this.RolePriorityBonus = 0.1;
+this.MaxUsers_InUse(1);
+this.MaxUsers_InProgress(1);
+
+//////////////////////////////////////////////////////////////////////////
+
+this.UpgradeVersion = function(Props)
+{
+	if(Props.Version==0)
+	{
+		//upgrade from old waypoint format
+		Props.Version = 1;
+		this.SetPosition(this.GetPosition() + Util.WaypointGoalOffset);
+	}
+	else if(Props.Version == 1)
+	{
+		this.CloseMines = {};
+		OnTriggerRegion(this.GetPosition(), 64, {
+			Name = this.GetName(),
+			OnEnter = this.MineEntered,
+			OnExit = this.MineExited,
+			CallbackObject = this,
+			TriggerOnCategory = CAT.MINE,
+		});
+		//todo: attach the life of this region to the mapgoal
+	}
+};
+
+//////////////////////////////////////////////////////////////////////////
+
+this.Render = function()
+{
+	offset2 = Vec3(0,0,64);
+
+	while(this.RenderGoal)
+	{
+		goalBasePos = this.GetPosition();
+		goalPos = goalBasePos + offset2;
+
+		this.RenderDefault();
+
+		if(this.IsDisabled())
+		{
+			DrawLine(goalPos,goalBasePos,COLOR.RED,2);
+		}
+		else
+		{
+			if ( this.InUse )
+			{
+				DrawLine(goalPos,goalBasePos,COLOR.ORANGE,2);
+			}
+			else
+			{
+				DrawLine(goalPos,goalBasePos,COLOR.GREEN,2);
+			}
+		}
+
+		sleep(2);
+	}
+};
+
+this.MineEntered = function(ent)
+{
+	this.CloseMines[ent] = 1;
+	this.InUse = true;
+};
+this.MineExited = function(ent)
+{
+	this.CloseMines[ent] = null;
+	if ( tableCount(this.CloseMines) == 0 )
+	{
+		this.InUse = false;
+	}
+};

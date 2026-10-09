@@ -1,0 +1,429 @@
+global _MG = 
+{
+	AMMOCAB_ammo_cabane = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(3016.000, -3344.000, 3256.000),
+		Range = 1250,
+		TeamAvailability = 6,
+	},
+	AMMOCAB_ammo_entrance_trigger = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-1180.000, 2372.000, 4692.000),
+		Range = 1250,
+		TeamAvailability = 6,
+	},
+	AMMOCAB_ammo_locker = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-132.000, -3016.000, 3678.000),
+		Range = 1250,
+		TeamAvailability = 6,
+	},
+	ATTACK_armor1 = 
+	{
+		AimVectors = 
+		{
+			Vec3(0.730, -0.683, 0.033),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(-960.231, 1550.424, 4137.125),
+	},
+	ATTACK_armor2 = 
+	{
+		AimVectors = 
+		{
+			Vec3(-0.510, -0.842, 0.174),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(-693.920, 1553.347, 4137.125),
+	},
+	ATTACK_entrance1 = 
+	{
+		AimVectors = 
+		{
+			Vec3(0.857, -0.479, 0.189),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(-1727.025, 2439.320, 4363.900),
+	},
+	ATTACK_entrance2 = 
+	{
+		AimVectors = 
+		{
+			Vec3(0.922, 0.351, 0.166),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(-1955.594, 2009.267, 4326.202),
+	},
+	ATTACK_entrance3 = 
+	{
+		AimVectors = 
+		{
+			Vec3(0.619, 0.779, 0.105),
+			Vec3(0.776, -0.616, 0.132),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(-1765.388, 1751.877, 4357.574),
+	},
+	ATTACK_relic1 = 
+	{
+		AimVectors = 
+		{
+			Vec3(-0.402, 0.282, -0.871),
+			Vec3(-0.078, 0.997, 0.010),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(-681.043, 1260.688, 4432.125),
+	},
+	ATTACK_relic2 = 
+	{
+		AimVectors = 
+		{
+			Vec3(-0.902, 0.414, -0.123),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(1901.873, 1949.375, 4441.170),
+	},
+	ATTACK_relic3 = 
+	{
+		AimVectors = 
+		{
+			Vec3(-0.840, 0.519, 0.155),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(1376.437, 2072.070, 4529.125),
+	},
+	ATTACK_relic4 = 
+	{
+		AimVectors = 
+		{
+			Vec3(0.847, 0.507, 0.159),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(817.428, 1774.324, 4529.125),
+	},
+	BUILD_assault_ladder = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(2048.000, 1880.000, 4484.000),
+		TeamAvailability = 4,
+	},
+	BUILD_moats_bridge = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(2632.000, 2516.000, 4476.000),
+		TeamAvailability = 4,
+	},
+	BUILD_relic_protection = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(1512.000, 1820.000, 4484.000),
+		TeamAvailability = 2,
+	},
+	BUILD_wood_wall = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-1288.000, 1356.000, 4476.000),
+		TeamAvailability = 2,
+	},
+	CAPPOINT_truck = 
+	{
+		Position = Vec3(1504.641, -1215.706, 3224.125),
+	},
+	CHECKPOINT_cp = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(1856.000, -1200.000, 3288.000),
+	},
+	DEFEND_place1 = 
+	{
+		AimVectors = 
+		{
+			Vec3(0.282, 0.899, -0.336),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(1676.950, -1480.132, 3224.125),
+	},
+	DEFEND_place2 = 
+	{
+		AimVectors = 
+		{
+			Vec3(-0.727, 0.653, -0.213),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(2017.076, -763.822, 3224.125),
+	},
+	DEFEND_place3 = 
+	{
+		AimVectors = 
+		{
+			Vec3(0.500, -0.813, -0.297),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(1363.379, -938.634, 3224.125),
+	},
+	DEFEND_place4 = 
+	{
+		AimVectors = 
+		{
+			Vec3(0.065, 0.791, -0.609),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(-48.706, -2018.040, 3408.125),
+	},
+	DEFEND_place5 = 
+	{
+		AimVectors = 
+		{
+			Vec3(-0.250, -0.661, -0.708),
+		},
+		DisableCM = 1,
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(1557.214, -658.221, 3512.125),
+	},
+	DEFEND_relic1 = 
+	{
+		AimVectors = 
+		{
+			Vec3(-0.097, -0.689, -0.719),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(-1580.622, 869.590, 4296.125),
+	},
+	DEFEND_relic2 = 
+	{
+		AimVectors = 
+		{
+			Vec3(-0.616, 0.512, -0.598),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(-1293.874, 1749.822, 4432.125),
+	},
+	DEFEND_relic3 = 
+	{
+		AimVectors = 
+		{
+			Vec3(0.434, 0.748, -0.501),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(-994.990, 1548.336, 4256.125),
+	},
+	DEFEND_relic4 = 
+	{
+		AimVectors = 
+		{
+			Vec3(0.951, -0.018, -0.308),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(-714.342, 1414.696, 4136.125),
+	},
+	DEFEND_relic5 = 
+	{
+		AimVectors = 
+		{
+			Vec3(-0.008, 0.919, -0.394),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(1973.510, 2182.376, 4792.127),
+	},
+	DEFEND_relic6 = 
+	{
+		AimVectors = 
+		{
+			Vec3(-0.645, -0.104, -0.757),
+		},
+		DisableCM = 1,
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(1826.126, 1005.018, 4680.125),
+	},
+	FLAG_relic = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(-800.000, 1732.000, 4157.125),
+		TeamAvailability = 4,
+	},
+	FLAG_relic_1 = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(1464.000, 1920.000, 4453.125),
+		TeamAvailability = 4,
+	},
+	HEALTHCAB_health_cabane = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(3084.000, -3344.000, 3256.000),
+		Range = 1250,
+		TeamAvailability = 6,
+	},
+	HEALTHCAB_healthhidden = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(696.000, 1088.000, 4464.000),
+		Range = 1250,
+		TeamAvailability = 6,
+	},
+	MOUNTMG42_mg42_house = 
+	{
+		CreateOnLoad = 0,
+		MaxCampTime = 90,
+		MinCampTime = 15,
+		Position = Vec3(2600.000, -2616.000, 3508.000),
+		TeamAvailability = 6,
+	},
+	PLANT_Relic_Armour = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 1,
+		Position = Vec3(-800.000, 1728.000, 4176.000),
+		TeamAvailability = 4,
+	},
+	PLANT__the_castle_main_entrance = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 1,
+		Position = Vec3(-1324.000, 2176.000, 4536.000),
+		TeamAvailability = 4,
+	},
+	PLANT_assault_ladder = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 3,
+		Position = Vec3(2032.000, 2025.425, 4628.000),
+		TeamAvailability = 2,
+	},
+	PLANT_moats_bridge = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 3,
+		Position = Vec3(2388.000, 2592.000, 4436.000),
+		TeamAvailability = 2,
+	},
+	PLANT_relic_protection = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 3,
+		Position = Vec3(1484.000, 1920.000, 4496.000),
+		TeamAvailability = 4,
+	},
+	PLANT_wood_wall = 
+	{
+		CreateOnLoad = 0,
+		ExplosiveType = 3,
+		Position = Vec3(-1248.000, 1164.000, 4512.000),
+		TeamAvailability = 4,
+	},
+	REPAIRMG42_mg42_house = 
+	{
+		CreateOnLoad = 0,
+		Position = Vec3(2600.000, -2616.000, 3508.000),
+		TeamAvailability = 6,
+	},
+	ROUTE_3routes = 
+	{
+		Position = Vec3(-2640.383, -2736.408, 3216.125),
+		Radius = 35,
+	},
+	ROUTE_allied_first_spawn = 
+	{
+		Position = Vec3(-3256.626, -3223.418, 3224.125),
+		Radius = 500,
+	},
+	ROUTE_flag = 
+	{
+		Position = Vec3(1827.431, -1184.392, 3224.125),
+		Radius = 400,
+	},
+	ROUTE_fuckroute = 
+	{
+		Position = Vec3(-2704.510, -84.229, 3224.125),
+		Radius = 35,
+	},
+	ROUTE_fuckroute_rapide = 
+	{
+		Position = Vec3(-812.358, -83.904, 3224.125),
+		Radius = 35,
+	},
+	ROUTE_garenne_bas = 
+	{
+		Position = Vec3(2182.937, -592.788, 3272.125),
+		Radius = 35,
+	},
+	ROUTE_garenne_haut = 
+	{
+		Position = Vec3(3181.693, 123.355, 3192.125),
+		Radius = 35,
+	},
+	ROUTE_haut_colline = 
+	{
+		Position = Vec3(-1910.770, 777.383, 4224.125),
+		Radius = 35,
+	},
+	ROUTE_monte_chemin = 
+	{
+		Position = Vec3(2260.036, 634.336, 3464.125),
+		Radius = 35,
+	},
+	ROUTE_plaine = 
+	{
+		Position = Vec3(3114.795, 1941.244, 4432.125),
+		Radius = 35,
+	},
+	ROUTE_rapide_bas = 
+	{
+		Position = Vec3(553.533, 251.386, 3224.125),
+		Radius = 10,
+	},
+	ROUTE_rapide_flag = 
+	{
+		Position = Vec3(1282.431, -90.591, 3224.125),
+		Radius = 35,
+	},
+	ROUTE_rapide_haut = 
+	{
+		Position = Vec3(452.744, 647.258, 3568.125),
+		Radius = 35,
+	},
+	ROUTE_route_mg = 
+	{
+		Position = Vec3(1608.070, -2667.513, 3216.139),
+		Radius = 35,
+	},
+	ROUTE_separation_rapide_flag = 
+	{
+		Position = Vec3(-722.636, -1193.052, 3224.125),
+		Radius = 35,
+	},
+	SNIPE_relic1 = 
+	{
+		AimVectors = 
+		{
+			Vec3(-0.645, -0.104, -0.757),
+		},
+		MaxCampTime = 60,
+		MinCampTime = 20,
+		Position = Vec3(1826.126, 1005.018, 4680.125),
+	},
+	Version = 1,
+};

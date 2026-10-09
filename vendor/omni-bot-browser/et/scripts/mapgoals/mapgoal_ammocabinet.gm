@@ -1,0 +1,23 @@
+this.GoalType = "AMMOCAB";
+this.Version = 1;
+this.DefaultPriority = 1.0;
+this.DisableIfEntityFlag(ENTFLAG.DISABLED);
+this.CreateOnLoad = false;
+this.RolePriorityBonus = 0.1;
+this.Range = 1250;
+
+//////////////////////////////////////////////////////////////////////////
+
+this.InitNewGoal = function()
+{
+	this.CreateOnLoad = true; // user created goals need this
+};
+
+//////////////////////////////////////////////////////////////////////////
+
+this.Help = function()
+{
+	print(this.GoalType,"goal");
+	print("Optional:");
+	print("		Range - default 1250, the radius in which the bot can use the cabinet");
+};

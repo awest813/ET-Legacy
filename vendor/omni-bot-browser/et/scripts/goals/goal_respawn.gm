@@ -1,0 +1,21 @@
+// This script contains functionality to disable waiting for medic in NoQuarter
+// because revived bots can't aim and have no chance to hit enemy
+this.Name = "Respawn";
+this.AutoAdd = GetModName()=="noquarter" && GetModVersion()=="1.2.9";
+this.InsertBefore = "Incapacitated";
+
+this.LimitToEntityFlag(ENTFLAG.DEAD);
+this.LimitToNoClass(CLASS.ENGINEER);
+
+this.GoodWeapons = {WEAPON.SHOTGUN, WEAPON.PANZERFAUST, WEAPON.BAZOOKA, WEAPON.FLAMETHROWER, WEAPON.MORTAR, WEAPON.K43_SCOPE, WEAPON.GARAND_SCOPE, WEAPON.FG42_SCOPE};
+
+this.GetPriority = function()
+{
+	foreach (w in this.GoodWeapons) {
+		if (this.Bot.HasWeapon(w)) {
+			block(0);
+		}
+	}
+	this.Bot.ExecCommand("kill");
+	block(0);
+};

@@ -1,0 +1,22 @@
+// This script increases snipers' max view distance
+
+this.Name = "Zooming";
+this.Parent = "LowLevel";
+
+this.LimitToEntityFlag(ENTFLAG.ZOOMING);
+
+this.GetPriority = function()
+{
+	//MaxViewDistanceZoom and MaxViewDistanceNormal are initialized in goal_difficulty.gm
+	if (this.Bot.MaxViewDistanceZoom)
+	{
+		this.Bot.MaxViewDistance = this.Bot.MaxViewDistanceZoom;
+		this.Priority = 0.1; // so exit can be called
+	}
+	block(0);
+};
+
+this.Exit = function()
+{
+	this.Bot.MaxViewDistance = this.Bot.MaxViewDistanceNormal;
+};

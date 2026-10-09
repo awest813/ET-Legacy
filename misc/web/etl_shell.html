@@ -1,0 +1,1941 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#151619">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>ET: Legacy — WebAssembly</title>
+<style>
+	:root { color-scheme: dark; --gold: #e4c477; --muted: #b2b1ad; }
+	* { box-sizing: border-box; }
+	html, body { margin: 0; background: #0a0b0d; color: #eee; font-family: "Segoe UI", system-ui, sans-serif; height: 100%; overflow: hidden; }
+	body { display: flex; flex-direction: column; }
+	@supports (height: 100dvh) { body { height: 100dvh; } }
+	body:fullscreen { width: 100%; height: 100%; background: #0a0b0d; }
+	body:-webkit-full-screen { width: 100%; height: 100%; background: #0a0b0d; }
+	button, input, select { font: inherit; }
+	button { cursor: pointer; }
+	button:disabled { opacity: .45; cursor: default; }
+	:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+	#wrap { position: relative; display: flex; flex: 1 1 0; min-height: 0; min-width: 0; align-items: center; justify-content: center; overflow: hidden; }
+	#canvas { display: block; background: #000; touch-action: none; image-rendering: auto; width: auto; height: auto; max-width: 100%; max-height: 100%; flex-shrink: 0; }
+	#canvas:focus:not(:focus-visible) { outline: none; }
+	#gamebar { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left)); background: #151619; border-bottom: 1px solid #37352e; font-size: 13px; }
+	#gamebar[hidden] { display: none; }
+	#focusgroup { display: flex; flex: 1 1 310px; align-items: center; gap: 12px; min-width: 0; }
+	#inputbadge { flex-shrink: 0; padding: 5px 8px; color: var(--gold); border: 1px solid #5d5036; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+	#focusstatus { color: #d4c6a5; line-height: 1.45; overflow-wrap: anywhere; }
+	#gameactions, #soundgroup { display: flex; align-items: center; gap: 10px; }
+	#gameactions { flex-wrap: wrap; }
+	#gamebar button { min-height: 38px; background: #222429; color: #eee; border: 1px solid #58544a; border-radius: 5px; padding: 7px 11px; white-space: nowrap; }
+	#gamebar button:hover:not(:disabled) { border-color: var(--gold); background: #2c2c2b; }
+	#soundgroup { padding-left: 16px; border-left: 1px solid #393a3b; }
+	#soundstatus { flex: 0 0 180px; color: var(--muted); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+	#capturebtn { min-width: 126px; }
+	#soundbtn { min-width: 104px; }
+	#networkbtn { width: 160px; overflow: hidden; text-overflow: ellipsis; }
+	#volume { width: 88px; accent-color: var(--gold); vertical-align: middle; }
+	#volumevalue { display: inline-block; min-width: 34px; font-variant-numeric: tabular-nums; color: #ddd; }
+	#overlay { position: absolute; inset: 0; padding: max(28px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; overflow: auto; background: radial-gradient(ellipse at 50% 0, #30291c 0, #141619 40%, #0a0b0d 85%); z-index: 10; text-align: center; }
+	#overlay > * { flex-shrink: 0; max-width: 100%; }
+	.eyebrow { color: var(--gold); font-size: 11px; font-weight: 600; letter-spacing: 2.5px; margin: auto 0 12px; }
+	#overlay h1 { color: #f2eee5; letter-spacing: -1px; margin: 0 0 10px; font-size: clamp(30px, 5vw, 46px); line-height: 1.1; font-weight: 650; }
+	#overlay p.sub { color: var(--muted); margin: 0 0 28px; font-size: 15px; }
+	#matchform { width: 440px; padding: 26px; background: #191b1e; border: 1px solid #484234; border-radius: 12px; box-shadow: 0 20px 55px #0005; text-align: left; }
+	#matchsettings { border: 0; padding: 0; margin: 0 0 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; min-width: 0; }
+	#matchsettings legend { padding: 0 0 20px; color: #eee; font-size: 16px; font-weight: 600; }
+	#mapfield, #mapbrief, #matchhint { grid-column: 1 / -1; }
+	#matchsettings label { display: grid; gap: 8px; font-size: 13px; color: #ccc; font-weight: 500; }
+	#matchsettings select, #matchsettings input { width: 100%; min-height: 44px; padding: 10px 12px; background: #111316; color: #eee; border: 1px solid #5b5c5d; border-radius: 6px; font-size: 15px; }
+	#matchsettings select:hover:not(:disabled), #matchsettings input:hover:not(:disabled) { border-color: #b19b6c; }
+	#matchsettings select:disabled, #matchsettings input:disabled { opacity: .55; }
+	#mapbrief { margin: -6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; min-height: 39px; }
+	#custommaps { grid-column: 1 / -1; font-size: 13px; color: var(--muted); }
+	#custommaps summary { cursor: pointer; min-height: 44px; padding: 12px 0; color: #ddd; }
+	#custommaps p { line-height: 1.5; margin: 8px 0; }
+	#custommaps button { min-height: 44px; padding: 8px 12px; border: 1px solid #58544a; border-radius: 5px; background: #222429; color: #eee; }
+	#matchhint { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0; }
+	#matchsummary { margin: 0 0 14px; color: #d8c69d; font-size: 13px; }
+	#playbtn { width: 100%; min-height: 48px; font-size: 15px; padding: 12px; background: #e1bd6e; color: #17140d; border: 1px solid #f1d28e; border-radius: 6px; font-weight: 700; letter-spacing: .7px; }
+	#playbtn:hover:not(:disabled) { background: #f1d28e; }
+	#etl_status { display: none; margin-top: 18px; color: var(--gold); font-size: 14px; width: 440px; line-height: 1.5; overflow-wrap: anywhere; }
+	#loadsteps { display: flex; list-style: none; counter-reset: stage; gap: 18px; width: 440px; justify-content: center; padding: 0; margin: 22px 0 0; color: #969997; font-size: 12px; }
+	#loadsteps li { counter-increment: stage; display: flex; align-items: center; gap: 6px; }
+	#loadsteps li::before { content: counter(stage); display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid #555; border-radius: 50%; font-size: 10px; }
+	#loadsteps [data-stage="active"] { color: var(--gold); }
+	#loadsteps [data-stage="active"]::before { border-color: var(--gold); }
+	#loadsteps [data-stage="complete"] { color: #bcc9b8; }
+	#overlay[data-state="ready"] #loadsteps, #overlay[data-state="failed"] #loadsteps { display: none; }
+	#overlay[data-state="failed"] #modebar, #overlay[data-state="failed"] #matchsettings, #overlay[data-state="failed"] #matchsummary { display: none; }
+	#barwrap { width: 440px; height: 6px; background: #292c2f; border-radius: 3px; margin-top: 16px; overflow: hidden; }
+	#bar { height: 100%; width: 0%; background: var(--gold); transition: width .15s; }
+	#bartext { margin-top: 8px; font-size: 12px; color: var(--muted); min-height: 16px; }
+	#cancelload { min-height: 44px; padding: 8px 16px; margin-top: 12px; background: #222429; color: #eee; border: 1px solid #58544a; border-radius: 6px; }
+	#controls { width: 440px; margin: 20px 0 auto; color: var(--muted); font-size: 13px; line-height: 1.65; }
+	#controls summary { cursor: pointer; color: #ddd; display: list-item; padding: 8px; }
+	#controls p { margin: 8px 0; }
+	kbd { display: inline-block; padding: 1px 5px; border: 1px solid #55534c; border-bottom-width: 2px; border-radius: 3px; font: 12px "Segoe UI", system-ui, sans-serif; color: #eee; white-space: nowrap; }
+	#helpdialog { width: 460px; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); padding: 24px; color: #eee; background: #191b1e; border: 1px solid #81704b; border-radius: 10px; overflow: auto; }
+	#helpdialog::backdrop { background: #000a; }
+	.dialoghead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+	.dialoghead h2 { font-size: 20px; margin: 0; }
+	#closehelp { min-height: 44px; padding: 6px 12px; color: #eee; background: #26282c; border: 1px solid #69635a; border-radius: 5px; }
+	#helpdialog p { font-size: 14px; line-height: 1.65; color: #c2c3be; }
+	.bindings { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px 24px; font-size: 14px; padding: 16px 0; border-block: 1px solid #3e403e; }
+	.bindings dt, .bindings dd { margin: 0; }
+	#helpdialog summary, #networkdialog summary { min-height: 44px; padding: 12px 0; cursor: pointer; color: #ddd; font-size: 14px; }
+	#networkdialog .connectionactions button[data-primary="true"], #matchdialog #resumematch { background: #e1bd6e; color: #17140d; border-color: #f1d28e; font-weight: 600; }
+	@media (max-width: 760px) { #gamebar { gap: 8px; padding: 8px 12px; } #focusgroup { flex-basis: 100%; } #gameactions { justify-content: center; width: 100%; } #soundstatus { flex-basis: 100%; text-align: center; } }
+	@media (max-width: 420px) { #overlay { padding: 24px 16px; } #matchform { padding: 20px; } #gamebar { font-size: 12px; } #soundgroup { border-left: 0; padding-left: 0; } #gamebar button { min-height: 40px; padding: 7px 10px; } #volume { width: 72px; } #volumevalue { min-width: 30px; } #gameactions { gap: 8px; } }
+	@media (max-width: 340px) { #matchsettings { grid-template-columns: 1fr; } }
+	@media (prefers-reduced-motion: reduce) { #bar { transition: none; } }
+	#modebar { display: flex; gap: 6px; width: 440px; margin: 0 0 16px; padding: 4px; border: 1px solid #484234; border-radius: 8px; background: #151619; }
+	#modebar button { flex: 1; min-height: 44px; border: 0; border-radius: 5px; background: transparent; color: #aaa; }
+	#modebar button[aria-pressed="true"] { background: #393329; color: var(--gold); font-weight: 600; }
+	#onlinepanel { width: 440px; padding: 26px; text-align: left; background: #191b1e; border: 1px solid #484234; border-radius: 12px; }
+	#onlinepanel h2 { font-size: 18px; margin: 0 0 14px; }
+	#onlinepanel p { color: var(--muted); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+	#publicbrowser label { display: block; margin: 12px 0; color: #ddd; font-size: 13px; }
+	#publicbrowser input, #publicbrowser select { display: block; width: 100%; min-width: 0; min-height: 44px; margin-top: 6px; padding: 8px; background: #26282c; color: #eee; border: 1px solid #69635a; border-radius: 5px; }
+	#serverdetails { padding: 14px; margin: 14px 0; border: 1px solid #58544a; border-radius: 8px; }
+	#servername { font-size: 16px; margin: 0 0 8px; overflow-wrap: anywhere; }
+	#serverdetails p { margin: 6px 0; }
+	#serverpassword { margin: 14px 0; }
+	#serverpassword summary { cursor: pointer; min-height: 44px; padding: 12px 0; }
+	#onlinepassword { width: 100%; min-height: 44px; padding: 10px; color: #eee; background: #222429; border: 1px solid #58544a; border-radius: 6px; }
+	#joinbtn, #refreshonline, #canceljoin, #refreshpublic { width: 100%; min-height: 44px; border-radius: 6px; padding: 10px; }
+	#joinbtn { color: #17140d; background: #e1bd6e; border: 1px solid #f1d28e; font-weight: 700; }
+	#refreshonline, #canceljoin, #refreshpublic { margin-top: 10px; background: #222429; color: #ddd; border: 1px solid #58544a; }
+	#networkdialog, #matchdialog { width: 460px; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); padding: 24px; color: #eee; background: #191b1e; border: 1px solid #81704b; border-radius: 10px; overflow: auto; }
+	#networkdialog::backdrop, #matchdialog::backdrop { background: #000a; }
+	#networkdialog p, #matchdialog p { font-size: 14px; color: var(--muted); line-height: 1.65; overflow-wrap: anywhere; }
+	#networkdialog button, #matchdialog button { min-height: 44px; padding: 8px 12px; background: #26282c; color: #eee; border: 1px solid #69635a; border-radius: 5px; }
+	.connectionactions { display: flex; flex-wrap: wrap; gap: 10px; }
+	#serverdownload { padding: 14px; margin: 16px 0; border: 1px solid #59503c; border-radius: 7px; background: #111316; }
+	#serverdownload p { margin: 0 0 8px; }
+	#serverpackname { color: var(--gold) !important; font-weight: 600; }
+	#serverpackprogress { display: block; width: 100%; height: 10px; accent-color: var(--gold); }
+	#serverpackdetail { margin: 8px 0 0 !important; font-variant-numeric: tabular-nums; }
+	#networkbtn[data-failed="true"] { border-color: #da986c; color: #efb88e; }
+	#touchcontrols { position: absolute; inset: 0; pointer-events: none; user-select: none; }
+	#touchcontrols[hidden], #touchtools[hidden] { display: none; }
+	#touchcontrols button, #touchmove, #touchlook { touch-action: none; pointer-events: auto; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+	#touchlook { position: absolute; inset: 0 0 0 40%; }
+	#touchlook span { position: absolute; right: 18px; top: 20%; color: #fff9; font-size: 11px; letter-spacing: 1px; text-shadow: 0 1px 3px #000; }
+	#touchmove { position: absolute; left: max(18px, env(safe-area-inset-left)); bottom: max(24px, env(safe-area-inset-bottom)); width: 116px; height: 116px; border: 2px solid #ffffff6b; background: #10141960; border-radius: 50%; display: grid; place-items: center; }
+	#touchmove::after { content: 'MOVE'; position: absolute; top: -22px; color: #fffc; font-size: 11px; letter-spacing: 1px; }
+	#touchthumb { width: 48px; height: 48px; border: 1px solid #fff8; background: #e4c47780; border-radius: 50%; pointer-events: none; }
+	#touchbuttons { position: absolute; right: max(14px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(3, 52px); gap: 8px; }
+	#touchcontrols button { width: 52px; height: 52px; border-radius: 50%; border: 1px solid #fff8; background: #101419a8; color: #fff; font-size: 11px; font-weight: 600; padding: 0; text-shadow: 0 1px 3px #000; }
+	#touchcontrols button[data-held] { background: #9c743de0; border-color: var(--gold); }
+	@media (min-width: 600px) { #touchbuttons { grid-template-columns: repeat(4, 52px); } }
+	#touchtools { display: flex; gap: 8px; }
+	#appdialog { width: 460px; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); padding: 24px; color: #eee; background: #191b1e; border: 1px solid #81704b; border-radius: 10px; overflow: auto; }
+	#appdialog::backdrop { background: #000a; }
+	#appdialog p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+	#appdialog button, #launchtools button { min-height: 44px; padding: 8px 12px; color: #eee; background: #26282c; border: 1px solid #69635a; border-radius: 5px; }
+	#launchtools { display: flex; gap: 8px; margin: 18px 0 0; flex-wrap: wrap; justify-content: center; }
+	#fullscreenstatus { color: #efb88e; font-size: 12px; margin: 0; padding: 0 12px; }
+	#fullscreenstatus:empty { display: none; }
+	#launchfullstatus { color: #efb88e; font-size: 13px; }
+	#launchfullstatus:empty { display: none; }
+	#touchtools button { touch-action: none; min-width: 44px; }
+	#touchbtn[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+	body[data-touch="true"] #capturebtn { display: none; }
+	body[data-touch="true"] #gamebar button { min-height: 44px; }
+	@media (max-width: 900px) and (max-height: 500px), (max-width: 600px) and (max-height: 700px) {
+		body[data-touch="true"] #gamebar { padding: 4px max(8px, env(safe-area-inset-left)); gap: 4px 8px; font-size: 11px; }
+		body[data-touch="true"] #focusgroup, body[data-touch="true"] #soundstatus { display: none; }
+		body[data-touch="true"] #gameactions { flex-wrap: wrap; justify-content: center; width: 100%; gap: 6px; }
+		body[data-touch="true"] #gamebar button { min-height: 44px; padding: 5px 8px; }
+		body[data-touch="true"] #soundgroup { padding: 0; border: 0; gap: 4px; }
+		body[data-touch="true"] #soundgroup label, body[data-touch="true"] #volumevalue, body[data-touch="true"] #matchbtn { display: none; }
+		body[data-touch="true"] #touchmove { bottom: 16px; }
+	}
+	@media (max-width: 600px) and (max-height: 700px) and (orientation: portrait) {
+		body[data-touch="true"] #wrap { align-items: flex-start; }
+	}
+</style>
+</head>
+<body>
+<div id="gamebar" hidden aria-label="Game controls">
+	<div id="focusgroup"><span id="inputbadge" aria-hidden="true">GAME</span><span id="focusstatus" role="status">Click the game to focus</span></div>
+	<div id="gameactions">
+		<button id="capturebtn" type="button">Capture mouse</button>
+		<div id="soundgroup">
+			<button id="soundbtn" type="button">Enable sound</button>
+			<label for="volume">Volume <input id="volume" type="range" min="0" max="100" step="1" value="80"></label>
+			<output id="volumevalue" for="volume">80%</output>
+		</div>
+		<button id="helpbtn" type="button" aria-haspopup="dialog">Controls</button>
+		<button id="fullscreenbtn" type="button" aria-pressed="false">Fullscreen</button>
+		<button id="appbtn" type="button" aria-haspopup="dialog">App &amp; offline</button>
+		<button id="touchbtn" type="button" aria-pressed="false">Touch off</button>
+		<div id="touchtools" hidden aria-label="Touch menu controls"><button type="button" data-touch-action="1">Team</button><button type="button" data-touch-action="2">Menu</button><button type="button" data-touch-action="4">Weapon</button><button type="button" data-touch-action="16" aria-label="Answer yes (F1)" title="Answer Yes to the current vote or fireteam prompt">Yes</button><button type="button" data-touch-action="32" aria-label="Answer no (F2)" title="Answer No to the current vote or fireteam prompt">No</button></div>
+		<button id="matchbtn" type="button" aria-haspopup="dialog">Match setup</button>
+		<button id="networkbtn" type="button" aria-haspopup="dialog" hidden>Connection</button>
+	</div>
+	<span id="soundstatus" role="status"></span>
+</div>
+<p id="fullscreenstatus" role="status"></p>
+<div id="wrap" inert>
+	<canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1" aria-hidden="true" aria-label="Enemy Territory game"></canvas>
+	<div id="touchcontrols" hidden aria-label="Touch gameplay controls">
+		<div id="touchlook" aria-label="Drag to aim"><span>DRAG TO AIM</span></div>
+		<div id="touchmove" aria-label="Drag to move"><span id="touchthumb"></span></div>
+		<div id="touchbuttons"><button type="button" data-touch-bit="16">Reload</button><button type="button" data-touch-bit="32">Use</button><button type="button" data-touch-bit="1">Fire</button><button type="button" data-touch-action="8" aria-label="Alternate fire">Alt fire</button><button type="button" data-touch-bit="64">Prone</button><button type="button" data-touch-bit="8">Sprint</button><button type="button" data-touch-bit="4">Crouch</button><button type="button" data-touch-bit="2">Jump</button></div>
+	</div>
+</div>
+<main id="overlay" data-state="engine-loading" aria-labelledby="launcher-title">
+	<p class="eyebrow">WOLFENSTEIN &middot; ET: LEGACY</p>
+	<h1 id="launcher-title">Enemy Territory</h1>
+	<p class="sub">Offline bots or online Legacy servers</p>
+	<div id="modebar" role="group" aria-label="Play mode">
+		<button id="offlinebtn" type="button" aria-pressed="true">Offline with bots</button>
+		<button id="onlinebtn" type="button" aria-pressed="false">Online</button>
+	</div>
+	<section id="onlinepanel" aria-labelledby="online-title" hidden>
+		<h2 id="online-title">Online server</h2>
+		<p id="onlineintro">Choose a compatible Legacy server, or play offline with bots.</p>
+		<section id="publicbrowser" aria-label="Public server browser" hidden>
+			<label for="serverfilter">Find a server <input id="serverfilter" type="search" maxlength="100" placeholder="Server name or map" autocomplete="off"></label>
+			<label for="publicserver">Server <select id="publicserver"><option value="">Launcher default</option></select></label>
+			<p id="publicstatus" role="status">Discovering public servers…</p>
+			<button id="refreshpublic" type="button">Refresh public list</button>
+			<p>Only servers that replied with a compatible Legacy protocol appear. Response times are measured from the relay host. Custom maps may need matching packs from an approved source or a local import.</p>
+		</section>
+		<p id="onlinestatus" role="status">Checking online configuration…</p>
+		<section id="serverdetails" aria-labelledby="servername" hidden>
+			<h3 id="servername"></h3>
+			<p id="serverhostname"></p>
+			<p id="serverpopulation"></p>
+			<p id="servermap"></p>
+			<p id="serverresponse"></p>
+			<p id="serverrules"></p>
+		</section>
+		<details id="serverpassword"><summary>Server password</summary>
+			<label for="onlinepassword">Password <input id="onlinepassword" type="password" maxlength="64" autocomplete="off" aria-describedby="passwordhint"></label>
+			<p id="passwordhint">Only needed for password-protected servers. It is not saved.</p>
+		</details>
+		<p id="onlineassetsinfo">Installed custom maps and matching Legacy assets load before joining. Executable custom mods are unsupported.</p>
+		<button id="joinbtn" type="button" disabled>JOIN SERVER</button>
+		<button id="canceljoin" type="button" hidden>Cancel connection</button>
+		<button id="refreshonline" type="button">Check again</button>
+	</section>
+	<form id="matchform">
+		<fieldset id="matchsettings">
+			<legend>Set up your match</legend>
+			<label for="mapselect" id="mapfield">Map
+				<select id="mapselect" name="map" aria-describedby="mapbrief">
+					<option value="oasis">Oasis</option>
+					<option value="goldrush">Gold Rush</option>
+					<option value="battery">Battery</option>
+					<option value="fueldump">Fuel Dump</option>
+					<option value="radar">Radar</option>
+					<option value="railgun">Rail Gun</option>
+				</select>
+			</label>
+			<p id="mapbrief">Infiltrate the desert garrison and destroy its two anti-tank guns.</p>
+			<details id="custommaps"><summary>Custom maps &amp; assets</summary>
+				<p>Import an Enemy Territory map PK3 from your device. Imported maps are saved by the local launcher and cached in this browser when played.</p>
+				<label for="customfile">Map pack (.pk3, up to 256 MB)<input id="customfile" type="file" accept=".pk3"></label>
+				<button id="refreshmaps" type="button">Refresh map list</button>
+				<p id="customstatus" role="status">Checking installed custom maps…</p>
+			</details>
+			<label for="botcount">Bots
+				<input id="botcount" name="bots" type="number" min="0" max="12" step="1" value="4" required aria-describedby="matchhint matchsummary">
+			</label>
+			<label for="difficulty">Difficulty
+				<select id="difficulty" name="difficulty">
+					<option value="2">Easy</option>
+					<option value="4" selected>Normal</option>
+					<option value="6">Hard</option>
+				</select>
+			</label>
+			<p id="matchhint">Balanced teams. Choose 0 bots to explore alone.</p>
+		</fieldset>
+		<p id="matchsummary">Oasis &middot; 4 bots &middot; Normal</p>
+		<button id="playbtn" type="submit" disabled>LOADING&hellip;</button>
+	</form>
+	<div id="etl_status" role="status" aria-live="polite"></div>
+	<ol id="loadsteps" aria-label="Loading stages"><li id="stage-engine" data-stage="active" aria-current="step">Engine</li><li id="stage-files">Game files</li><li id="stage-match">Match</li></ol>
+	<div id="barwrap" role="progressbar" aria-label="Loading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="display:none"><div id="bar"></div></div>
+	<div id="bartext"></div>
+	<button id="cancelload" type="button" hidden>Cancel loading</button>
+	<div id="launchtools"><button id="launchfullscreen" type="button" aria-pressed="false">Fullscreen</button><button id="launchapp" type="button" aria-haspopup="dialog">App &amp; offline</button></div>
+	<p id="launchfullstatus" role="status"></p>
+	<details id="controls">
+		<summary>How to play</summary>
+		<p>Press <kbd>L</kbd> to choose a team and class after the map loads.<br>
+		<kbd>W A S D</kbd> move &middot; Mouse aims and fires &middot; <kbd>Space</kbd> jumps<br>
+		<kbd>Esc</kbd> opens the menu &middot; <kbd>~</kbd> opens the console</p>
+		<p>Click the game to capture the mouse. <kbd>Esc</kbd> releases it for menus.<br>
+		If capture is blocked, hold the right mouse button to aim and left-click to fire.<br>
+		Sound resumes on a click. The top bar controls volume and mute.<br>
+		On a phone, touch controls turn on automatically. Use landscape for a larger view.<br>
+		Drag the left stick to move and the right side to aim. Tap Team to choose a class.<br>
+		Touch on/off in the top bar switches the controls.</p>
+		<p>Use an updated browser with WebAssembly and WebGL 2 enabled.<br>
+		Custom maps and offline installation need HTTPS or localhost.<br>
+		Mouse capture, fullscreen and app installation depend on your browser.</p>
+		<p><a href="network/recovery" style="color:var(--gold)">Repair a saved app that will not start</a>. Saved maps and settings are kept.</p>
+	</details>
+</main>
+<dialog id="appdialog" aria-labelledby="app-title">
+	<div class="dialoghead"><h2 id="app-title">App &amp; offline</h2><button id="closeapp" type="button">Close</button></div>
+	<p id="appstatus" role="status">Saving app for offline use…</p>
+	<p id="installhint">Install from your browser menu.</p>
+	<div class="connectionactions"><button id="installapp" type="button" hidden>Install app</button><button id="retryapp" type="button" hidden>Retry offline saving</button><button id="updateapp" type="button" hidden>Reload to update</button></div>
+	<p>Offline play needs saved game files. Start an offline match while connected first. Updates and reloading end your current match. Browser storage can be cleared by you or your device.</p>
+</dialog>
+<dialog id="helpdialog" aria-labelledby="help-title">
+	<div class="dialoghead"><h2 id="help-title">Game controls</h2><button id="closehelp" type="button">Close</button></div>
+	<p id="helpstart">Start with <kbd>L</kbd> to choose a team and class. In the team menu, point and click to make your selection.</p>
+	<details id="touchhelp"><summary>Touch controls</summary>
+	<p>Drag the left stick to move and the right side to aim. Hold Fire, Sprint or Crouch; tap Jump, Reload or Use. When wounded, Jump joins the reinforcement queue; waiting lets a Medic revive you. Alt fire switches supported weapon modes, including scopes and rifle grenades. Prone lies down or stands up. Team selects your class; Menu opens options; Weapon cycles weapons. Yes and No answer the current vote or fireteam prompt (F1/F2). Tap native menus to select. Landscape gives a larger view. Touch on/off switches controls.</p></details>
+	<details id="keyboardhelp" open><summary>Keyboard and mouse controls</summary>
+	<dl class="bindings">
+		<dt><kbd>W A S D</kbd></dt><dd>Move</dd>
+		<dt>Mouse</dt><dd>Aim &middot; left click fires</dd>
+		<dt><kbd>Space</kbd> / <kbd>R</kbd></dt><dd>Jump / reload</dd>
+		<dt><kbd>Shift</kbd> / <kbd>C</kbd></dt><dd>Sprint / crouch</dd>
+		<dt><kbd>X</kbd> / right click</dt><dd>Prone / alternate fire with mouse captured</dd>
+		<dt><kbd>Q</kbd> / <kbd>E</kbd></dt><dd>Lean left / right</dd>
+		<dt><kbd>1–0</kbd> / wheel</dt><dd>Select weapon</dd>
+		<dt><kbd>F</kbd> / <kbd>Tab</kbd></dt><dd>Interact / scoreboard</dd>
+		<dt><kbd>Esc</kbd> / <kbd>~</kbd></dt><dd>Menu / console</dd>
+	</dl>
+	</details>
+	<p id="settingshelp">These are the default bindings. Press <kbd>Esc</kbd> &rarr; Options: System for brightness; Controls for mouse sensitivity and key bindings.</p>
+	<p id="settingsstatus" role="status">Game settings save in this browser.</p>
+	<details id="focushelp"><summary>Focus &amp; sound</summary>
+	<p id="mousehelp">Click the game to capture the mouse. If capture is blocked, hold the right mouse button and drag to aim; left click fires. Use Capture mouse to retry capture.</p>
+	<p>Click, tap, or press a key in the game to resume sound. Use the top bar to mute or adjust volume. Volume changes keep your mute setting. Sound pauses while the game is out of focus; click the game to hear your adjustment. Press <kbd>Shift + Tab</kbd> from the game to reach these controls.</p>
+	</details>
+</dialog>
+<dialog id="matchdialog" aria-labelledby="match-title" aria-describedby="match-return-description">
+	<div class="dialoghead"><h2 id="match-title">Return to match setup?</h2></div>
+	<p id="match-return-description">Returning ends your current match. Choose a new offline match or switch to online play in the launcher.</p>
+	<div class="connectionactions"><button id="resumematch" type="button">Keep playing</button><button id="returnlauncher" type="button">End match and return</button></div>
+</dialog>
+<dialog id="networkdialog" aria-labelledby="network-title">
+	<div class="dialoghead"><h2 id="network-title">Online connection</h2><button id="closenetwork" type="button">Close</button></div>
+	<p id="connectiontarget" hidden></p>
+	<p id="connectionstatus" role="status">Opening the configured relay…</p>
+	<div id="serverdownload" hidden>
+		<p id="serverpackname"></p>
+		<progress id="serverpackprogress" max="100" aria-label="Server pack download"></progress>
+		<p id="serverpackdetail"></p>
+		<p>Verified packs stay installed. When all required packs are ready, the game reloads and rejoins automatically.</p>
+	</div>
+	<p id="connectionhint">Retry to join this server, or return to the launcher to choose offline play.</p>
+	<div class="connectionactions"><button id="reloadassets" type="button" hidden>Reload to load packs</button><button id="retryconnection" type="button">Retry connection</button><button id="disconnectonline" type="button">Disconnect</button><button id="backoffline" type="button">Return to launcher</button></div>
+	<details id="connectiondetails"><summary>Connection details</summary><p id="networkstats"></p></details>
+</dialog>
+<script type="text/javascript">
+	var statusEl = document.getElementById('etl_status');
+	var barwrap = document.getElementById('barwrap');
+	var bar = document.getElementById('bar');
+	var bartext = document.getElementById('bartext');
+	var playbtn = document.getElementById('playbtn');
+	var matchform = document.getElementById('matchform');
+	var matchsettings = document.getElementById('matchsettings');
+	var mapselect = document.getElementById('mapselect');
+	var botcount = document.getElementById('botcount');
+	var difficulty = document.getElementById('difficulty');
+	var matchOptions;
+	var playMode = 'offline', onlineConfigured = false, onlineRequest = null, onlineEpoch = 0, joiningOnline = false;
+	var checkingOnline = false, retryingOnline = false;
+	var publicEnabled = false, publicEntries = [], publicRequest = null, publicTimer = null, publicEpoch = 0, publicBusy = false, selectedServerId = '', selectedServerLabel = '';
+	var serverCompatible = true, serverPasswordRequired = false, serverVerified = false;
+	var bootFailed = false;
+	var cacheEnabled = false;
+	var loadState = 'engine-loading';
+	var loadEpoch = 0;
+	var activeRequest = null;
+	var cacheRoot = '/idb/etmain';
+	var manifest = null;
+	var cacheDirty = false;
+	var cacheNotice = '';
+	var supportedMaps = ['oasis', 'goldrush', 'battery', 'fueldump', 'radar', 'railgun'];
+	var mapNames = ['Oasis', 'Gold Rush', 'Battery', 'Fuel Dump', 'Radar', 'Rail Gun'];
+	var mapBriefs = [
+		'Infiltrate the desert garrison and destroy its two anti-tank guns.',
+		'Escort the tank, breach the bank, and escape with the gold.',
+		'Assault the coastal bunker and destroy its gun controls.',
+		'Escort the demolition tank through the snow to the Axis fuel depot.',
+		'Break into the installation and steal both radar components.',
+		'Transport ammunition to the railway gun, or stop it from firing.'
+	];
+	var savedOptions = {};
+	try { savedOptions = JSON.parse(localStorage.getItem('etl.offlineMatch')) || {}; } catch (e) {}
+	var queryOptions = new URLSearchParams(window.location.search);
+	function optionValue(name, fallback)
+	{
+		return queryOptions.has(name) ? queryOptions.get(name) : (savedOptions[name] == null ? fallback : savedOptions[name]);
+	}
+	var initialMap = optionValue('map', 'oasis');
+	mapselect.value = supportedMaps.indexOf(initialMap) >= 0 ? initialMap : 'oasis';
+	var initialBots = String(optionValue('bots', 4));
+	botcount.value = /^\d+$/.test(initialBots) && Number(initialBots) <= 12 ? Number(initialBots) : 4;
+	var initialDifficulty = String(optionValue('difficulty', 4));
+	difficulty.value = ['2', '4', '6'].indexOf(initialDifficulty) >= 0 ? initialDifficulty : '4';
+	var customCatalog = {version: 1, packs: [], errors: []}, catalogKnown = false, catalogBusy = false, catalogEpoch = 0, catalogRequest = null, previousBots = null;
+	function validCatalog(value)
+	{
+		return value && value.version === 1 && Array.isArray(value.packs) && value.packs.length <= 64 && value.packs.every(function(pack)
+		{
+			return pack && /^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,119}\.pk3$/.test(pack.name) &&
+				!['pak0.pk3', 'pak1.pk3', 'pak2.pk3', 'etloose.pk3'].includes(pack.name.toLowerCase()) &&
+				['etmain', 'legacy'].includes(pack.game) && Number.isSafeInteger(pack.size) && pack.size >= 22 && pack.size <= 268435456 &&
+				/^[0-9a-f]{8}$/.test(pack.crc32) && /^[0-9a-f]{64}$/.test(pack.sha256) &&
+				(pack.checksum == null || (Number.isInteger(pack.checksum) && pack.checksum >= -2147483648 && pack.checksum <= 2147483647)) &&
+				Array.isArray(pack.maps) && pack.maps.length <= 1024 && pack.maps.every(function(map) { return /^[a-z0-9_][a-z0-9_-]{0,63}$/.test(map); });
+		});
+	}
+	function customStatus(text) { document.getElementById('customstatus').textContent = text; }
+	function customMapName(map) { return map.split(/[_-]+/).map(function(word) { return word === 'etl' ? 'ETL' : word.charAt(0).toUpperCase() + word.slice(1); }).join(' '); }
+	function installCatalog(value, saved)
+	{
+		customCatalog = value;
+		catalogKnown = true;
+		var selected = mapselect.value, maps = [];
+		value.packs.forEach(function(pack) { if (pack.game === 'etmain') pack.maps.forEach(function(map) { if (!supportedMaps.slice(0, 6).includes(map) && !maps.includes(map)) maps.push(map); }); });
+		supportedMaps.splice(6); mapNames.splice(6); mapBriefs.splice(6);
+		if (mapselect.options) while (mapselect.options.length > 6) mapselect.remove(6);
+		maps.sort().forEach(function(map)
+		{
+			supportedMaps.push(map); mapNames.push(customMapName(map)); mapBriefs.push('Custom map · bot navigation available.');
+			var option = document.createElement('option'); option.value = map; option.textContent = customMapName(map) + ' · Custom'; mapselect.appendChild(option);
+		});
+		mapselect.value = supportedMaps.includes(initialMap) ? initialMap : supportedMaps.includes(selected) ? selected : 'oasis';
+		initialMap = null;
+		customStatus((saved ? 'Using saved map list. ' : '') + maps.length + (maps.length === 1 ? ' custom map' : ' custom maps') + ' · ' + value.packs.length + (value.packs.length === 1 ? ' extra pack.' : ' extra packs.') +
+			(value.errors && value.errors.length ? ' ' + value.errors.length + ' invalid packs skipped; check the launcher server log.' : ''));
+		updateMatchSummary();
+	}
+	function refreshCatalog(callback)
+	{
+		if (bootFailed || catalogBusy) return;
+		catalogBusy = true;
+		var epoch = ++catalogEpoch, xhr = catalogRequest = new XMLHttpRequest();
+		var refresh = document.getElementById('refreshmaps'), restoreRefreshFocus = document.activeElement === refresh;
+		refresh.disabled = true; document.getElementById('customfile').disabled = true;
+		playbtn.disabled = true; updateOnlineJoin(); customStatus('Checking installed custom maps…');
+		xhr.open('GET', 'assets/custom.json', true); xhr.timeout = 10000;
+		function finish(value)
+		{
+			if (bootFailed || epoch !== catalogEpoch || !catalogBusy) return;
+			catalogBusy = false; catalogRequest = null;
+			var saved = false;
+			if (!validCatalog(value)) { try { value = JSON.parse(localStorage.getItem('etl.customAssets')); saved = true; } catch (e) {} }
+			if (validCatalog(value))
+			{
+				installCatalog(value, saved);
+				if (!saved) try { localStorage.setItem('etl.customAssets', JSON.stringify(value)); } catch (e) {}
+			}
+			else customStatus('Custom map list unavailable. Bundled maps still work. Start the local launcher and refresh to import maps.');
+			document.getElementById('refreshmaps').disabled = loadState !== 'ready'; document.getElementById('customfile').disabled = loadState !== 'ready';
+			playbtn.disabled = loadState !== 'ready'; updateOnlineJoin();
+			if (restoreRefreshFocus && document.activeElement === document.body && playMode === 'offline' && loadState === 'ready') refresh.focus();
+			if (callback) callback();
+		}
+		xhr.onload = function() { var value; try { if (xhr.status === 200) value = JSON.parse(xhr.responseText); } catch (e) {} finish(value); };
+		xhr.onerror = xhr.ontimeout = function() { finish(null); };
+		xhr.send();
+	}
+	document.getElementById('refreshmaps').addEventListener('click', function() { if (loadState === 'ready') refreshCatalog(); });
+	document.getElementById('customfile').addEventListener('change', function()
+	{
+		if (loadState !== 'ready' || catalogBusy || !this.files || !this.files.length) return;
+		var file = this.files[0], input = this;
+		if (!/^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,119}\.pk3$/.test(file.name) || file.size < 22 || file.size > 268435456)
+		{ customStatus('Choose a .pk3 map pack with a simple filename, up to 256 MB.'); input.value = ''; return; }
+		catalogBusy = true; input.disabled = true; document.getElementById('refreshmaps').disabled = true; playbtn.disabled = true; updateOnlineJoin();
+		customStatus('Checking and importing ' + file.name + '…');
+		var epoch = ++catalogEpoch, xhr = catalogRequest = new XMLHttpRequest(); xhr.open('POST', 'assets/import/' + encodeURIComponent(file.name), true); xhr.timeout = 180000;
+		xhr.setRequestHeader('X-ETL-Import', '1'); xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+		if (xhr.upload)
+		{
+			xhr.upload.onprogress = function(event) { if (!bootFailed && epoch === catalogEpoch && catalogBusy && event.lengthComputable) customStatus('Uploading ' + file.name + ' · ' + Math.round(event.loaded / event.total * 100) + '%'); };
+			xhr.upload.onload = function() { if (!bootFailed && epoch === catalogEpoch && catalogBusy) customStatus('Verifying ' + file.name + '… Larger packs take longer.'); };
+		}
+		function finish(ok, message)
+		{
+			if (bootFailed || epoch !== catalogEpoch || !catalogBusy) return;
+			catalogBusy = false; catalogRequest = null; input.value = '';
+			if (ok) { refreshCatalog(); return; }
+			input.disabled = loadState !== 'ready'; document.getElementById('refreshmaps').disabled = loadState !== 'ready'; playbtn.disabled = loadState !== 'ready'; updateOnlineJoin(); customStatus(message);
+		}
+		xhr.onload = function() { if (bootFailed || epoch !== catalogEpoch || !catalogBusy) return; if (xhr.status === 200) try { var result = JSON.parse(xhr.responseText); initialMap = result.installed.maps[0]; } catch (e) {} finish(xhr.status === 200, xhr.status === 409 ? 'That pack name is already installed. Rename the new pack, or choose the existing map.' : 'Import rejected. Use a valid ET map PK3 without executable mods, unsafe paths or startup settings.'); };
+		xhr.onerror = xhr.ontimeout = function() { finish(false, 'Import did not finish. Start the local launcher, check the connection, then refresh the map list before retrying.'); };
+		xhr.send(file);
+	});
+	function updateMatchSummary()
+	{
+		var index = supportedMaps.indexOf(mapselect.value), count = Number(botcount.value);
+		var navigation = true;
+		if (index >= 6) try { navigation = Module.FS.stat('/omni-bot/et/nav/' + mapselect.value + '.way').size > 0 && Module.FS.stat('/omni-bot/et/nav/' + mapselect.value + '.gm').size > 0; } catch (e) { navigation = false; }
+		if (!navigation) { if (previousBots === null) previousBots = botcount.value; botcount.value = 0; count = 0; }
+		else if (previousBots !== null) { botcount.value = previousBots; count = Number(previousBots); previousBots = null; }
+		botcount.disabled = !navigation;
+		var valid = botcount.value !== '' && Number.isInteger(count) && count >= 0 && count <= 12;
+		controlAttribute(botcount, 'aria-invalid', String(!valid));
+		var names = { '2': 'Easy', '4': 'Normal', '6': 'Hard' };
+		difficulty.disabled = valid && count === 0;
+		controlText(document.getElementById('mapbrief'), !navigation ? 'Custom map · solo exploration. No bot navigation is installed for this map.' : mapBriefs[index] || 'Choose a map for your match.');
+		controlText(document.getElementById('matchsummary'), (mapNames[index] || 'Choose a map') + ' · ' +
+			(!valid ? 'Choose 0–12 bots' : count === 0 ? 'Solo exploration' : count + (count === 1 ? ' bot' : ' bots') + ' · ' + names[difficulty.value]));
+	}
+	mapselect.addEventListener('change', updateMatchSummary);
+	botcount.addEventListener('input', updateMatchSummary);
+	difficulty.addEventListener('change', updateMatchSummary);
+	updateMatchSummary();
+
+	function setStatus(msg, color)
+	{
+		statusEl.style.display = 'block';
+		statusEl.textContent = msg;
+		statusEl.style.color = color || '#e8c766';
+	}
+	function setLoadState(state, message)
+	{
+		loadState = state;
+		document.getElementById('cancelload').hidden = !['cache-loading','manifest-loading','downloading','verifying'].includes(state);
+		document.getElementById('customfile').disabled = state !== 'ready' || catalogBusy;
+		document.getElementById('refreshmaps').disabled = state !== 'ready' || catalogBusy;
+		document.getElementById('overlay').setAttribute('data-state', state);
+		var stage = state === 'engine-loading' ? 0 : state === 'starting' || state === 'running' ? 2 : 1;
+		['engine', 'files', 'match'].forEach(function(name, index)
+		{
+			var element = document.getElementById('stage-' + name);
+			controlAttribute(element, 'data-stage', index < stage || state === 'running' ? 'complete' : index === stage ? 'active' : 'pending');
+			controlAttribute(element, 'aria-current', index === stage ? 'step' : 'false');
+		});
+		controlAttribute(document.getElementById('matchform'), 'aria-busy', !['ready', 'failed', 'running'].includes(state));
+		if (message) setStatus(message);
+	}
+	function loading(epoch) { return epoch === loadEpoch && !bootFailed && loadState !== 'running'; }
+	function setProgress(frac, text)
+	{
+		barwrap.style.display = 'block';
+		var percent = Math.round(Math.max(0, Math.min(1, frac)) * 100);
+		bar.style.width = percent + '%';
+		barwrap.setAttribute('aria-valuenow', percent);
+		if (text) bartext.textContent = text;
+	}
+
+	var Module = {
+		canvas: (function() { return document.getElementById('canvas'); })(),
+		print: function(text) { console.log(text); },
+		printErr: function(text) { console.warn(text); },
+		onAbort: function(reason) { showFatal('The engine stopped: ' + reason); },
+		setStatus: function(text) {
+			if (!text || bootFailed) return;
+			var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+			if (m) {
+				var f = parseFloat(m[2]) / parseFloat(m[4]);
+				setProgress(f, 'compiling engine ' + Math.round(f * 100) + '%');
+			}
+		},
+		onRuntimeInitialized: function()
+		{
+			if (bootFailed || loadState !== 'engine-loading') return;
+			setLoadState('ready');
+			playbtn.disabled = false;
+			playbtn.textContent = 'PLAY OFFLINE';
+			bartext.textContent = '';
+			barwrap.style.display = 'none';
+			updateOnlineJoin();
+			refreshCatalog(resumeServerAssets);
+		}
+	};
+	Module.preRun = [];
+	Module.postRun = [];
+
+	// Small native settings snapshots use separate storage from the game packs.
+	var settingsConfig = null, settingsSaved = null, settingsTimer = null;
+	function settingsMessage(text) { document.getElementById('settingsstatus').textContent = text; }
+	try
+	{
+		var savedSettings = JSON.parse(localStorage.getItem('etl.engineSettings'));
+		if (savedSettings && savedSettings.version === 1 && typeof savedSettings.config === 'string' &&
+			savedSettings.config.length <= 256 * 1024 && savedSettings.config.startsWith('// generated by ') && !savedSettings.config.includes('\0'))
+			settingsConfig = settingsSaved = savedSettings.config;
+		else if (savedSettings) settingsMessage('Saved game settings are invalid; this match uses defaults.');
+	} catch (e) { settingsMessage(e instanceof SyntaxError ? 'Saved game settings are invalid; this match uses defaults.' :
+		'Game settings last only for this page; browser storage is unavailable.'); }
+	function flushSettings()
+	{
+		if (settingsTimer !== null) { clearTimeout(settingsTimer); settingsTimer = null; }
+		if (settingsConfig === null || settingsConfig === settingsSaved) return;
+		try
+		{
+			localStorage.setItem('etl.engineSettings', JSON.stringify({ version: 1, config: settingsConfig }));
+			settingsSaved = settingsConfig;
+			settingsMessage('Game settings saved in this browser. Apply display changes before leaving the menu.');
+		} catch (e) { settingsMessage('Game settings last only for this page; browser storage is unavailable.'); }
+	}
+	Module['browserSaveSettings'] = function(config)
+	{
+		if (typeof config !== 'string' || config.length > 256 * 1024 || !config.startsWith('// generated by ') || config.includes('\0')) return;
+		// A profile may previously have marked password as archived. Keep the
+		// connection secret out of browser settings even in that case.
+		config = config.split('\n').filter(function(line) { return !/^\s*seta?\s+"?password"?\s/i.test(line); }).join('\n');
+		settingsConfig = config;
+		if (settingsTimer === null) settingsTimer = setTimeout(flushSettings, 250);
+	};
+	function restoreSettings()
+	{
+		for (var path of ['/browser', '/browser/legacy', '/browser/etmain']) { try { Module.FS.mkdir(path); } catch (e) {} }
+		// Keep the native player identity through asset-recovery reloads. It is
+		// local game data, independent of packs and generated player settings.
+		var identity = null;
+		try { identity = localStorage.getItem('etl.playerKey'); } catch (e) {}
+		if (typeof identity !== 'string' || !/^0000001002\d{18}$/.test(identity))
+		{
+			if (typeof crypto !== 'undefined' && crypto.getRandomValues)
+			{
+				identity = '0000001002' + Array.from(crypto.getRandomValues(new Uint8Array(18)), function(value) { return String(value % 10); }).join('');
+				try { localStorage.setItem('etl.playerKey', identity); } catch (e) { settingsMessage('Online identity lasts only for this page; browser storage is unavailable.'); }
+			}
+			else identity = null; // Native generation remains available on older browsers.
+		}
+		if (identity) Module.FS.writeFile('/browser/etmain/etkey', identity);
+		if (settingsConfig !== null)
+		{
+			try { Module.FS.writeFile('/browser/legacy/etconfig.cfg', settingsConfig); }
+			catch (e) { settingsMessage('Saved game settings could not be restored. This match uses defaults.'); }
+		}
+	}
+
+	// Keep browser permissions and focus separate from SDL's synchronous grab API.
+	var gamebar = document.getElementById('gamebar');
+	var focusstatus = document.getElementById('focusstatus');
+	var capturebtn = document.getElementById('capturebtn');
+	var soundbtn = document.getElementById('soundbtn');
+	var volume = document.getElementById('volume');
+	var soundstatus = document.getElementById('soundstatus');
+	var volumevalue = document.getElementById('volumevalue');
+	var helpdialog = document.getElementById('helpdialog');
+	var helpbtn = document.getElementById('helpbtn');
+	var networkdialog = document.getElementById('networkdialog');
+	var matchdialog = document.getElementById('matchdialog');
+	var appdialog = document.getElementById('appdialog');
+	function closeBrowserDialogs(except)
+	{
+		[helpdialog, networkdialog, matchdialog, appdialog].forEach(function(dialog)
+		{
+			if (dialog !== except && dialog.open) dialog.close();
+		});
+	}
+	function resumeBrowserGame()
+	{
+		if (!bootFailed && loadState === 'running' &&
+			![helpdialog, networkdialog, matchdialog, appdialog].some(function(dialog) { return dialog.open; })) Module.canvas.focus();
+	}
+	Module['browserModalOpen'] = function() { return [helpdialog, networkdialog, matchdialog, appdialog].some(function(dialog) { return dialog.open; }); };
+	var networkbtn = document.getElementById('networkbtn');
+	var joinbtn = document.getElementById('joinbtn');
+	var autoServerAssets = false, configuredRelay = '', missingServerAssets = null, serverPackSelection = null;
+	var recoveringAssets = false, assetRequest = null, assetRecoveryEpoch = 0, assetResume = null, resumeOnlineAssets = null, assetError = '', assetsNeedReload = false;
+	function sameAssetServer(value)
+	{
+		return value && (selectedServerId ? value.serverId === selectedServerId && value.relay.split('/relay')[0] === configuredRelay.split('/relay')[0] : !value.serverId && value.relay === configuredRelay);
+	}
+	function validServerRefs(refs)
+	{
+		return Array.isArray(refs) && refs.length > 0 && refs.length <= 64 && refs.every(function(ref)
+		{
+			return ref && ['etmain','legacy'].includes(ref.game) && /^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,119}\.pk3$/.test(ref.name) &&
+				Number.isInteger(ref.checksum) && ref.checksum >= -2147483648 && ref.checksum <= 2147483647;
+		});
+	}
+	try
+	{
+		var savedResume = JSON.parse(localStorage.getItem('etl.assetResume'));
+		if (savedResume && savedResume.version === 1 && validServerRefs(savedResume.required) && typeof savedResume.relay === 'string' &&
+			Number.isInteger(savedResume.attempts) && savedResume.attempts >= 1 && savedResume.attempts <= 4 &&
+			Number.isFinite(savedResume.expires) && savedResume.expires > Date.now() && savedResume.expires <= Date.now() + 600000)
+			if (!savedResume.serverId || typeof savedResume.serverId === 'string' && /^[a-f0-9]{32}$/.test(savedResume.serverId)) assetResume = savedResume;
+	} catch (e) {}
+	function saveAssetResume(value)
+	{
+		// Cancellation must clear the current session even if storage stops working.
+		assetResume = null;
+		try
+		{
+			if (value === null) localStorage.removeItem('etl.assetResume');
+			else localStorage.setItem('etl.assetResume', JSON.stringify(value));
+			assetResume = value; return true;
+		}
+		catch (e) { try { localStorage.removeItem('etl.assetResume'); } catch (ignored) {} return false; }
+	}
+	function resumeServerAssets()
+	{
+		if (!assetResume || !catalogKnown || loadState !== 'ready') return;
+		resumeOnlineAssets = assetResume; selectedServerId = assetResume.serverId || ''; selectPlayMode('online');
+	}
+	Module['browserMissingAssets'] = function(missing, names, checksums)
+	{
+		missingServerAssets = null;
+		if (![missing,names,checksums].every(function(value) { return typeof value === 'string' && value.length <= 16384; })) return;
+		var paths = names.trim().split(/\s+/), sums = checksums.trim().split(/\s+/), required = [];
+		if (paths.length !== sums.length || paths.length > 64) return;
+		paths.forEach(function(path, index)
+		{
+			var parts = path.split('/');
+			required.push({game:parts.length === 2 ? parts[0] : '', name:parts[1] + '.pk3', checksum:/^-?\d+$/.test(sums[index]) ? Number(sums[index]) : NaN});
+		});
+		if (!validServerRefs(required)) return;
+		var absent = missing.trim().split(/\n/).map(function(line) { return line.split(' ')[0]; });
+		var needed = required.filter(function(ref) { return absent.includes(ref.game + '/' + ref.name); });
+		if (!needed.length || needed.length !== absent.length || needed.some(function(ref) { return ['pak0.pk3','pak1.pk3','pak2.pk3','etloose.pk3'].includes(ref.name.toLowerCase()); })) return;
+		missingServerAssets = {required:required, needed:needed};
+	};
+	function cancelServerAssets()
+	{
+		assetRecoveryEpoch++; recoveringAssets = false; missingServerAssets = null; assetError = '';
+		assetsNeedReload = false; document.getElementById('reloadassets').hidden = true;
+		document.getElementById('serverdownload').hidden = true;
+		controlText(document.getElementById('disconnectonline'), 'Disconnect');
+		if (assetRequest) { assetRequest.abort(); assetRequest = null; }
+		saveAssetResume(null);
+	}
+	function recoverServerAssets()
+	{
+		if (recoveringAssets) return;
+		var assets = missingServerAssets; missingServerAssets = null;
+		var attempts = sameAssetServer(assetResume) ? assetResume.attempts : 0;
+		if (attempts >= 4) { controlText(document.getElementById('connectionstatus'), 'Server assets keep changing. Check again later or choose offline play.'); saveAssetResume(null); return; }
+		recoveringAssets = true; assetError = '';
+		document.getElementById('serverdownload').hidden = false;
+		controlText(networkbtn, 'Downloading packs');
+		var epoch = ++assetRecoveryEpoch, index = 0;
+		document.getElementById('retryconnection').disabled = true;
+		document.getElementById('disconnectonline').disabled = false;
+		controlText(document.getElementById('disconnectonline'), 'Cancel download');
+		controlText(document.getElementById('connectionhint'), 'Cancel to stop this download. Verified packs stay installed.');
+		updateConnectionActions();
+		function failed(message)
+		{
+			if (epoch !== assetRecoveryEpoch) return;
+			cancelServerAssets(); document.getElementById('retryconnection').disabled = false; document.getElementById('disconnectonline').disabled = true;
+			controlText(networkbtn, 'Download failed');
+			assetError = assets.needed[Math.max(0, index - 1)].name + ': ' + (typeof message === 'string' ? message : 'Required server pack could not be verified or downloaded. Retry the connection.') + ' Verified packs stay installed. Offline play is available.';
+			controlText(document.getElementById('connectionstatus'), assetError);
+			controlText(document.getElementById('connectionhint'), 'Retry to reconnect, or return to the launcher to choose offline play.');
+			updateConnectionActions(); document.getElementById('retryconnection').focus();
+		}
+		function next()
+		{
+			if (bootFailed) { cancelServerAssets(); return; }
+			if (epoch !== assetRecoveryEpoch || !recoveringAssets) return;
+			if (index === assets.needed.length)
+			{
+				if (!saveAssetResume({version:1, relay:configuredRelay, serverId:selectedServerId, required:assets.required, attempts:attempts + 1, expires:Date.now() + 600000}))
+				{
+					cancelServerAssets(); document.getElementById('disconnectonline').disabled = true;
+					assetsNeedReload = true; document.getElementById('reloadassets').hidden = false;
+					assetError = 'Server packs verified. Browser storage is unavailable. Reload to load the packs, then choose Online and join again.';
+					controlText(networkbtn, 'Packs ready');
+					controlText(document.getElementById('connectionstatus'), assetError);
+					controlText(document.getElementById('connectionhint'), 'Reload to load the verified packs, then join again from the launcher.');
+					updateConnectionActions();
+					document.getElementById('reloadassets').focus(); return;
+				}
+				flushSettings(); audioPageHidden = true; silenceAudio();
+				controlText(document.getElementById('connectionstatus'), 'Server packs verified. Reloading to rejoin…'); location.reload(); return;
+			}
+			var ref = assets.needed[index++];
+			controlText(document.getElementById('serverpackname'), 'Pack ' + index + ' of ' + assets.needed.length + ' · ' + ref.name);
+			controlText(document.getElementById('connectionstatus'), 'Preparing required server packs…');
+			var meter = document.getElementById('serverpackprogress'), detail = document.getElementById('serverpackdetail');
+			meter.removeAttribute('value'); controlText(detail, 'Checking installed packs…');
+			var xhr = assetRequest = new XMLHttpRequest();
+			xhr.open('GET', 'network/assets/' + ref.game + '/' + ref.name + '?checksum=' + ref.checksum, true);
+			xhr.setRequestHeader('X-ETL-Assets','1'); xhr.setRequestHeader('Accept','application/x-ndjson'); xhr.timeout = 240000;
+			var offset = 0, result = null, streamFailed = false;
+			var stages = {waiting:'Waiting for another pack download…', checking:'Checking installed packs…', resolving:'Finding the approved download source…', downloading:'Downloading from the approved source…', extracting:'Unpacking the required game pack…', verifying:'Verifying pack integrity and server version…', publishing:'Installing verified pack…', ready:'Already installed and verified.'};
+			function readProgress(final)
+			{
+				if (epoch !== assetRecoveryEpoch || streamFailed) return;
+				var response = xhr.responseText || '';
+				if (response.length > 262144) { streamFailed = true; failed('Download progress was invalid. Retry the connection.'); return; }
+				var end;
+				while ((end = response.indexOf('\n', offset)) >= 0)
+				{
+					var value; try { value = JSON.parse(response.slice(offset, end)); } catch (e) { streamFailed = true; failed(); return; }
+					offset = end + 1;
+					if (!value || typeof value !== 'object' || Array.isArray(value)) { streamFailed = true; failed(); return; }
+					if (value.error)
+					{
+						var errors = {timeout:'The pack source took too long. Retry the connection.', source:'The approved source is unavailable or does not have this pack. Retry later or ask the server operator to add a download source.', checksum:'The source has a different pack version. Ask the server operator to update its download source.', limit:'The pack exceeds launcher limits. Ask the server operator to review installed packs.', invalid:'The pack could not be verified. Ask the server operator for a valid copy.'};
+						streamFailed = true; failed(errors[value.error]); return;
+					}
+					if (value.installed) { result = value; continue; }
+					if (!Object.prototype.hasOwnProperty.call(stages, value.stage)) { streamFailed = true; failed(); return; }
+					controlText(document.getElementById('connectionstatus'), stages[value.stage]);
+					meter.removeAttribute('value');
+					if (value.stage === 'downloading' && Number.isFinite(value.loaded) && value.loaded >= 0 && value.loaded <= 268435456 && Number.isFinite(value.total) && value.total >= 0 && value.total <= 268435456)
+					{
+						var known = value.total > 0, percent = known ? Math.min(100, Math.floor(value.loaded / value.total * 100)) : 0;
+						if (known) meter.value = percent;
+						controlText(detail, (value.loaded / 1048576).toFixed(1) + (known ? ' / ' + (value.total / 1048576).toFixed(1) : '') + ' MB' + (known ? ' · ' + percent + '%' : ' downloaded'));
+					}
+					else controlText(detail, stages[value.stage]);
+				}
+				if (final && offset !== response.length) { streamFailed = true; failed(); }
+			}
+			xhr.onprogress = function() { readProgress(false); };
+			xhr.onload = function()
+			{
+				if (epoch !== assetRecoveryEpoch) return;
+				readProgress(true); if (epoch !== assetRecoveryEpoch || streamFailed) return;
+				assetRequest = null;
+				if (xhr.status !== 200 || !result || result.installed.game !== ref.game || result.installed.checksum !== ref.checksum) { failed(); return; }
+				next();
+			};
+			xhr.onerror = function() { failed('The connection to the launcher was interrupted. Retry the connection.'); };
+			xhr.ontimeout = function() { failed('Pack preparation took too long. Retry the connection.'); }; xhr.send();
+		}
+		next();
+	}
+	function updateOnlineJoin()
+	{
+		var password = document.getElementById('onlinepassword');
+		var passwordValid = password.value.length <= 64 && password.value.split('').every(function(char) {
+			return char.charCodeAt(0) >= 32 && char.charCodeAt(0) !== 127 && ['\\','"',';'].indexOf(char) === -1;
+		});
+		controlAttribute(password, 'aria-invalid', String(!passwordValid));
+		controlText(document.getElementById('passwordhint'), passwordValid ? 'Only needed for password-protected servers. It is not saved.' : 'ET passwords cannot contain quotes, backslashes, semicolons or control characters, and must be at most 64 characters.');
+		password.disabled = joiningOnline;
+		document.getElementById('publicserver').disabled = joiningOnline || checkingOnline;
+		document.getElementById('refreshpublic').disabled = joiningOnline || publicBusy;
+		joinbtn.disabled = loadState !== 'ready' || catalogBusy || !onlineConfigured || joiningOnline || !serverCompatible || !passwordValid || (serverPasswordRequired && !password.value);
+		controlText(joinbtn, joiningOnline ? (loadState === 'ready' ? 'CONNECTING…' : 'LOADING GAME…') : loadState === 'engine-loading' ? 'LOADING ENGINE…' : serverPasswordRequired && !password.value ? 'ENTER SERVER PASSWORD' : onlineConfigured && !serverVerified ? 'TRY JOINING SERVER' : 'JOIN SERVER');
+		controlAttribute(joinbtn, 'aria-busy', String(joiningOnline));
+		document.getElementById('canceljoin').hidden = !joiningOnline || loadState !== 'ready';
+		document.getElementById('refreshonline').disabled = checkingOnline || joiningOnline || loadState !== 'ready';
+		controlText(document.getElementById('refreshonline'), checkingOnline ? 'Checking…' : 'Check again');
+	}
+	function networkText(message) { controlText(document.getElementById('onlinestatus'), message); }
+	function stopPublicScan()
+	{
+		publicEpoch++; publicBusy = false;
+		if (publicRequest) { publicRequest.abort(); publicRequest = null; }
+		if (publicTimer !== null) { clearTimeout(publicTimer); publicTimer = null; }
+	}
+	function renderPublicList(force)
+	{
+		var select = document.getElementById('publicserver'), filter = document.getElementById('serverfilter').value.trim().toLowerCase();
+		// Background discovery must not reset an open native picker or keyboard
+		// navigation. Apply its latest options when the player leaves the control.
+		if (!force && document.activeElement === select) return publicEntries.filter(function(entry) { return (entry.info.hostname + ' ' + entry.info.map).toLowerCase().includes(filter); }).length;
+		select.textContent = '';
+		function add(identity, text) { var option = document.createElement('option'); option.value = identity; option.textContent = text; select.appendChild(option); }
+		add('', 'Launcher default');
+		var shown = 0;
+		publicEntries.forEach(function(entry)
+		{
+			var info = entry.info, matches = (info.hostname + ' ' + info.map).toLowerCase().includes(filter);
+			if (!matches && entry.id !== selectedServerId) return;
+			if (matches) shown++;
+			var slots = Number.isInteger(info.players) && Number.isInteger(info.capacity) ? ' · ' + info.players + '/' + info.capacity : '';
+			add(entry.id, (info.hostname || entry.host) + ' · ' + info.map + slots + ' · ' + info.latencyMs + ' ms' + (info.password ? ' · Password' : '') + (!matches ? ' · Selected' : ''));
+		});
+		if (selectedServerId && !publicEntries.some(function(entry) { return entry.id === selectedServerId; })) add(selectedServerId, selectedServerLabel ? selectedServerLabel + ' · Selected' : 'Selected server · check availability');
+		select.value = selectedServerId;
+		controlAttribute(select, 'aria-describedby', 'publicstatus');
+		return shown;
+	}
+	function loadPublicServers()
+	{
+		if (!publicEnabled || publicBusy || joiningOnline || bootFailed || playMode !== 'online' || !['ready','engine-loading'].includes(loadState)) return;
+		if (publicTimer !== null) { clearTimeout(publicTimer); publicTimer = null; }
+		var epoch = ++publicEpoch, xhr = publicRequest = new XMLHttpRequest(); publicBusy = true; updateOnlineJoin();
+		xhr.open('GET', 'network/servers.json', true); xhr.timeout = 5000;
+		function failed()
+		{
+			if (epoch !== publicEpoch || bootFailed) return;
+			publicRequest = null; publicBusy = false; updateOnlineJoin();
+			controlText(document.getElementById('publicstatus'), 'Could not refresh the public list. Try again, use the launcher default, or play offline.');
+		}
+		xhr.onload = function()
+		{
+			if (epoch !== publicEpoch || bootFailed) return;
+			try
+			{
+				if (xhr.status !== 200 || xhr.responseText.length > 4194304) throw new Error('Invalid public catalog');
+				var value = JSON.parse(xhr.responseText);
+				if (!value || value.version !== 1 || !['checking','ready','unavailable'].includes(value.status) || !Array.isArray(value.servers) || value.servers.length > 4096 ||
+					!Number.isInteger(value.total) || value.total < 0 || value.total > 4096 || !Number.isInteger(value.checked) || value.checked < 0 || value.checked > value.total) throw new Error('Invalid public catalog');
+				var ids = {};
+				value.servers.forEach(function(entry) {
+					var info = entry && entry.info;
+					if (!entry || typeof entry.id !== 'string' || !/^[a-f0-9]{32}$/.test(entry.id) || ids[entry.id] || typeof entry.host !== 'string' || entry.host.length > 64 ||
+						!info || info.status !== 'online' || info.compatible !== true || typeof info.hostname !== 'string' || info.hostname.length > 160 || typeof info.map !== 'string' || info.map.length > 64 ||
+						!Number.isInteger(info.latencyMs) || info.latencyMs < 0 || info.latencyMs > 10000) throw new Error('Invalid server entry');
+					ids[entry.id] = true;
+				});
+				publicEntries = value.servers; var shown = renderPublicList();
+				publicRequest = null; publicBusy = false; updateOnlineJoin();
+				controlText(document.getElementById('publicstatus'), value.status === 'unavailable' ? 'The public master is unavailable. Recent verified servers are shown; retry later.' :
+					shown + ' matching compatible server' + (shown === 1 ? '' : 's') + ' · ' + value.checked + '/' + value.total + ' checked' + (value.status === 'checking' ? ' · Checking…' : '. Refreshes at most once a minute.'));
+				if (value.status === 'checking') publicTimer = setTimeout(loadPublicServers, 2000);
+			} catch (error) { failed(); }
+		};
+		xhr.onerror = failed; xhr.ontimeout = failed; xhr.send();
+	}
+	document.getElementById('serverfilter').addEventListener('input', function() {
+		var shown = renderPublicList(); controlText(document.getElementById('publicstatus'), shown + ' matching compatible server' + (shown === 1 ? '' : 's') + '.');
+	});
+	document.getElementById('publicserver').addEventListener('change', function() {
+		if (joiningOnline || checkingOnline) return;
+		selectedServerId = this.value; selectedServerLabel = ''; document.getElementById('onlinepassword').value = ''; resumeOnlineAssets = null;
+		checkOnline();
+	});
+	document.getElementById('refreshpublic').addEventListener('click', loadPublicServers);
+	document.getElementById('publicserver').addEventListener('blur', function() { renderPublicList(true); });
+	function showServerInfo(config)
+	{
+		var info = config.serverInfo;
+		serverVerified = !!(info && info.status === 'online' && typeof info.compatible === 'boolean' &&
+			typeof info.hostname === 'string' && info.hostname.length <= 160 && typeof info.map === 'string' && info.map.length <= 64);
+		serverCompatible = !serverVerified || info.compatible;
+		serverPasswordRequired = serverVerified && info.password === true;
+		document.getElementById('serverdetails').hidden = false;
+		controlText(document.getElementById('servername'), config.serverLabel);
+		controlText(document.getElementById('serverhostname'), serverVerified ? info.hostname : 'Live server details unavailable');
+		function count(value) { return Number.isInteger(value) && value >= 0 && value <= 128; }
+		var population = serverVerified && count(info.players) && count(info.capacity) ? info.players + ' / ' + info.capacity + ' slots occupied' : 'Player count unavailable';
+		if (serverVerified && count(info.humans) && count(info.players) && info.humans <= info.players) population += ' · ' + info.humans + ' human' + (info.humans === 1 ? '' : 's');
+		if (serverVerified && count(info.players) && count(info.capacity) && info.capacity > 0 && info.players >= info.capacity) population += ' · Full';
+		controlText(document.getElementById('serverpopulation'), population);
+		controlText(document.getElementById('servermap'), serverVerified && info.map ? 'Map: ' + info.map : 'Map unavailable');
+		controlText(document.getElementById('serverresponse'), serverVerified && Number.isFinite(info.latencyMs) && info.latencyMs >= 0 && info.latencyMs <= 10000 ? 'Server response: ' + Math.round(info.latencyMs) + ' ms from the relay host. ' + (config.serverId ? 'Details come from the latest public scan.' : 'Details refresh at most every 10 seconds.') : 'The server may be offline or may not answer browser queries. You can still try joining.');
+		var incompatibility = info && typeof info.reason === 'string' && info.reason.length <= 240 ? info.reason : 'This browser needs an ET: Legacy server with protocol 84 and the Legacy mod.';
+		controlText(document.getElementById('serverrules'), !serverCompatible ? 'Incompatible: ' + incompatibility : serverPasswordRequired ? 'Password protected. Enter the server password below.' : serverVerified ? 'Legacy server · No password required' : 'Compatibility will be checked when joining.');
+		document.getElementById('serverpassword').open = serverPasswordRequired;
+		return !serverCompatible ? 'This server is incompatible with the browser build. Ask the launcher operator to configure a compatible Legacy server, or play offline.' : serverPasswordRequired ? 'Server replied. Enter its password to join.' : serverVerified ? 'Server replied. Join when ready; matching game packs are checked during connection.' : 'The server has not been verified. Try joining, check again, or play offline.';
+	}
+	function showNetworkDialog()
+	{
+		stopDragAim(); releaseMouse(); resetInput = true;
+		closeBrowserDialogs(networkdialog);
+		if (!networkdialog.open) networkdialog.showModal();
+		document.getElementById('closenetwork').focus();
+	}
+	Module['browserNetworkStatus'] = function(label, text, stats)
+	{
+		controlText(networkbtn, recoveringAssets ? 'Downloading packs' : assetsNeedReload ? 'Packs ready' : assetError ? 'Download failed' : label);
+		if (label === 'Online') saveAssetResume(null);
+		controlAttribute(networkbtn, 'data-failed', String(stats.failed));
+		if (!recoveringAssets) controlText(document.getElementById('connectionstatus'), assetError || (label === 'Online' ? 'Connected to the game server.' : text));
+		var target = document.getElementById('connectiontarget');
+		controlText(target, stats.serverLabel ? 'Server: ' + stats.serverLabel : '');
+		target.hidden = !stats.serverLabel;
+		controlText(document.getElementById('networkstats'), (label === 'Online' ? text + ' · ' : '') + 'Packets: ' + stats.sent + ' sent · ' + stats.received + ' received');
+		controlText(document.getElementById('connectionhint'), recoveringAssets ? 'Cancel to stop this download. Verified packs stay installed.' : assetsNeedReload ? 'Reload to load the verified packs, then join again from the launcher.' : stats.closing ? 'Leaving the server…' : stats.opening ? 'You can cancel this connection attempt.' : label === 'Online' ? 'You are connected. Disconnect to leave this server, or return to the launcher to change play mode.' : stats.ready ? 'Joining the server. Disconnect to cancel, or return to the launcher.' : 'Retry to reconnect, or return to the launcher to choose offline play.');
+		document.getElementById('retryconnection').disabled = recoveringAssets || assetsNeedReload || stats.ready || stats.opening;
+		document.getElementById('disconnectonline').disabled = stats.closing || (!recoveringAssets && !stats.ready && !stats.opening);
+		controlText(document.getElementById('disconnectonline'), recoveringAssets ? 'Cancel download' : stats.opening ? 'Cancel connection' : 'Disconnect');
+		updateConnectionActions();
+		if (playMode === 'online' && loadState === 'ready') networkText(text);
+		if (retryingOnline && label === 'Online')
+		{
+			retryingOnline = false;
+			if (networkdialog.open) networkdialog.close();
+		}
+	};
+	Module['browserNetworkFailure'] = function(reason, started)
+	{
+		retryingOnline = false;
+		joiningOnline = false; updateOnlineJoin();
+		document.getElementById('offlinebtn').disabled = false;
+		document.getElementById('onlinebtn').disabled = false;
+		if (started && !bootFailed) showNetworkDialog();
+		if (started && !bootFailed && autoServerAssets && missingServerAssets) recoverServerAssets();
+		if (started && !bootFailed)
+		{
+			updateConnectionActions();
+			var preferred = recoveringAssets ? 'disconnectonline' : assetsNeedReload ? 'reloadassets' : 'retryconnection';
+			if (!document.getElementById(preferred).disabled) document.getElementById(preferred).focus();
+		}
+	};
+	function updateConnectionActions()
+	{
+		var retry = document.getElementById('retryconnection'), disconnect = document.getElementById('disconnectonline');
+		disconnect.hidden = disconnect.disabled;
+		retry.hidden = retry.disabled;
+		controlAttribute(retry, 'data-primary', String(!retry.disabled));
+		controlAttribute(disconnect, 'data-primary', String(recoveringAssets));
+		controlAttribute(document.getElementById('reloadassets'), 'data-primary', String(assetsNeedReload));
+	}
+	function checkOnline()
+	{
+		if (checkingOnline) return;
+		var epoch = ++onlineEpoch;
+		var refresh = document.getElementById('refreshonline');
+		var restoreCheckFocus = document.activeElement === refresh;
+		if (onlineRequest) onlineRequest.abort();
+		checkingOnline = true;
+		serverCompatible = true; serverPasswordRequired = false; serverVerified = false;
+		document.getElementById('serverdetails').hidden = true;
+		onlineConfigured = false; updateOnlineJoin(); networkText(selectedServerId ? 'Checking the selected server…' : 'Checking the launcher default…');
+		var xhr = onlineRequest = new XMLHttpRequest();
+		xhr.open('GET', 'network/config.json' + (selectedServerId ? '?server=' + encodeURIComponent(selectedServerId) : ''), true); xhr.timeout = 5000;
+		function restoreFocus()
+		{
+			if (restoreCheckFocus && document.activeElement === document.body && playMode === 'online' && loadState === 'ready') refresh.focus();
+		}
+		function unavailable(message)
+		{
+			if (epoch !== onlineEpoch || bootFailed) return;
+			onlineRequest = null; checkingOnline = false; networkText(message); updateOnlineJoin();
+			restoreFocus();
+		}
+		xhr.onload = function()
+		{
+			if (epoch !== onlineEpoch || bootFailed) return;
+			onlineRequest = null; checkingOnline = false;
+			try
+			{
+				if (xhr.status !== 200) throw new Error('Could not check online configuration. Check the preview server, then try again.');
+				var config = JSON.parse(xhr.responseText);
+				publicEnabled = config.publicServers === true;
+				document.getElementById('publicbrowser').hidden = !publicEnabled;
+				controlText(document.getElementById('onlineintro'), publicEnabled ? 'Browse public compatible Legacy servers. Choose a server to see its details, then join.' : 'This launcher connects to the server configured by its operator.');
+				if (publicEnabled) loadPublicServers();
+				if (config.version === 1 && config.enabled === false) { unavailable(selectedServerId ? 'This public server is no longer verified. Refresh the public list and choose another server, or play offline.' : 'Online play needs a relay configured for an ET: Legacy server. Offline matches are ready to play.'); return; }
+				if ((config.serverId || '') !== selectedServerId) throw new Error('The server selection changed. Choose your server again.');
+				Module['browserNetwork'].configure(config, Module.canvas.ownerDocument.baseURI);
+				selectedServerLabel = config.serverLabel;
+				if (publicEnabled) renderPublicList();
+				onlineConfigured = true; autoServerAssets = config.autoAssets === true; configuredRelay = config.relay;
+				controlText(document.getElementById('onlineassetsinfo'), autoServerAssets ? 'Missing server packs download from approved sources, then the game reloads to rejoin. Packs are checked against the server checksum. Executable custom mods are unsupported.' : 'Installed custom maps and matching Legacy assets load before joining. Ask the server operator for missing PK3 packs. Executable custom mods are unsupported.');
+				networkText(showServerInfo(config)); updateOnlineJoin();
+				if (sameAssetServer(resumeOnlineAssets) && !joinbtn.disabled)
+				{
+					joinbtn.click();
+				}
+				restoreFocus();
+			} catch (error) { unavailable(error.message); }
+		};
+		xhr.onerror = function() { unavailable('Could not check online configuration. Check the preview server, then try again.'); };
+		xhr.ontimeout = function() { unavailable('Checking online configuration timed out. Try again, or play offline.'); };
+		xhr.send();
+	}
+	function selectPlayMode(mode)
+	{
+		if (joiningOnline || !['ready', 'engine-loading'].includes(loadState)) return;
+		playMode = mode;
+		matchform.hidden = mode !== 'offline'; document.getElementById('onlinepanel').hidden = mode !== 'online';
+		controlAttribute(document.getElementById('offlinebtn'), 'aria-pressed', String(mode === 'offline'));
+		controlAttribute(document.getElementById('onlinebtn'), 'aria-pressed', String(mode === 'online'));
+		if (mode === 'online') checkOnline();
+		else { stopPublicScan(); onlineEpoch++; checkingOnline = false; document.getElementById('onlinepassword').value = ''; if (onlineRequest) { onlineRequest.abort(); onlineRequest = null; } updateOnlineJoin(); }
+	}
+	document.getElementById('offlinebtn').addEventListener('click', function() { selectPlayMode('offline'); });
+	document.getElementById('onlinebtn').addEventListener('click', function() { selectPlayMode('online'); });
+	document.getElementById('refreshonline').addEventListener('click', function() { if (!checkingOnline && !joiningOnline && loadState === 'ready') checkOnline(); });
+	document.getElementById('onlinepassword').addEventListener('input', updateOnlineJoin);
+	joinbtn.addEventListener('click', function()
+	{
+		if (joinbtn.disabled || joiningOnline || !onlineConfigured || loadState !== 'ready') return;
+		var focusCancel = document.activeElement === joinbtn;
+		if (sameAssetServer(resumeOnlineAssets)) { serverPackSelection = resumeOnlineAssets.required; resumeOnlineAssets = null; }
+		stopPublicScan();
+		joiningOnline = true; updateOnlineJoin(); primeAudio();
+		if (focusCancel) document.getElementById('canceljoin').focus();
+		document.getElementById('offlinebtn').disabled = true; document.getElementById('onlinebtn').disabled = true;
+		Module['browserNetwork'].connect(function(error)
+		{
+			if (error)
+			{
+				var restoreJoinFocus = document.activeElement === document.getElementById('canceljoin');
+				joiningOnline = false; networkText(error.message); updateOnlineJoin();
+				document.getElementById('offlinebtn').disabled = false; document.getElementById('onlinebtn').disabled = false;
+				if (restoreJoinFocus) joinbtn.focus();
+				return;
+			}
+			matchOptions = {online:true, password:document.getElementById('onlinepassword').value};
+			document.getElementById('onlinepassword').value = ''; startGame();
+			updateOnlineJoin();
+		});
+	});
+	document.getElementById('canceljoin').addEventListener('click', function()
+	{
+		if (joiningOnline && loadState === 'ready') Module['browserNetwork'].close('Connection cancelled. Join again, or play offline.');
+	});
+	networkbtn.addEventListener('click', showNetworkDialog);
+	document.getElementById('closenetwork').addEventListener('click', function() { networkdialog.close(); });
+	networkdialog.addEventListener('close', function() { retryingOnline = false; resumeBrowserGame(); });
+	document.getElementById('retryconnection').addEventListener('click', function()
+	{
+		if (this.disabled || bootFailed || loadState !== 'running') return;
+		assetError = '';
+		this.disabled = true; retryingOnline = true;
+		document.getElementById('closenetwork').focus();
+		Module['browserNetwork'].connect(function(error)
+		{
+			if (error) { retryingOnline = false; return; }
+			if (!Module['browserNetwork'].begin(true)) retryingOnline = false;
+		});
+	});
+	document.getElementById('disconnectonline').addEventListener('click', function()
+	{
+		cancelServerAssets(); retryingOnline = false;
+		var close = document.getElementById('closenetwork'), retry = document.getElementById('retryconnection');
+		close.focus();
+		Module['browserNetwork'].close('Disconnected by you. Retry, or return to offline play.', function()
+		{
+			if (networkdialog.open && !returningToLauncher && document.activeElement === close && !retry.disabled) retry.focus();
+		});
+	});
+	var returningToLauncher = false;
+	function returnToLauncher()
+	{
+		if (bootFailed || loadState !== 'running' || returningToLauncher) return;
+		returningToLauncher = true;
+		['returnlauncher','backoffline','reloadassets'].forEach(function(id) { document.getElementById(id).disabled = true; });
+		cancelServerAssets(); saveAssetResume(null);
+		flushSettings();
+		stopDragAim(); releaseMouse(); resetInput = true;
+		audioPageHidden = true; silenceAudio();
+		Module['browserNetwork'].close('', function() { location.reload(); });
+	}
+	document.getElementById('backoffline').addEventListener('click', returnToLauncher);
+	document.getElementById('reloadassets').addEventListener('click', returnToLauncher);
+	document.getElementById('cancelload').addEventListener('click', function()
+	{
+		if (!['cache-loading','manifest-loading','downloading','verifying'].includes(loadState) || returningToLauncher) return;
+		returningToLauncher = true; loadEpoch++;
+		this.disabled = true; cancelServerAssets();
+		if (activeRequest) { var request = activeRequest; activeRequest = null; request.abort(); }
+		joiningOnline = false; setLoadState('cancelled', 'Returning to match setup…');
+		audioPageHidden = true; silenceAudio();
+		Module['browserNetwork'].close('', function() { location.reload(); });
+	});
+	Module['browserShowMatchSetup'] = function()
+	{
+		if (bootFailed || loadState !== 'running') return;
+		stopDragAim(); releaseMouse(); resetInput = true;
+		closeBrowserDialogs(matchdialog);
+		if (!matchdialog.open) matchdialog.showModal();
+		document.getElementById('resumematch').focus();
+	};
+	document.getElementById('matchbtn').addEventListener('click', Module['browserShowMatchSetup']);
+	document.getElementById('resumematch').addEventListener('click', function() { matchdialog.close(); });
+	matchdialog.addEventListener('close', resumeBrowserGame);
+	document.getElementById('returnlauncher').addEventListener('click', function() { if (matchdialog.open) returnToLauncher(); });
+	var closehelp = document.getElementById('closehelp');
+	var canvasDoc = Module.canvas.ownerDocument || document;
+	var inputMode = 3, resetInput = false, capturePending = false, captureError = '', captureTimer = null, captureEpoch = 0;
+	var dragFallback = false, draggingAim = false;
+	var audioContext = null, audioProcessor = null, audioGain = null, audioTarget = -1;
+	var audioGraphError = '', audioError = '', audioEpoch = 0, audioResume = null, audioStateListener = null, audioPageHidden = false;
+	var soundMuted = false, soundVolume = 0.8, soundLastVolume = 0.8;
+	try
+	{
+		var soundSettings = JSON.parse(localStorage.getItem('etl.sound'));
+		if (soundSettings && Number.isFinite(soundSettings.volume)) soundVolume = Math.max(0, Math.min(1, soundSettings.volume));
+		soundMuted = !!(soundSettings && soundSettings.muted === true);
+		if (soundSettings && Number.isFinite(soundSettings.lastVolume) && soundSettings.lastVolume > 0) soundLastVolume = Math.min(1, soundSettings.lastVolume);
+		if (soundVolume > 0) soundLastVolume = soundVolume;
+	} catch (e) {}
+	volume.value = Math.round(soundVolume * 100);
+	function canvasFocused()
+	{
+		return !canvasDoc.hidden && canvasDoc.hasFocus() && canvasDoc.activeElement === Module.canvas;
+	}
+	function mouseLocked() { return canvasDoc.pointerLockElement === Module.canvas; }
+	function controlText(element, text) { if (element.textContent !== text) element.textContent = text; }
+	function controlAttribute(element, name, value) { if (element.getAttribute(name) !== String(value)) element.setAttribute(name, value); }
+	function saveSound()
+	{
+		try { localStorage.setItem('etl.sound', JSON.stringify({ volume: soundVolume, muted: soundMuted, lastVolume: soundLastVolume })); } catch (e) {}
+	}
+	function silenceAudio()
+	{
+		if (!audioGain) return;
+		try { audioGain.gain.cancelScheduledValues(audioContext.currentTime); } catch (e) {}
+		try { audioGain.gain.value = 0; } catch (e) {}
+		audioTarget = 0;
+	}
+	function disconnectAudio()
+	{
+		silenceAudio();
+		if (audioProcessor) try { audioProcessor.disconnect(); } catch (e) {}
+		if (audioGain) try { audioGain.disconnect(); } catch (e) {}
+		audioGain = null; audioTarget = -1;
+	}
+	function clearAudioResume()
+	{
+		if (audioResume) clearTimeout(audioResume.timer);
+		audioResume = null;
+	}
+	Module['browserAudioDeviceClosing'] = function()
+	{
+		// Release shell resources before native SDL frees the callback device.
+		disconnectAudio(); audioEpoch++; clearAudioResume();
+		if (audioContext && audioStateListener && audioContext.removeEventListener) audioContext.removeEventListener('statechange', audioStateListener);
+		audioStateListener = null; audioContext = audioProcessor = null;
+		audioError = audioGraphError = '';
+	};
+	function updateAudio(retryGraph)
+	{
+		var sdl = Module['SDL2'];
+		var context = sdl && sdl.audioContext, processor = sdl && sdl.audio && sdl.audio.scriptProcessorNode;
+		if (context !== audioContext || processor !== audioProcessor)
+		{
+			disconnectAudio(); audioEpoch++; clearAudioResume();
+			if (audioContext && audioStateListener && audioContext.removeEventListener) audioContext.removeEventListener('statechange', audioStateListener);
+			audioContext = context; audioProcessor = processor; audioError = ''; audioGraphError = '';
+			audioStateListener = function() { if (audioContext === context) { if (context.state === 'running' || context.state === 'closed') { audioError = ''; clearAudioResume(); } updateAudio(); } };
+			if (context && context.addEventListener) context.addEventListener('statechange', audioStateListener);
+			retryGraph = true;
+		}
+		if (context && context.state === 'closed' && audioGain) disconnectAudio();
+		if (retryGraph && !audioGain && context && processor && context.state !== 'closed' && !bootFailed)
+		{
+			var gain = null;
+			try
+			{
+				// Remove SDL's direct output before building the controlled path. A
+				// partial failure must stay silent instead of bypassing mute/volume.
+				processor.disconnect(); gain = context.createGain(); gain.gain.value = 0;
+				processor.connect(gain); gain.connect(context.destination);
+				audioGain = gain; audioTarget = -1; audioGraphError = '';
+			}
+			catch (e)
+			{
+				try { processor.disconnect(); } catch (ignored) {}
+				if (gain) try { gain.disconnect(); } catch (ignored) {}
+				audioGraphError = 'Audio controls unavailable · click Retry sound';
+			}
+		}
+		var state = !audioContext || !audioProcessor ? 'unavailable' : audioContext.state;
+		var active = canvasFocused() && !audioPageHidden && !bootFailed && loadState === 'running', muted = soundMuted || soundVolume === 0;
+		var target = active && !muted && state === 'running' ? soundVolume : 0;
+		if (audioGain && target !== audioTarget)
+		{
+			try
+			{
+				var param = audioGain.gain, time = audioContext.currentTime;
+				if (param.cancelAndHoldAtTime) param.cancelAndHoldAtTime(time);
+				else { var held = param.value; param.cancelScheduledValues(time); param.setValueAtTime(held, time); }
+				param.setTargetAtTime(target, time, 0.015); audioTarget = target;
+			}
+			catch (e) { disconnectAudio(); audioGraphError = 'Audio controls unavailable · click Retry sound'; }
+		}
+		controlText(soundstatus, audioGraphError || audioError || (muted ? 'Muted' : state === 'running' ? (!active ? 'Sound paused away from game' : 'Sound on') : state === 'suspended' || state === 'interrupted' ? (audioResume ? 'Enabling sound…' : 'Click to enable sound') : 'Sound unavailable'));
+		controlAttribute(soundstatus, 'data-audio-state', state);
+		controlAttribute(soundstatus, 'data-volume', Math.round(soundVolume * 100));
+		controlAttribute(soundstatus, 'data-output-volume', audioGain ? Math.round(audioGain.gain.value * 100) : 0);
+		controlAttribute(soundstatus, 'data-audio-ready', String(!!audioGain));
+		controlAttribute(soundstatus, 'title', context && context.sampleRate ? 'Audio output: ' + context.sampleRate + ' Hz. Sound pauses when the game loses focus.' : 'Sound pauses when the game loses focus.');
+		controlText(volumevalue, Math.round(soundVolume * 100) + '%');
+		controlAttribute(volume, 'aria-valuetext', Math.round(soundVolume * 100) + ' percent');
+		controlText(soundbtn, audioGraphError ? 'Retry sound' : muted ? 'Unmute' : state !== 'running' ? 'Enable sound' : 'Mute');
+		soundbtn.disabled = state === 'unavailable' || state === 'closed';
+		controlAttribute(soundbtn, 'aria-pressed', String(muted));
+	}
+	function resumeAudio()
+	{
+		updateAudio(true);
+		if (bootFailed || !audioContext || audioContext.state === 'closed') return;
+		if (audioContext.state === 'running') { audioError = ''; updateAudio(); return; }
+		if (audioResume) return;
+		var resumedContext = audioContext, epoch = audioEpoch, pending = {};
+		audioResume = pending; audioError = '';
+		function settled(error)
+		{
+			if (epoch !== audioEpoch || audioResume !== pending || bootFailed) return;
+			clearAudioResume();
+			if (error && resumedContext.state !== 'running' && resumedContext.state !== 'closed') audioError = 'Sound could not resume · click the sound control to retry';
+			updateAudio();
+		}
+		// Some autoplay policies leave resume() pending instead of rejecting.
+		// Bound the wait so the next trusted gesture can make a fresh attempt.
+		pending.timer = setTimeout(function() { settled(true); }, 4000);
+		try
+		{
+			var result = resumedContext.resume();
+			if (result && result.then) result.then(function() { settled(false); }, function() { settled(true); });
+			else settled(false);
+		} catch (e) { settled(true); }
+		updateAudio();
+	}
+	function primeAudio()
+	{
+		// Start the same context SDL will use while PLAY still has user activation,
+		// before pack verification and downloads yield back to the browser.
+		try
+		{
+			var Constructor = window.AudioContext || window.webkitAudioContext;
+			if (!Constructor) return;
+			var sdl = Module['SDL2'] || (Module['SDL2'] = {});
+			if (!sdl.audioContext || sdl.audioContext.state === 'closed') sdl.audioContext = new Constructor();
+			resumeAudio();
+		} catch (e) { audioError = 'Click Enable sound after the map loads'; }
+	}
+	function releaseMouse()
+	{
+		captureEpoch++; clearTimeout(captureTimer); capturePending = false;
+		if (mouseLocked()) try { canvasDoc.exitPointerLock(); } catch (e) {}
+	}
+	function captureMouse()
+	{
+		if (inputMode !== 0 || capturePending || bootFailed || loadState !== 'running') return;
+		Module.canvas.focus(); resumeAudio(); captureError = '';
+		if (mouseLocked()) return;
+		if (!Module.canvas.requestPointerLock) { dragFallback = true; captureError = 'Capture unavailable · hold right mouse to aim'; return; }
+		capturePending = true;
+		var epoch = ++captureEpoch;
+		captureTimer = setTimeout(function() { if (epoch !== captureEpoch) return; capturePending = false; dragFallback = true; captureError = 'Capture timed out · hold right mouse to aim'; }, 2000);
+		function failed()
+		{
+			if (epoch !== captureEpoch) return;
+			clearTimeout(captureTimer); capturePending = false;
+			dragFallback = true; captureError = 'Capture blocked · hold right mouse to aim, left click fires';
+		}
+		try
+		{
+			var result = Module.canvas.requestPointerLock();
+			if (result && result.catch) result.catch(failed);
+		} catch (e) { failed(); }
+	}
+	Module['browserInputFrame'] = function(mode)
+	{
+		if (mode !== inputMode) { inputMode = mode; captureError = ''; if (mode !== 0) { draggingAim = false; releaseMouse(); } }
+		var focused = canvasFocused(), locked = mouseLocked();
+		if (Module['browserTouch']) Module['browserTouch'].frame(mode, focused, !bootFailed && loadState === 'running');
+		if (!focused) { stopDragAim(); releaseMouse(); }
+		if (gamebar.hidden !== (bootFailed || loadState !== 'running')) gamebar.hidden = bootFailed || loadState !== 'running';
+		capturebtn.disabled = mode !== 0 || locked || capturePending;
+		capturebtn.title = mode === 1 ? 'Close the menu to capture the mouse' : mode === 2 ? 'Close the console to capture the mouse' : mode === 3 ? 'Wait for the map to finish loading' : locked ? 'Press Esc to release the mouse' : dragFallback ? 'Click here to retry mouse capture; left click in the game fires' : 'Click here or click the game to capture the mouse';
+		controlText(document.getElementById('inputbadge'), ['IN GAME', 'MENU', 'CONSOLE', 'LOADING'][mode]);
+		controlText(capturebtn, locked ? 'Mouse captured' : capturePending ? 'Capturing…' : 'Capture mouse');
+		controlText(focusstatus, !focused ? 'Click the game to focus' : captureError || (mode === 3 ? 'Loading map…' : mode === 2 ? 'Console · ~ to return' : mode === 1 ? 'Menu · point and click' : locked ? 'Mouse captured · Esc releases' : dragFallback ? 'Hold right mouse to aim · left click fires' : 'Click the game to capture mouse'));
+		if (Module['browserTouch'] && Module['browserTouch'].enabled()) controlText(focusstatus, mode === 3 ? 'Loading map…' : mode === 0 ? 'Touch · left stick moves · right side aims' : 'Tap the menu to select · Menu returns');
+		controlAttribute(Module.canvas, 'data-input-mode', ['game', 'menu', 'console', 'loading'][mode]);
+		controlAttribute(Module.canvas, 'data-mouse-captured', String(locked));
+		controlAttribute(Module.canvas, 'data-drag-aim', String(draggingAim));
+		updateAudio();
+		var flags = (focused ? 1 : 0) | (locked ? 2 : 0) | (resetInput ? 4 : 0) | (focused && draggingAim ? 8 : 0) |
+			(focused && mode === 0 && dragFallback ? 16 : 0);
+		resetInput = false;
+		return flags;
+	};
+	canvasDoc.addEventListener('pointerlockchange', function()
+	{
+		var granted = mouseLocked(), wanted = capturePending && inputMode === 0 && canvasFocused() && !bootFailed && loadState === 'running';
+		captureEpoch++; clearTimeout(captureTimer); capturePending = false;
+		if (!granted) resetInput = true;
+		else if (!wanted) { resetInput = true; releaseMouse(); }
+		else { dragFallback = false; draggingAim = false; captureError = ''; }
+	});
+	canvasDoc.addEventListener('pointerlockerror', function()
+	{
+		if (!capturePending || inputMode !== 0) return;
+		captureEpoch++; clearTimeout(captureTimer); capturePending = false;
+		dragFallback = true; captureError = 'Capture blocked · hold right mouse to aim, left click fires';
+	});
+	Module.canvas.addEventListener('mousedown', function(event)
+	{
+		Module.canvas.focus(); resumeAudio();
+		if (inputMode === 0 && dragFallback && !mouseLocked())
+		{
+			if (event.button === 2) { draggingAim = true; event.preventDefault(); event.stopImmediatePropagation(); return; }
+			// Capture denial must not prevent stationary shots. The toolbar
+			// remains the explicit way to retry capture while fallback is active.
+			if (event.button === 0 || draggingAim) return;
+		}
+		if (inputMode === 0 && !mouseLocked() && !(Module['browserTouch'] && Module['browserTouch'].enabled())) { event.preventDefault(); event.stopImmediatePropagation(); captureMouse(); }
+	}, true);
+	function audioGesture() { Module.canvas.focus(); resumeAudio(); }
+	Module['browserTouchGesture'] = function() { releaseMouse(); audioGesture(); };
+	Module['browserAppPause'] = function() { stopDragAim(); releaseMouse(); resetInput = true; if (Module['browserTouch']) Module['browserTouch'].reset(); silenceAudio(); };
+	Module['browserAppOpen'] = function() { closeBrowserDialogs(appdialog); };
+	Module['browserAppResume'] = resumeBrowserGame;
+	Module.canvas.addEventListener('pointerdown', audioGesture, { passive: true });
+	Module.canvas.addEventListener('touchstart', audioGesture, { passive: true });
+	function stopDragAim() { if (draggingAim) { draggingAim = false; resetInput = true; } }
+	canvasDoc.addEventListener('mouseup', function(event) { if (event.button === 2) stopDragAim(); }, true);
+	Module.canvas.addEventListener('mouseleave', stopDragAim);
+	Module.canvas.addEventListener('pointercancel', function() { stopDragAim(); releaseMouse(); resetInput = true; });
+	Module.canvas.addEventListener('keydown', function(event)
+	{
+		resumeAudio();
+		if (event.key === 'Tab' && event.shiftKey)
+		{
+			event.preventDefault(); event.stopImmediatePropagation();
+			stopDragAim(); releaseMouse(); resetInput = true; helpbtn.focus(); return;
+		}
+		if (event.key === 'Escape') { stopDragAim(); releaseMouse(); }
+	}, true);
+	// SDL listens at window level. Leave native form/dialog keyboard behavior
+	// available while keeping gameplay bindings on the focused canvas.
+	window.addEventListener('keydown', function(event)
+	{
+		if (event.target !== Module.canvas)
+		{
+			// Form keys stop here before the document listener can see Escape.
+			if (Module['browserApp']) Module['browserApp'].handleEscape(event);
+			event.stopImmediatePropagation();
+		}
+	}, true);
+	window.addEventListener('keyup', function(event)
+	{
+		if (event.target !== Module.canvas) event.stopImmediatePropagation();
+	}, true);
+	window.addEventListener('keypress', function(event)
+	{
+		if (event.target !== Module.canvas) event.stopImmediatePropagation();
+	}, true);
+	// SDL's document mouse listeners must not consume toolbar/dialog gestures.
+	['mousedown', 'mouseup', 'mousemove', 'wheel'].forEach(function(type)
+	{
+		window.addEventListener(type, function(event)
+		{
+			if (event.target === Module.canvas) return;
+			if (type === 'mouseup') stopDragAim();
+			event.stopImmediatePropagation();
+		}, true);
+	});
+	capturebtn.addEventListener('click', captureMouse);
+	soundbtn.addEventListener('click', function()
+	{
+		updateAudio();
+		if (!audioGraphError && (soundMuted || soundVolume === 0))
+		{
+			soundMuted = false;
+			if (soundVolume === 0) { soundVolume = soundLastVolume; volume.value = Math.round(soundVolume * 100); }
+		}
+		else if (!audioGraphError && audioContext && audioContext.state === 'running') soundMuted = true;
+		saveSound(); Module.canvas.focus(); resumeAudio();
+	});
+	volume.addEventListener('input', function()
+	{
+		var value = Number(volume.value);
+		if (!Number.isFinite(value)) return;
+		soundVolume = Math.max(0, Math.min(1, value / 100));
+		if (soundVolume > 0) soundLastVolume = soundVolume;
+		saveSound(); resumeAudio();
+	});
+	helpbtn.addEventListener('click', function()
+	{
+		var touch = Module['browserTouch'] && typeof Module['browserTouch'].enabled === 'function' && Module['browserTouch'].enabled();
+		document.getElementById('touchhelp').open = !!touch;
+		document.getElementById('keyboardhelp').open = !touch;
+		document.getElementById('mousehelp').hidden = !!touch;
+		controlText(document.getElementById('settingshelp'), touch ? 'Tap Menu → Options: System for brightness; Controls for game bindings. Touch on/off in the top bar switches touch controls.' : 'These are the default bindings. Press Esc → Options: System for brightness; Controls for mouse sensitivity and key bindings.');
+		controlText(document.getElementById('helpstart'), touch ? 'Tap Team to choose a team and class, then tap the menu options to select them.' : 'Press L to choose a team and class, then click the menu options to select them.');
+		stopDragAim(); releaseMouse(); resetInput = true;
+		closeBrowserDialogs(helpdialog);
+		if (!helpdialog.open) helpdialog.showModal();
+		closehelp.focus();
+	});
+	closehelp.addEventListener('click', function() { helpdialog.close(); });
+	helpdialog.addEventListener('close', resumeBrowserGame);
+	function lostBrowserFocus() { resetInput = true; stopDragAim(); releaseMouse(); updateAudio(); silenceAudio(); }
+	window.addEventListener('blur', lostBrowserFocus);
+	window.addEventListener('focus', function() { updateAudio(); });
+	window.addEventListener('pagehide', function() { flushSettings(); audioPageHidden = true; lostBrowserFocus(); });
+	window.addEventListener('pageshow', function() { audioPageHidden = false; updateAudio(); });
+	canvasDoc.addEventListener('focusin', function() { updateAudio(); });
+	canvasDoc.addEventListener('focusout', function(event)
+	{
+		silenceAudio();
+		if (event && event.target === Module.canvas) { stopDragAim(); releaseMouse(); resetInput = true; }
+	});
+	canvasDoc.addEventListener('visibilitychange', function() { if (canvasDoc.hidden) lostBrowserFocus(); else updateAudio(); });
+	Module.canvas.addEventListener('webglcontextlost', function(event)
+	{
+		if (event) event.preventDefault();
+		showFatal('The graphics context was lost. Retry to rebuild the renderer and start a new match.');
+	});
+
+	matchform.addEventListener('submit', function(event)
+	{
+		event.preventDefault();
+		if (bootFailed) { location.reload(); return; }
+		if (loadState !== 'ready' || playbtn.disabled || !matchform.reportValidity()) return;
+		if (playMode !== 'offline') return;
+		if (catalogBusy) return;
+		updateMatchSummary();
+		matchOptions = { map: mapselect.value, bots: Number(botcount.value), difficulty: Number(difficulty.value) };
+		try { localStorage.setItem('etl.offlineMatch', JSON.stringify(matchOptions)); } catch (e) {}
+		matchsettings.disabled = true;
+		document.getElementById('offlinebtn').disabled = true; document.getElementById('onlinebtn').disabled = true;
+		primeAudio();
+		startGame();
+	});
+
+	function showFatal(msg)
+	{
+		if (bootFailed) return;
+		bootFailed = true;
+		catalogEpoch++; catalogBusy = false;
+		if (catalogRequest) { var catalog = catalogRequest; catalogRequest = null; try { catalog.abort(); } catch (e) {} }
+		cancelServerAssets();
+		if (Module['browserTouch']) Module['browserTouch'].frame(3, false, false);
+		onlineEpoch++;
+		checkingOnline = false; retryingOnline = false;
+		if (onlineRequest) { onlineRequest.abort(); onlineRequest = null; }
+		if (Module['browserNetwork']) Module['browserNetwork'].close();
+		closeBrowserDialogs();
+		matchform.hidden = false; document.getElementById('onlinepanel').hidden = true;
+		releaseMouse();
+		gamebar.hidden = true;
+		document.getElementById('wrap').inert = true;
+		controlAttribute(Module.canvas, 'tabindex', -1);
+		controlAttribute(Module.canvas, 'aria-hidden', 'true');
+		controlAttribute(statusEl, 'role', 'alert');
+		audioEpoch++; clearAudioResume(); disconnectAudio();
+		if (audioContext && audioContext.state !== 'closed') try { var closing = audioContext.close(); if (closing && closing.catch) closing.catch(function() {}); } catch (e) {}
+		loadEpoch++;
+		setLoadState('failed');
+		if (activeRequest) { var request = activeRequest; activeRequest = null; try { request.abort(); } catch (e) {} }
+		document.getElementById('overlay').style.display = 'flex';
+		setStatus(msg, '#ff5555');
+		barwrap.style.display = 'none';
+		bartext.textContent = '';
+		matchsettings.disabled = true;
+		matchform.noValidate = true;
+		playbtn.disabled = false;
+		playbtn.textContent = 'RETRY';
+		controlAttribute(playbtn, 'aria-describedby', 'etl_status');
+		playbtn.focus();
+	}
+	window.addEventListener('error', function(event)
+	{
+		if (event.error && event.error.name === 'RuntimeError') showFatal('The engine stopped: ' + event.error.message);
+		else if (event.target && event.target.tagName === 'SCRIPT') showFatal('The engine could not load. Check that the local server is running.');
+	}, true);
+	window.addEventListener('unhandledrejection', function(event)
+	{
+		var reason = event.reason;
+		if (reason && (reason.name === 'RuntimeError' || /Aborted|wasm|Failed to fetch/i.test(String(reason)))) showFatal('The engine could not start: ' + reason);
+	});
+
+	function syncCache(populate, callback)
+	{
+		if (!cacheEnabled) { callback(null); return; }
+		var completed = false;
+		var timer = setTimeout(function()
+		{
+			// A pending IDB read may finish later. Keep the session's downloads
+			// in a separate mount so that it cannot replace verified bytes.
+			if (populate) cacheRoot = '/session-assets';
+			done(new Error('Storage did not respond'));
+		}, 15000);
+		function done(err)
+		{
+			if (completed) return;
+			completed = true;
+			clearTimeout(timer);
+			if (err) { cacheEnabled = false; cacheNotice = 'Asset caching is unavailable. Files will load again next time.'; console.warn('Asset cache unavailable:', err); }
+			callback(err);
+		}
+		try { Module.FS.syncfs(populate, done); } catch (e) { done(e); }
+	}
+
+	// ---------------------------------------------------------------------------
+	// asset pipeline: IndexedDB cache -> fetch missing pk3s -> boot engine
+	// ---------------------------------------------------------------------------
+	var PAKS = [
+		// Legacy's updated definitions must override the original ET packs.
+		{ name: 'etloose.pk3',      dst: '/legacy/' },
+		{ name: 'pak0.pk3',         dst: '/etmain/' },
+		{ name: 'pak1.pk3',         dst: '/etmain/' },
+		{ name: 'pak2.pk3',         dst: '/etmain/' }
+	];
+
+	function startGame()
+	{
+		if (loadState !== 'ready' || catalogBusy) return;
+		var chosen = customCatalog.packs.filter(function(pack)
+		{
+			return (matchOptions.online && (!serverPackSelection || serverPackSelection.some(function(ref) { return ref.game === pack.game && ref.checksum === pack.checksum; }))) || (!matchOptions.online && pack.game === 'etmain' && (pack.maps.length === 0 || pack.maps.includes(matchOptions.map)));
+		});
+		if (matchOptions.online && autoServerAssets && !serverPackSelection && chosen.reduce(function(total, pack) { return total + pack.size; }, 0) > 536870912)
+		{
+			// The first handshake can identify missing packs. Do not let unrelated
+			// installed maps exhaust memory before we can ask the server what it needs.
+			var kept = [], bytes = 0;
+			function priority(pack) { return pack.game === 'legacy' ? 0 : pack.maps.length === 0 ? 1 : 2; }
+			chosen.slice().sort(function(a, b) { return priority(a) - priority(b); }).forEach(function(pack)
+			{
+				if (bytes + pack.size <= 536870912) { kept.push(pack); bytes += pack.size; }
+			});
+			// Retain the catalog's mount order so Legacy definitions still override ET.
+			chosen = chosen.filter(function(pack) { return kept.includes(pack); });
+		}
+		if (chosen.reduce(function(total, pack) { return total + pack.size; }, 0) > 536870912)
+		{ showFatal('This match needs more than 512 MB of extra packs. Keep only the required maps and assets installed, then retry.'); return; }
+		if (chosen.length && !securePackVerificationAvailable())
+		{ showFatal('Custom maps and server packs need secure verification. Open this game on localhost or HTTPS in an updated browser, then retry.'); return; }
+		chosen.forEach(function(pack) { PAKS.push({name: pack.name, dst: '/' + pack.game + '/', custom: true, entry: pack}); });
+		var epoch = ++loadEpoch;
+		setLoadState('cache-loading', 'Checking saved game files…');
+		playbtn.disabled = true;
+		playbtn.textContent = 'LOADING ASSETS\u2026';
+
+		try
+		{
+			Module.FS.mkdir('/idb');
+			Module.FS.mount(Module.FS.filesystems.IDBFS, {}, '/idb');
+			cacheEnabled = true;
+		} catch (e) { cacheNotice = 'Asset caching is unavailable. Files will load again next time.'; console.warn('Asset cache mount unavailable:', e); }
+
+		syncCache(true, function()
+		{
+			if (!loading(epoch)) return;
+			try { ensureDirs(); loadManifest(epoch); }
+			catch (e) { showFatal('Could not prepare game assets: ' + e); }
+		});
+	}
+
+	function securePackVerificationAvailable()
+	{
+		try { return typeof crypto !== 'undefined' && !!crypto.subtle && typeof crypto.subtle.digest === 'function'; }
+		catch (e) { return false; }
+	}
+
+	function ensureDirs()
+	{
+		function mk(p) { try { Module.FS.mkdir(p); } catch (e) {} }
+		mk('/etmain');
+		mk('/legacy');
+		mk('/idb/etmain');
+		mk('/session-assets');
+		pruneCustomCache();
+		// ENV is a global in current Emscripten; Module.ENV in older ones.
+		// Emscripten already defaults HOME to /home/web_user - this is belt
+		// and braces, and must never throw (it runs inside the IDB callback).
+		function setEnv(k, v)
+		{
+			try
+			{
+				if (typeof ENV !== 'undefined' && ENV) ENV[k] = v;
+				else if (Module.ENV) Module.ENV[k] = v;
+			}
+			catch (e) {}
+		}
+		setEnv('HOME', '/home/web_user');
+		setEnv('USER', 'web_user');
+	}
+	function pruneCustomCache()
+	{
+		// Hash-named files are managed by this launcher. Keep other cached maps
+		// within a 512 MB budget, reserving space for this match before fetching.
+		if (!catalogKnown || typeof Module.FS.readdir !== 'function') return;
+		var selected = PAKS.filter(function(pack) { return pack.custom; }), keep = selected.map(function(pack) { return pack.entry.sha256 + '.pk3'; });
+		var known = customCatalog.packs.map(function(pack) { return pack.sha256 + '.pk3'; });
+		var budget = selected.reduce(function(total, pack) { return total + pack.entry.size; }, 0), other = [];
+		Module.FS.readdir(cacheRoot).forEach(function(name)
+		{
+			if (!/^[0-9a-f]{64}\.pk3$/.test(name) || keep.includes(name)) return;
+			if (!known.includes(name)) { Module.FS.unlink(cacheRoot + '/' + name); cacheDirty = true; return; }
+			var size = Module.FS.stat(cacheRoot + '/' + name).size; budget += size; other.push({name: name, size: size});
+		});
+		while (budget > 536870912 && other.length)
+		{
+			var pack = other.shift(); Module.FS.unlink(cacheRoot + '/' + pack.name); budget -= pack.size; cacheDirty = true;
+		}
+	}
+
+	function validateManifest(value)
+	{
+		if (!value || value.version !== 1 || !value.packs) return false;
+		return PAKS.filter(function(pack) { return !pack.custom; }).every(function(pack)
+		{
+			var entry = value.packs[pack.name];
+			return entry && Number.isSafeInteger(entry.size) && entry.size >= 22 && entry.size <= 1073741824 &&
+				/^[0-9a-f]{8}$/.test(entry.crc32) && /^[0-9a-f]{64}$/.test(entry.sha256);
+		});
+	}
+	function loadManifest(epoch)
+	{
+		setLoadState('manifest-loading', 'Checking game file versions…');
+		var saved;
+		try { saved = JSON.parse(Module.FS.readFile('/idb/asset-manifest.json', { encoding: 'utf8' })); } catch (e) {}
+		var xhr = activeRequest = new XMLHttpRequest();
+		xhr.open('GET', 'assets/manifest.json', true);
+		xhr.timeout = 10000;
+		function finish(value)
+		{
+			if (!loading(epoch)) return;
+			activeRequest = null;
+			if (!validateManifest(value))
+			{
+				if (!validateManifest(saved)) { showFatal('The game file list is unavailable. Check the local server and retry.'); return; }
+				value = saved;
+				cacheNotice = 'Using verified saved files. The local asset server is unavailable.';
+			}
+			manifest = value;
+			cacheDirty = cacheDirty || JSON.stringify(saved) !== JSON.stringify(value);
+			try { fetchMissing(0, epoch); }
+			catch (e) { showFatal('Could not prepare game files: ' + e); }
+		}
+		xhr.onload = function()
+		{
+			var value;
+			try { if (xhr.status === 200) value = JSON.parse(xhr.responseText); } catch (e) {}
+			finish(value);
+		};
+		xhr.onerror = xhr.ontimeout = function() { finish(null); };
+		xhr.send();
+	}
+
+	var crcTable = new Uint32Array(256);
+	for (var t = 0; t < 256; t++)
+	{
+		var value = t;
+		for (var bit = 0; bit < 8; bit++) value = (value >>> 1) ^ ((value & 1) ? 0xedb88320 : 0);
+		crcTable[t] = value >>> 0;
+	}
+	function verifyPack(path, entry, epoch, callback)
+	{
+		var stream, buffer, finished = false, offset = 0, crc = 0xffffffff;
+		try
+		{
+			if (Module.FS.stat(path).size !== entry.size) { callback(false); return; }
+			stream = Module.FS.open(path, 'r');
+			buffer = new Uint8Array(Math.min(entry.size, 8 * 1048576));
+		}
+		catch (e) { if (stream) try { Module.FS.close(stream); } catch (ignored) {} callback(false); return; }
+		function finish(valid)
+		{
+			if (finished) return;
+			finished = true;
+			try { Module.FS.close(stream); } catch (e) {}
+			if (loading(epoch))
+			{
+				try
+				{
+					if (valid && entry.game)
+					{
+						var customBytes = Module.FS.readFile(path), verification;
+						try {
+							if (!securePackVerificationAvailable()) throw new Error('Secure hashing unavailable');
+							verification = crypto.subtle.digest('SHA-256', customBytes);
+						} catch (e) { showFatal('Custom pack verification is unavailable. Open the launcher on localhost or HTTPS in an updated browser and retry.'); return; }
+						verification.then(function(hash)
+						{
+							if (!loading(epoch)) return;
+							var digest = Array.from(new Uint8Array(hash), function(byte) { return byte.toString(16).padStart(2, '0'); }).join('');
+							try { callback(digest === entry.sha256); } catch (e) { showFatal('Could not prepare custom files: ' + e); }
+						}, function() { if (loading(epoch)) showFatal('Custom pack verification is unavailable. Open the launcher on localhost or HTTPS and retry.'); });
+						return;
+					}
+					callback(valid);
+				}
+				catch (e) { showFatal('Could not prepare game files: ' + e); }
+			}
+		}
+		function step()
+		{
+			if (!loading(epoch)) { finish(false); return; }
+			try
+			{
+				var count = Module.FS.read(stream, buffer, 0, Math.min(buffer.length, entry.size - offset), offset);
+				if (count <= 0) { finish(false); return; }
+				for (var n = 0; n < count; n++) crc = (crc >>> 8) ^ crcTable[(crc ^ buffer[n]) & 255];
+				offset += count;
+				setProgress(offset / entry.size, 'Verifying ' + (entry.name || path.split('/').pop()) + ' · ' + Math.round(offset / entry.size * 100) + '%');
+				if (offset === entry.size) finish(((crc ^ 0xffffffff) >>> 0).toString(16).padStart(8, '0') === entry.crc32);
+				else setTimeout(step, 0);
+			}
+			catch (e) { finish(false); }
+		}
+		step();
+	}
+	function packCachePath(pack) { return cacheRoot + '/' + (pack.custom ? pack.entry.sha256 + '.pk3' : pack.name); }
+	function fetchMissing(i, epoch)
+	{
+		if (!loading(epoch)) return;
+		if (i >= PAKS.length)
+		{
+			try { Module.FS.writeFile('/idb/asset-manifest.json', JSON.stringify(manifest)); }
+			catch (e) { cacheEnabled = false; }
+			if (cacheDirty) syncCache(false, function() { if (loading(epoch)) copyPaksAndBoot(); });
+			else copyPaksAndBoot();
+			return;
+		}
+		var pack = PAKS[i], name = pack.name;
+		var cached = packCachePath(pack);
+		setLoadState('verifying', 'Verifying game file ' + (i + 1) + ' of ' + PAKS.length + '…');
+
+		verifyPack(cached, pack.entry || manifest.packs[name], epoch, function(valid)
+		{
+			if (valid) { fetchMissing(i + 1, epoch); return; }
+			downloadPack(i, epoch);
+		});
+	}
+	function downloadPack(i, epoch)
+	{
+		if (!loading(epoch)) return;
+		var pack = PAKS[i], name = pack.name, cached = packCachePath(pack), entry = pack.entry || manifest.packs[name];
+		setLoadState('downloading', 'Downloading ' + name + ' · file ' + (i + 1) + ' of ' + PAKS.length + '…');
+
+		var xhr = activeRequest = new XMLHttpRequest();
+		xhr.open('GET', pack.custom ? 'assets/custom/' + entry.game + '/' + entry.sha256 + '/' + name : 'assets/' + name, true);
+		xhr.responseType = 'arraybuffer';
+		xhr.timeout = 180000;
+		xhr.onprogress = function(ev)
+		{
+			if (!loading(epoch)) return;
+			// The progress bar describes this file, as it does during verification.
+			// Manifest sizes are available even when HTTP omits a content length.
+			setProgress(Math.min(ev.loaded / entry.size, 1), name + ' · ' + (ev.loaded / 1048576).toFixed(1) + ' / ' + (entry.size / 1048576).toFixed(1) + ' MB');
+		};
+		xhr.onload = function()
+		{
+			if (!loading(epoch)) return;
+			activeRequest = null;
+			if (xhr.status !== 200)
+			{
+				showFatal('Failed to download assets/' + name + ' (HTTP ' + xhr.status + ')');
+				return;
+			}
+			try
+			{
+				var bytes = new Uint8Array(xhr.response);
+				if (bytes.length !== entry.size) throw new Error('Incomplete game pack');
+				// The complete response is a dedicated, immutable pack buffer. MEMFS
+				// can retain it directly rather than copying the 228 MB original pack.
+				Module.FS.writeFile(cached, bytes, { canOwn: true });
+				cacheDirty = true;
+				setLoadState('verifying', 'Verifying ' + name + '…');
+				verifyPack(cached, entry, epoch, function(valid)
+				{
+					if (!valid) { try { Module.FS.unlink(cached); } catch (e) {} showFatal(name + ' failed its integrity check. Check the local game pack and retry.'); return; }
+					fetchMissing(i + 1, epoch);
+				});
+			}
+			catch (e)
+			{
+				showFatal('Could not load ' + name + ': ' + e);
+			}
+		};
+		xhr.onerror = function()
+		{
+			if (loading(epoch)) showFatal('Network error downloading ' + name + ' — is the server running?');
+		};
+		xhr.ontimeout = function() { if (loading(epoch)) showFatal('Downloading ' + name + ' timed out. Check the local server and retry.'); };
+		xhr.send();
+	}
+
+	function copyPaksAndBoot()
+	{
+		if (bootFailed || loadState === 'running' || loadState === 'starting') return;
+		setLoadState('starting', cacheNotice || (matchOptions.online ? 'Preparing your online connection…' : 'Starting your offline match…'));
+		setProgress(1, 'starting engine\u2026');
+		try
+		{
+			restoreSettings();
+			for (var i = 0; i < PAKS.length; i++)
+			{
+				var src = packCachePath(PAKS[i]);
+				var dst = PAKS[i].dst + PAKS[i].name;
+				try { Module.FS.unlink(dst); } catch (e) {}
+				// POSIX file access follows these links. Keep one copy of the
+				// 228 MB original pack instead of duplicating it at startup.
+				Module.FS.symlink(src, dst);
+			}
+			var args = ['+set', 'com_motd', '0', '+set', 'fs_game', 'legacy', '+set', 'fs_homepath', '/browser',
+				'+set', 'sv_pure', '0', '+set', 'r_fullscreen', '0', '+set', 's_initsound', '1',
+				'+set', 'cl_allowDownload', '0', '+set', 'cl_wwwDownload', '0', '+set', 's_muteWhenUnfocused', '1'];
+			if (matchOptions.online)
+			{
+				// Pass the password through a transient config, never through the
+				// command line where '+' and demo-like strings have special meaning.
+				Module.FS.writeFile('/browser/legacy/browser-connect.cfg', 'set password "' + (matchOptions.password || '') + '"\n');
+				args.push('+exec', 'browser-connect.cfg'); matchOptions.password = '';
+				if (!Module['browserNetwork'].begin(false)) throw new Error('The relay disconnected while game files were loading. Retry the online connection.');
+				args.push('+set', 'cl_allowDownload', '0', '+set', 'cl_wwwDownload', '0', '+set', 'cl_timeout', '20', '+connect', '192.0.2.1:27960');
+				networkbtn.hidden = false;
+			}
+			else
+			{
+			// Write the match configuration before Omni-bot initializes its scripts.
+			var botConfig = '[ServerManager]\nMinBots = ' + matchOptions.bots + '\nMaxBots = ' + matchOptions.bots +
+				'\nBalanceTeams = 1\nSleepBots = 0\nCountSpectators = 0\n\n[Difficulty]\nCurrentDifficulty = ' + matchOptions.difficulty +
+				'\nAdjustAim = 1\n\n[CombatMovement]\nmoveskill = ' + (matchOptions.difficulty / 2) + '\n';
+			Module.FS.writeFile('/omni-bot/et/user/omni-bot.cfg', botConfig);
+			args.push('+set', 'omnibot_enable', '1', '+set', 'omnibot_path', '/omni-bot');
+			// A launcher selection is one objective map, not a campaign whose
+			// next round can silently switch to another map.
+			args.push('+set', 'sv_maxclients', '16', '+set', 'g_gametype', '2', '+map', matchOptions.map);
+			}
+			Module.callMain(args);
+		}
+		catch (e)
+		{
+			// callMain unwinding via emscripten_unwind_to_js_event_loop throws
+			// intentionally; only real errors should surface here
+			if (!/unwind/i.test(String(e)))
+			{
+				showFatal('Engine start error: ' + e);
+				return;
+			}
+		}
+		if (bootFailed) return;
+		setLoadState('running');
+		if (Module['browserApp']) Module['browserApp'].gameFilesReady(cacheEnabled);
+		document.getElementById('overlay').style.display = 'none';
+		document.getElementById('wrap').inert = false;
+		controlAttribute(Module.canvas, 'tabindex', 0);
+		controlAttribute(Module.canvas, 'aria-hidden', 'false');
+		Module.canvas.focus();
+		Module['browserInputFrame'](inputMode);
+	}
+
+	function checkBrowserSupport()
+	{
+		var problem = '';
+		try {
+			if (typeof WebAssembly !== 'object' || typeof WebAssembly.instantiate !== 'function' ||
+				!WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0])))
+				problem = 'This browser cannot run the game engine. Enable WebAssembly or open the game in an updated browser.';
+		} catch (e) { problem = 'WebAssembly is blocked here. Check your browser security settings or open the game in an updated browser.'; }
+		if (!problem)
+		{
+			var graphics = null;
+			try { graphics = document.createElement('canvas').getContext('webgl2'); } catch (e) {}
+			if (!graphics) problem = 'WebGL 2 graphics are unavailable. Enable hardware acceleration and WebGL in your browser, then restart it, or try another browser.';
+			// Do not retain a second graphics context on devices with a low context limit.
+			if (graphics) try { var lose = graphics.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext(); } catch (e) {}
+		}
+		if (!problem && typeof helpdialog.showModal !== 'function')
+			problem = 'This browser cannot open the game menus. Update your browser and reload the game.';
+		if (!problem) return true;
+		showFatal(problem);
+		playbtn.textContent = 'RECHECK SUPPORT';
+		document.getElementById('offlinebtn').disabled = true;
+		document.getElementById('onlinebtn').disabled = true;
+		document.getElementById('launchtools').style.display = 'none';
+		return false;
+	}
+	Module['browserCanStart'] = checkBrowserSupport();
+</script>
+<template id="enginecode">
+{{{ SCRIPT }}}
+</template>
+<script>
+	// Template scripts are inert until the required browser features pass the checks.
+	if (Module['browserCanStart']) {
+		var engineScript = document.getElementById('enginecode').content.querySelector('script');
+		document.body.appendChild(engineScript.cloneNode(true));
+	}
+</script>
+</body>
+</html>

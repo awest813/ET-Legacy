@@ -1,0 +1,18 @@
+this.Name = "JumpOverMine";
+this.Parent = "LowLevel";
+this.AlwaysRecieveEvents = true;
+this.AutoAdd = false;
+
+this.Initialize = function()
+{
+	this.WatchForEntityCategory({
+		Radius = 180,
+		Category = CAT.MINE,
+		RequireLOS = TRACE.VISIBLE,
+	});
+};
+
+this.Events[EVENT.ENT_ENTER_RADIUS] = function()
+{
+	this.Bot.PressButton(BTN.JUMP);
+};

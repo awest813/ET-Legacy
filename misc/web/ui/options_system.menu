@@ -1,0 +1,61 @@
+#include "ui/menudef.h"
+#include "ui/menumacros.h"
+
+// Browser-only replacement; desktop builds keep etmain/ui/options_system.menu.
+#define WINDOW_X 16
+#define WINDOW_Y 16
+#define WINDOW_WIDTH 608
+#define WINDOW_HEIGHT 300
+#define GROUP_NAME "grpOptionsSystem"
+
+menuDef {
+    name "options_system"
+    visible 0
+    fullscreen 0
+    rect WINDOW_X WINDOW_Y WINDOW_WIDTH WINDOW_HEIGHT
+    style WINDOW_STYLE_FILLED
+    onOpen { uiScript systemCvarsGet ; uiScript vidSave ; uiScript glCustom }
+    onESC { uiScript systemCvarsReset ; uiScript vidReset ; close options_system ; open options }
+    WINDOW(_("SYSTEM"), 150)
+
+#define GRAPHICS_Y SUBWINDOW_OPTION_Y_START
+#define GRAPHICS_H SUBWINDOW_OPTION_COMPUTE_H(13)
+    SUBWINDOW(SUBWINDOW_OPTION_HEADER_X1_START, GRAPHICS_Y, SUBWINDOW_OPTION_HEADER_WIDTH_L, GRAPHICS_H, _("GRAPHICS"))
+    COMBO(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 1), SUBWINDOW_OPTION_WIDTH_L, 10, _("Render Resolution:"), .2, 8, "ui_r_mode", cvarFloatList { "Automatic" -2 "Custom" -1 "856*480 (16:9)" 11 "1366*768 (16:9)" 12 "1920*1080 (16:9)" 16 "2560*1440 (16:9)" 18 }, uiScript glCustom, _("Set render size. The game scales to fit the browser."))
+    NUMERICFIELD(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 2), SUBWINDOW_OPTION_WIDTH_L, 10, _("Custom Width:"), .2, 8, "r_customwidth", 5, _("Used with Custom render resolution"))
+    NUMERICFIELD(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 3), SUBWINDOW_OPTION_WIDTH_L, 10, _("Custom Height:"), .2, 8, "r_customheight", 5, _("Used with Custom render resolution"))
+    CVARFLOATLABEL(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 4), SUBWINDOW_OPTION_WIDTH_L, 10, "r_gamma", .2, ITEM_ALIGN_RIGHT, $evalfloat(SUBWINDOW_OPTION_WIDTH_L), 8)
+    SLIDER(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 4), SUBWINDOW_OPTION_WIDTH_L, 10, _("Brightness:"), .2, 8, "r_gamma" 1.3 1 3, _("Adjust brightness; apply to rebuild software gamma"))
+    MULTI(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 5), SUBWINDOW_OPTION_WIDTH_L, 10, _("Map Brightness:"), .2, 8, "ui_r_mapoverbrightbits", cvarFloatList { "Very Dark" 0 "Dark" 1 "Normal" 2 "Bright" 3 }, _("Set world texture brightness"))
+    MULTI(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 6), SUBWINDOW_OPTION_WIDTH_L, 10, _("Texture Detail:"), .2, 8, "ui_r_picmip", cvarFloatList { "Low" 3 "Medium" 2 "High" 1 "Very High" 0 }, _("Lower texture detail to reduce memory use"))
+    MULTI(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 7), SUBWINDOW_OPTION_WIDTH_L, 10, _("Texture Filtering:"), .2, 8, "ui_r_texturemode", cvarStrList { "Bilinear"; "GL_LINEAR_MIPMAP_NEAREST"; "Trilinear"; "GL_LINEAR_MIPMAP_LINEAR" }, _("Set texture filtering"))
+    MULTI(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 8), SUBWINDOW_OPTION_WIDTH_L, 10, _("Anisotropic Filtering:"), .2, 8, "ui_r_ext_texture_filter_anisotropic", cvarFloatList { "Disabled" 0 "4x" 4 "8x" 8 "16x" 16 }, _("Limited to what your graphics device supports"))
+    MULTI(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 9), SUBWINDOW_OPTION_WIDTH_L, 10, _("Dynamic Lights:"), .2, 8, "ui_r_dynamiclight", cvarFloatList { "Disabled" 0 "Single-pass" 1 "Multi-pass" 2 }, _("Enable dynamic lighting effects"))
+    YESNO(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 10), SUBWINDOW_OPTION_WIDTH_L, 10, _("Dynamic Shadows:"), .2, 8, "cg_shadows", _("Draw shadows for dynamic objects"))
+    YESNO(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 11), SUBWINDOW_OPTION_WIDTH_L, 10, _("Detailed Sky:"), .2, 8, "cg_skybox", _("Draw the skybox portal scene"))
+    YESNO(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 12), SUBWINDOW_OPTION_WIDTH_L, 10, _("Low Quality Sky:"), .2, 8, "r_fastsky", _("Draw a simple sky to improve performance"))
+    MULTI(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 13), SUBWINDOW_OPTION_WIDTH_L, 10, _("Max FPS:"), .2, 8, "com_maxfps", cvarFloatList { "60" 60 "76" 76 "125" 125 "250" 250 }, _("The browser display rate also limits frame presentation"))
+
+#define AUDIO_Y SUBWINDOW_OPTION_Y_START
+#define AUDIO_H SUBWINDOW_OPTION_COMPUTE_H(4)
+    SUBWINDOW(SUBWINDOW_OPTION_HEADER_X2_START, AUDIO_Y, SUBWINDOW_OPTION_HEADER_WIDTH_R, AUDIO_H, _("AUDIO"))
+    CVARFLOATLABEL(SUBWINDOW_OPTION_X2_START, SUBWINDOW_OPTION_COMPUTE_Y(AUDIO_Y, 1), SUBWINDOW_OPTION_WIDTH_R, 10, "s_volume", .2, ITEM_ALIGN_RIGHT, $evalfloat(SUBWINDOW_OPTION_WIDTH_R), 8)
+    SLIDER(SUBWINDOW_OPTION_X2_START, SUBWINDOW_OPTION_COMPUTE_Y(AUDIO_Y, 1), SUBWINDOW_OPTION_WIDTH_R, 10, _("Effects Volume:"), .2, 8, "s_volume" .7 0 1, _("Mix effects before the toolbar master volume"))
+    CVARFLOATLABEL(SUBWINDOW_OPTION_X2_START, SUBWINDOW_OPTION_COMPUTE_Y(AUDIO_Y, 2), SUBWINDOW_OPTION_WIDTH_R, 10, "s_musicvolume", .2, ITEM_ALIGN_RIGHT, $evalfloat(SUBWINDOW_OPTION_WIDTH_R), 8)
+    SLIDER(SUBWINDOW_OPTION_X2_START, SUBWINDOW_OPTION_COMPUTE_Y(AUDIO_Y, 2), SUBWINDOW_OPTION_WIDTH_R, 10, _("Music Volume:"), .2, 8, "s_musicvolume" .25 0 1, _("Mix music before the toolbar master volume"))
+    MULTI(SUBWINDOW_OPTION_X2_START, SUBWINDOW_OPTION_COMPUTE_Y(AUDIO_Y, 3), SUBWINDOW_OPTION_WIDTH_R, 10, _("Sound Quality:"), .2, 8, "ui_s_khz", cvarFloatList { "22 kHz" 22 "44 kHz" 44 "48 kHz" 48 }, _("Set game mixer rate; browser output uses its device rate"))
+    YESNO(SUBWINDOW_OPTION_X2_START, SUBWINDOW_OPTION_COMPUTE_Y(AUDIO_Y, 4), SUBWINDOW_OPTION_WIDTH_R, 10, _("Doppler FX:"), .2, 8, "s_doppler", _("Toggle the doppler effect"))
+
+#define NETWORK_Y (AUDIO_Y + AUDIO_H + SUBWINDOW_OPTION_Y_PADDING)
+#define NETWORK_H SUBWINDOW_OPTION_COMPUTE_H(2)
+    SUBWINDOW(SUBWINDOW_OPTION_HEADER_X2_START, NETWORK_Y, SUBWINDOW_OPTION_HEADER_WIDTH_R, NETWORK_H, _("NETWORK"))
+    MULTI(SUBWINDOW_OPTION_X2_START, SUBWINDOW_OPTION_COMPUTE_Y(NETWORK_Y, 1), SUBWINDOW_OPTION_WIDTH_R, 10, _("Max Packets:"), .2, 8, "ui_cl_maxpackets", cvarFloatList { "30" 30 "60" 60 "100" 100 "125" 125 }, _("Limit outgoing game packets"))
+    MULTI(SUBWINDOW_OPTION_X2_START, SUBWINDOW_OPTION_COMPUTE_Y(NETWORK_Y, 2), SUBWINDOW_OPTION_WIDTH_R, 10, _("Packet Duplication:"), .2, 8, "ui_cl_packetdup", cvarFloatList { "Off" 0 "x1" 1 "x2" 2 }, _("Repeat packet data to reduce effects of packet loss"))
+
+#define BROWSER_Y (NETWORK_Y + NETWORK_H + SUBWINDOW_OPTION_Y_PADDING)
+    SUBWINDOW(SUBWINDOW_OPTION_HEADER_X2_START, BROWSER_Y, SUBWINDOW_OPTION_HEADER_WIDTH_R, 108, _("BROWSER"))
+    LABELWHITE(SUBWINDOW_OPTION_X2_START + 6, BROWSER_Y + 28, SUBWINDOW_OPTION_WIDTH_R - 12, 10, _("Uses browser storage when available.\nApply display changes before leaving.\nToolbar volume controls all sound.\nSound pauses away from the game.\nChoose maps through Match setup."), .2, ITEM_ALIGN_LEFT, 0, 8)
+
+    BUTTON(SUBWINDOW_OPTION_HEADER_X1_START, WINDOW_HEIGHT - 24, .5 * (WINDOW_WIDTH - 24) - 3, 18, _("MSGID_MENU_BACK"), .3, 14, uiScript systemCvarsReset ; uiScript vidReset ; close options_system ; open options)
+    BUTTON(SUBWINDOW_OPTION_HEADER_X1_START + .5 * (WINDOW_WIDTH - 24) + 3, WINDOW_HEIGHT - 24, .5 * (WINDOW_WIDTH - 24) - 3, 18, _("MSGID_MENU_APPLY"), .3, 14, conditionalScript vidrestartIsRequired 2 ("open vid_restart") ("uiScript systemCvarsApply ; close options_system ; open options"))
+}
