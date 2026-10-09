@@ -209,6 +209,13 @@ class PreviewRoutes(unittest.TestCase):
             self.assertEqual(config['serverLabel'], 'Public Fixture')
             self.assertTrue(config['publicServers'])
             self.assertEqual(resolve_ticket(secret, config['relay'].split('/relay/')[1])[0], ('8.8.8.8', 27961))
+            rotated = 'cd' * 32
+            with patch.dict(os.environ, {'ETWASM_PUBLIC_SECRET': rotated}):
+                fresh = json.loads(self.request('/network/config.json?server=' + identity)[2])
+                self.assertEqual(fresh['serverId'], identity)
+                self.assertEqual(resolve_ticket(rotated, fresh['relay'].split('/relay/')[1])[0], ('8.8.8.8', 27961))
+                with self.assertRaises(ValueError):
+                    resolve_ticket(rotated, config['relay'].split('/relay/')[1])
             self.probe.assert_not_called()
             for query in ('127.0.0.1:27960', identity + '&server=' + identity, 'other.example&udpPort=1234'):
                 self.assertFalse(json.loads(self.request('/network/config.json?server=' + query)[2])['enabled'])

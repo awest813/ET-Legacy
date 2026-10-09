@@ -109,7 +109,10 @@ function launcher(fault = {}) {
                         publicServers:!!fault.publicCatalog,serverId:this.url.includes('?server=') ? this.url.split('?server=')[1] : '',
                         serverInfo:Object.hasOwn(fault,'onlineInfo') ? fault.onlineInfo : {status:'online',compatible:true,hostname:'Audit ET server',map:'oasis',players:8,capacity:16,humans:3,latencyMs:25,password:false}});
                     if (this.url.includes('?server=')) { const config=JSON.parse(this.responseText); config.relay+='/'+'A'.repeat(fault.rotatedTicket ? 101 : 100); this.responseText=JSON.stringify(config); }
+                    if (fault.onlineOverride) this.responseText=JSON.stringify({...JSON.parse(this.responseText),...fault.onlineOverride});
+                    if (fault.onlineBadJson) this.responseText='not JSON';
                     if (fault.onlineLate) { pending.push(()=>this.onload()); return; }
+                    if (fault.onlineNetworkError) return this.onerror();
                     if (fault.onlineTimeout) return this.ontimeout();
                     return this.onload();
                 }
@@ -144,9 +147,9 @@ function launcher(fault = {}) {
     vm.runInContext(source, context);
     // The probe releases its disposable context without affecting game calls.
     const probeReleased = calls.includes('probe-released'); calls.length=0;
-    let relayCallback, networkCloses=0; const networkCalls=[];
+    let relayCallback, networkCloses=0; const networkCalls=[], networkConfigs=[];
     context.Module.browserNetwork={
-        configure() {}, close(reason, done) {
+        configure(value) {networkConfigs.push(value);}, close(reason, done) {
             networkCloses++;
             if (relayCallback) {const done=relayCallback;relayCallback=null;done(Error('Connection cancelled.'));}
             if (done) { if (fault.closeLate) pending.push(done); else done(); }
@@ -189,7 +192,7 @@ function launcher(fault = {}) {
         if (fault.engine) throw Error('engine failure');
     };
     context.Module.onRuntimeInitialized();
-    return { context, elements, files, calls, requests, events, pending, timers, networkCalls, probeReleased, get writes() { return writes; },
+    return { context, elements, files, calls, requests, events, pending, timers, networkCalls, networkConfigs, probeReleased, get writes() { return writes; },
         get networkCloses() { return networkCloses; },
         start() { elements.matchform.submit({ preventDefault() {} }); } };
 }
@@ -584,6 +587,53 @@ assert.equal(disconnectElsewhere.context.document.activeElement,disconnectElsewh
 const publicEntries=[{id:'a'.repeat(32),host:'8.8.8.8',port:27960,info:{status:'online',compatible:true,hostname:'Public Oasis',map:'oasis',players:8,capacity:16,humans:3,latencyMs:25,password:false}},
     {id:'b'.repeat(32),host:'1.1.1.1',port:27960,info:{status:'online',compatible:true,hostname:'Public Radar',map:'radar',players:2,capacity:12,humans:0,latencyMs:40,password:true}}];
 const publicCatalog={version:1,status:'ready',total:5,checked:5,servers:publicEntries};
+function publicReady(fault) {
+    const page=launcher(fault);page.elements.onlinebtn.click();
+    page.elements.publicserver.value=publicEntries[0].id;page.elements.publicserver.change();return page;
+}
+const initialTicketFault={publicCatalog},initialTicket=publicReady(initialTicketFault);initialTicketFault.rotatedTicket=true;
+initialTicket.elements.joinbtn.click();assert.equal(initialTicket.networkConfigs.at(-1).relay,'ws://localhost:8082/relay/'+'A'.repeat(101));
+assert.equal(initialTicket.networkCalls.length,1,'Join renews a ticket after time spent in the launcher');
+const initialFailureFault={publicCatalog},initialFailure=publicReady(initialFailureFault);initialFailureFault.onlineUnavailable=true;
+initialFailure.elements.joinbtn.click();assert.equal(initialFailure.networkCalls.length,0);assert.equal(initialFailure.calls.length,0);
+assert.equal(initialFailure.elements.joinbtn.disabled,false);assert.equal(initialFailure.elements.offlinebtn.disabled,false);
+assert.match(initialFailure.elements.onlinestatus.textContent,/Could not refresh/);
+const initialCancelFault={publicCatalog},initialCancel=publicReady(initialCancelFault);initialCancelFault.onlineLate=true;
+initialCancel.elements.joinbtn.click();initialCancel.elements.canceljoin.click();initialCancel.pending.shift()();
+assert.equal(initialCancel.networkCalls.length,0,'Cancel stops a late initial ticket request before opening the relay');
+assert.equal(initialCancel.elements.offlinebtn.disabled,false);assert.equal(initialCancel.elements.joinbtn.disabled,false);
+function retryPublic(fault={publicCatalog}) {
+    const page=publicReady(fault);page.elements.joinbtn.click();
+    page.context.Module.browserNetworkStatus('Connection failed','Lost connection',{sent:2,received:2,ready:false,opening:false,failed:true});
+    page.context.Module.browserNetworkFailure('Lost connection',true);
+    return page;
+}
+const renewedFault={publicCatalog},renewed=retryPublic(renewedFault);
+renewedFault.rotatedTicket=true;const checksBefore=renewed.requests.filter(url=>url.startsWith('network/config.json')).length;
+renewed.elements.retryconnection.click();
+assert.equal(renewed.requests.filter(url=>url.startsWith('network/config.json')).length,checksBefore+1);
+assert.equal(renewed.networkConfigs.at(-1).relay,'ws://localhost:8082/relay/'+'A'.repeat(101));
+assert.equal(renewed.networkConfigs.at(-1).serverId,publicEntries[0].id);
+assert.equal(renewed.networkCalls.length,2,'Retry refreshes the same public selection before reconnecting');
+for(const changed of [{onlineUnavailable:true},{onlineTimeout:true},{onlineNetworkError:true},{onlineBadJson:true},
+    {onlineOverride:{enabled:false}},{onlineOverride:{serverId:publicEntries[1].id}},
+    {onlineOverride:{relay:'wss://other.example.org/relay/'+'B'.repeat(100)}},
+    {onlineOverride:{serverInfo:{compatible:false}}}]) {
+    const fault={publicCatalog},page=retryPublic(fault);Object.assign(fault,changed);page.elements.retryconnection.click();
+    assert.equal(page.networkCalls.length,1,'A failed or changed selection cannot reuse the old ticket');
+    assert.equal(page.elements.retryconnection.disabled,false);assert.equal(page.elements.retryconnection.hidden,false);
+    assert.notEqual(page.elements.connectionstatus.textContent,'Refreshing the selected server connection…');
+}
+const refreshFault={publicCatalog},refreshCancelled=retryPublic(refreshFault);refreshFault.onlineLate=true;
+refreshCancelled.elements.retryconnection.click();refreshCancelled.elements.retryconnection.click();
+assert.equal(refreshCancelled.pending.length,1,'Repeated retry shares one ticket refresh');
+refreshCancelled.elements.backoffline.click();refreshCancelled.pending.shift()();
+assert.equal(refreshCancelled.networkCalls.length,1,'Leaving the game cancels a late ticket refresh');
+const closeRefreshFault={publicCatalog},closeRefresh=retryPublic(closeRefreshFault);closeRefreshFault.onlineLate=true;
+closeRefresh.elements.retryconnection.click();closeRefresh.elements.closenetwork.click();closeRefresh.elements.helpbtn.click();
+closeRefresh.pending.shift()();assert.equal(closeRefresh.networkCalls.length,2,'Closing the dialog lets the requested connection finish');
+closeRefresh.context.Module.browserNetworkStatus('Online','12 ms',{sent:2,received:2,ready:true,opening:false,failed:false});
+assert.equal(closeRefresh.elements.helpdialog.open,true,'A completed refresh respects the player’s newer dialog');
 const publicUI=launcher({publicCatalog}); publicUI.elements.onlinebtn.click();
 assert.equal(publicUI.elements.publicbrowser.hidden,false);
 assert.match(publicUI.elements.publicstatus.textContent,/2 matching compatible/);

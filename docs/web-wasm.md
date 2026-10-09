@@ -2103,3 +2103,29 @@ Native HUD samples at 1280 by 720 showed 56 FPS outdoors and 58 FPS indoors with
 no concurrent builds; these are individual samples, not a sustained benchmark.
 The round is still in progress. Initial evidence is
 `build_wasm/radar-objective-round-progress.png` and `radar-objective-round-log.json`.
+
+## Public ticket renewal and sustained Radar test (October 9, 2026)
+
+Public Join and in-game Retry now fetch a fresh configuration for the selected
+public ID before opening the relay. This avoids reusing an expired four-hour
+ticket or a ticket invalidated by a hosted-service signing-key restart. Renewal
+preserves both the server ID and relay operator; a changed or unverified
+destination returns an actionable error instead of reusing the old ticket.
+Returning to the launcher or cancelling an initial join aborts the pending
+request, and late replies cannot open a connection. Closing the status dialog
+alone lets a requested reconnect finish without replacing a newer dialog.
+
+Launcher checks cover initial and retry renewal, rotated tickets, HTTP/network
+failure, timeout, malformed JSON, unavailable/incompatible selections, changed
+server IDs and relay operators, repeated clicks and cancellation. The loopback
+HTTP suite verifies that a fresh ticket resolves to the same destination after
+key rotation while the old ticket is rejected. All 26 HTTP checks, the complete
+launcher/network suites and the rebuilt browser bundle pass. These checks do
+not replace the pending public deployment test.
+
+The saved-app update was also applied through the normal App & offline dialog.
+The launcher retained Fuel Dump, twelve Hard bots and all eight custom-map
+choices; evidence is `build_wasm/pwa-saved-update-preferences.png`. The separate
+Radar bot match advanced through both entrance breaches, securing the Forward
+Bunker, and stealing the West Radar Parts. Delivery and final victory remain
+pending while the ordinary balanced round continues.

@@ -944,7 +944,7 @@
 		controlText(document.getElementById('connectionhint'), recoveringAssets ? 'Cancel to stop this download. Verified packs stay installed.' : assetsNeedReload ? 'Reload to load the verified packs, then join again from the launcher.' : stats.closing ? 'Leaving the server…' : stats.opening ? 'You can cancel this connection attempt.' : label === 'Online' ? 'You are connected. Disconnect to leave this server, or return to the launcher to change play mode.' : stats.ready ? 'Joining the server. Disconnect to cancel, or return to the launcher.' : 'Retry to reconnect, or return to the launcher to choose offline play.');
 		if (stats.failed && !recoveringAssets && !assetsNeedReload && !assetError && /Bad GUID: Duplicate etkey\./i.test(text))
 			controlText(document.getElementById('connectionhint'), 'Another game using this browser profile is connected with your player identity. Close or disconnect that game, then retry. Separate players need separate browser profiles.');
-		document.getElementById('retryconnection').disabled = recoveringAssets || assetsNeedReload || stats.ready || stats.opening;
+		document.getElementById('retryconnection').disabled = !!retryConfigRequest || recoveringAssets || assetsNeedReload || stats.ready || stats.opening;
 		document.getElementById('disconnectonline').disabled = stats.closing || (!recoveringAssets && !stats.ready && !stats.opening);
 		controlText(document.getElementById('disconnectonline'), recoveringAssets ? 'Cancel download' : stats.opening ? 'Cancel connection' : 'Disconnect');
 		updateConnectionActions();
@@ -1056,43 +1056,101 @@
 		joiningOnline = true; updateOnlineJoin(); primeAudio();
 		if (focusCancel) document.getElementById('canceljoin').focus();
 		document.getElementById('offlinebtn').disabled = true; document.getElementById('onlinebtn').disabled = true;
-		Module['browserNetwork'].connect(function(error)
+		function joinFailed(message)
 		{
-			if (error)
+			var restoreJoinFocus = document.activeElement === document.getElementById('canceljoin');
+			joiningOnline = false; networkText(message); updateOnlineJoin();
+			document.getElementById('offlinebtn').disabled = false; document.getElementById('onlinebtn').disabled = false;
+			if (restoreJoinFocus) joinbtn.focus();
+		}
+		refreshSelectedConnection(function()
+		{
+			Module['browserNetwork'].connect(function(error)
 			{
-				var restoreJoinFocus = document.activeElement === document.getElementById('canceljoin');
-				joiningOnline = false; networkText(error.message); updateOnlineJoin();
-				document.getElementById('offlinebtn').disabled = false; document.getElementById('onlinebtn').disabled = false;
-				if (restoreJoinFocus) joinbtn.focus();
-				return;
-			}
-			matchOptions = {online:true, password:document.getElementById('onlinepassword').value};
-			document.getElementById('onlinepassword').value = ''; startGame();
-			updateOnlineJoin();
-		});
+				if (error) { joinFailed(error.message); return; }
+				matchOptions = {online:true, password:document.getElementById('onlinepassword').value};
+				document.getElementById('onlinepassword').value = ''; startGame();
+				updateOnlineJoin();
+			});
+		}, joinFailed);
 	});
 	document.getElementById('canceljoin').addEventListener('click', function()
 	{
-		if (joiningOnline && loadState === 'ready') Module['browserNetwork'].close('Connection cancelled. Join again, or play offline.');
+		if (joiningOnline && loadState === 'ready')
+		{
+			cancelRetryConfig(); joiningOnline = false;
+			Module['browserNetwork'].close('Connection cancelled. Join again, or play offline.');
+			updateOnlineJoin(); document.getElementById('offlinebtn').disabled = false; document.getElementById('onlinebtn').disabled = false;
+			if (document.activeElement === this) joinbtn.focus();
+		}
 	});
 	networkbtn.addEventListener('click', showNetworkDialog);
 	document.getElementById('closenetwork').addEventListener('click', function() { networkdialog.close(); });
 	networkdialog.addEventListener('close', function() { retryingOnline = false; resumeBrowserGame(); });
+	var retryConfigRequest = null, retryConfigEpoch = 0;
+	function cancelRetryConfig()
+	{
+		retryConfigEpoch++;
+		if (retryConfigRequest) { var request = retryConfigRequest; retryConfigRequest = null; request.abort(); }
+	}
+	function refreshSelectedConnection(done, unavailable)
+	{
+		if (!selectedServerId) { done(); return; }
+		cancelRetryConfig();
+		var epoch = retryConfigEpoch, identity = selectedServerId;
+		var xhr = retryConfigRequest = new XMLHttpRequest();
+		controlText(document.getElementById('connectionstatus'), 'Refreshing the selected server connection…');
+		xhr.open('GET', 'network/config.json?server=' + encodeURIComponent(identity), true); xhr.timeout = 5000;
+		function failed(message)
+		{
+			if (epoch !== retryConfigEpoch || bootFailed || returningToLauncher) return;
+			retryConfigRequest = null;
+			if (unavailable) { unavailable(message); return; }
+			retryingOnline = false;
+			controlText(document.getElementById('connectionstatus'), message);
+			document.getElementById('retryconnection').disabled = false; updateConnectionActions();
+		}
+		xhr.onload = function()
+		{
+			if (epoch !== retryConfigEpoch || bootFailed || returningToLauncher) return;
+			try
+			{
+				if (xhr.status !== 200) throw new Error('Could not refresh the server connection. Check your connection and retry.');
+				var config = JSON.parse(xhr.responseText);
+				if (config.version !== 1 || config.enabled !== true || config.publicServers !== true || config.serverId !== identity || selectedServerId !== identity)
+					throw new Error('This public server is no longer verified. Return to the launcher and refresh the public server list.');
+				if (config.serverInfo && config.serverInfo.compatible === false)
+					throw new Error('This server is no longer compatible. Return to the launcher and choose another server.');
+				if (typeof config.relay !== 'string' || config.relay.split('/relay')[0] !== configuredRelay.split('/relay')[0])
+					throw new Error('The relay operator changed. Return to the launcher to review the new connection.');
+				retryConfigRequest = null;
+				Module['browserNetwork'].configure(config, Module.canvas.ownerDocument.baseURI);
+				configuredRelay = config.relay; selectedServerLabel = config.serverLabel; autoServerAssets = config.autoAssets === true;
+				done();
+			} catch (error) { failed(error.message); }
+		};
+		xhr.onerror = function() { failed('Could not refresh the server connection. Check your connection and retry.'); };
+		xhr.ontimeout = function() { failed('Refreshing the server connection timed out. Retry, or return to the launcher.'); };
+		xhr.send();
+	}
 	document.getElementById('retryconnection').addEventListener('click', function()
 	{
 		if (this.disabled || bootFailed || loadState !== 'running') return;
 		assetError = '';
 		this.disabled = true; retryingOnline = true;
 		document.getElementById('closenetwork').focus();
-		Module['browserNetwork'].connect(function(error)
+		refreshSelectedConnection(function()
 		{
-			if (error) { retryingOnline = false; return; }
-			if (!Module['browserNetwork'].begin(true)) retryingOnline = false;
+			Module['browserNetwork'].connect(function(error)
+			{
+				if (error) { retryingOnline = false; return; }
+				if (!Module['browserNetwork'].begin(true)) retryingOnline = false;
+			});
 		});
 	});
 	document.getElementById('disconnectonline').addEventListener('click', function()
 	{
-		cancelServerAssets(); retryingOnline = false;
+		cancelServerAssets(); cancelRetryConfig(); retryingOnline = false;
 		var close = document.getElementById('closenetwork'), retry = document.getElementById('retryconnection');
 		close.focus();
 		Module['browserNetwork'].close('Disconnected by you. Retry, or return to offline play.', function()
@@ -1105,6 +1163,7 @@
 	{
 		if (bootFailed || loadState !== 'running' || returningToLauncher) return;
 		returningToLauncher = true;
+		cancelRetryConfig(); retryingOnline = false;
 		['returnlauncher','backoffline','reloadassets'].forEach(function(id) { document.getElementById(id).disabled = true; });
 		cancelServerAssets(); saveAssetResume(null);
 		flushSettings();
