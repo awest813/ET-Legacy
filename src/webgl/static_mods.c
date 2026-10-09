@@ -4,8 +4,8 @@
  * The engine normally loads cgame/ui/qagame as native shared libraries
  * via Sys_LoadGameDll(). There is no dlopen in a browser, so the mod
  * sources are linked into the main binary as static archives whose
- * symbols have been prefixed (cg_ / ui_ / qa_) by the CMake post-build
- * step (llvm-objcopy --redefine-syms) to avoid collisions between the
+ * symbols are prefixed (cg_ / ui_ / qa_) while compiling using the
+ * versioned module_symbols headers to avoid collisions between the
  * modules and the engine (q_math.c etc. are compiled into both).
  *
  * WebAssembly indirect calls are signature-typed, so the real prefixed
@@ -19,7 +19,7 @@
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 
-// Renamed entry points (see cmake/ETLBuildMod.cmake post-build)
+// Renamed entry points (see cmake/ETLBuildMod.cmake compile definitions)
 extern intptr_t cg_vmMain(intptr_t command, intptr_t arg0, intptr_t arg1, intptr_t arg2, intptr_t arg3,
                           intptr_t arg4, intptr_t arg5, intptr_t arg6, intptr_t arg7, intptr_t arg8,
                           intptr_t arg9, intptr_t arg10, intptr_t arg11);

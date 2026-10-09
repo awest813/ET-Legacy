@@ -39,6 +39,12 @@ The vendored Boost Filesystem revision is
 
 For a fresh checkout, activate Emscripten with `emsdk_env.sh` (or set `EMSDK`),
 then run `./build_wasm.sh configure` followed by `./build_wasm.sh etl`.
+Static module symbol maps are versioned under `src/webgl/module_symbols` and
+required by CMake. They preserve DLL-private helper functions and global state
+without depending on headers left in a developer's build directory. New shared
+module symbols must be added to the appropriate map; clean CI linking detects
+unmapped collisions. `gen_mod_renames.py` can derive maps from an unprefixed
+diagnostic build, and must not be run against already-prefixed archives.
 Local `web-server.json`, downloaded packs, build output, Python environments
 and signing keystores are excluded from version control.
 
