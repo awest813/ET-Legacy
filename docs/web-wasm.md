@@ -2127,8 +2127,8 @@ The saved-app update was also applied through the normal App & offline dialog.
 The launcher retained Fuel Dump, twelve Hard bots and all eight custom-map
 choices; evidence is `build_wasm/pwa-saved-update-preferences.png`. The separate
 Radar bot match advanced through both entrance breaches, securing the Forward
-Bunker, and stealing the West Radar Parts. Delivery and final victory remain
-pending while the ordinary balanced round continues.
+Bunker, and stealing the West Radar Parts. The completed round and automatic
+restart are recorded below.
 
 ## Vertex packing performance (October 9, 2026)
 
@@ -2153,5 +2153,27 @@ including new strided byte-color and diffuse/lightmap pixel checks. Existing
 fog, portal, cutout, depth, index-format and fresh-context checks still pass.
 Evidence: `build_wasm/vertex-pack-gpu-checks.png` and
 `vertex-pack-gpu-checks.json`. The final browser build succeeds and parses the
-generated scripts. The running Radar round still uses its original engine;
-live gameplay verification of the new engine is a subsequent check.
+generated scripts. Radar completed using its original engine; the optimized
+engine was then verified in Oasis as recorded below.
+
+The balanced twelve-Hard-bot Radar test subsequently completed with an Allied
+victory. Bots breached both entrances, secured the Forward Bunker, stole both
+radar components through multiple defensive returns, and delivered West at
+native time 884100 and East at 1146300. The human remained a spectator and gave
+no objective assistance. The scoreboard shows six bots on each team. The
+ordinary automatic transition then restarted Radar and all twelve bots entered
+the next warmup. Evidence: `build_wasm/radar-bots-allied-win.png`,
+`radar-bots-allied-win-log.json`, `radar-bots-next-round.png` and
+`radar-bots-next-round-log.json`; earlier entrance-breach records remain in
+`radar-objective-round-log.json`. This proves one complete attacking chain and
+round transition, not all bundled-map objective chains.
+
+The optimized bundle was applied through App & offline's saved-update dialog.
+All seven locally generated bundle hashes matched the files served over HTTP
+(`build_wasm/vertex-pack-bundle-hashes.json`). A fresh Oasis game with twelve
+Hard bots rendered correctly, accepted movement, and fired the Thompson from
+30 to 27 rounds using the documented mouse-capture fallback. The visible FPS
+counter read 59 in that scene; this is a spot check, not a sustained performance
+benchmark. Evidence: `build_wasm/vertex-pack-live-oasis.png` and
+`vertex-pack-live-oasis-log.json`. The human then returned to spectator so the
+bot round could continue.
