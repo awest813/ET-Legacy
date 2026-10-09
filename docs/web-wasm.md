@@ -2967,3 +2967,29 @@ The later screenshot shows that next round playing. The victory screen
 itself was not captured. Evidence: `build_wasm/fueldump-oct9-first-round-log.json`,
 `fueldump-oct9-objective-round-log.json`, and
 `fueldump-oct9-next-round-playing.png`.
+
+## Sustained touch controls and cached bot play (October 9, 2026)
+
+A live Radar session on browser build `5de16fe` verified coordinate pointer
+holds on the touch controls. Holding Fire for 1.5 seconds consumed eleven
+MP40 rounds (30/60 to 19/60). Releasing Fire stopped consumption while the
+movement stick moved the player across the room. Manual Reload produced
+30/49. An eight-second Fire hold continued through an automatic reload and
+ended at 22/19; ammunition remained 22/19 after release. Accessibility button
+activation produces a single tap, so it does not measure sustained firing.
+These are desktop Chromium pointer tests, not physical multitouch validation.
+
+With both local launcher and relay services stopped, reloading the page
+restored the cached launcher. Starting Radar with four Hard bots verified the
+cached packs and loaded the engine in 5.40 seconds. Backfire, Morgriff,
+Blackadder and Nandet entered, then all four re-entered after normal warmup.
+Following Backfire showed movement from the bunker into the outdoor terrain
+and a death from Morgriff's Thompson while services remained stopped. This
+verifies cached startup and active offline AI; this session did not complete
+a round. The services were restored and the temporary test tab closed.
+
+Evidence: `build_wasm/touch-sustained-fire.png`, `touch-sustained-strafe.png`,
+`touch-live-reloaded.png`, `touch-held-auto-reload.png`,
+`touch-held-release-stopped.png`, `touch-offline-service-evidence.json`,
+`touch-offline-bots-log.json`, `touch-offline-bots-playing.png` and
+`touch-offline-bots-later.png`.
