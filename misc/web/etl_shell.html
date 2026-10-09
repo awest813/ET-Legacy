@@ -1966,16 +1966,32 @@
 		var xhr = activeRequest = new XMLHttpRequest();
 		xhr.open('GET', pack.custom ? 'assets/custom/' + entry.game + '/' + entry.sha256 + '/' + name : 'assets/' + name, true);
 		xhr.responseType = 'arraybuffer';
-		xhr.timeout = 180000;
+		// Large packs can take longer than three minutes on a slow connection.
+		// Bound inactivity instead of aborting a transfer that is still advancing.
+		xhr.timeout = 0;
+		var downloadTimer = null, downloaded = 0;
+		function clearDownloadTimer()
+		{
+			if (downloadTimer !== null) { clearTimeout(downloadTimer); downloadTimer = null; }
+		}
+		function waitForBytes()
+		{
+			clearDownloadTimer();
+			downloadTimer = setTimeout(function() { downloadTimer = null; xhr.ontimeout(); }, 180000);
+		}
+		xhr.onabort = clearDownloadTimer;
 		xhr.onprogress = function(ev)
 		{
 			if (!loading(epoch)) return;
+			if (!Number.isFinite(ev.loaded) || ev.loaded < 0) return;
+			if (ev.loaded > downloaded) { downloaded = ev.loaded; waitForBytes(); }
 			// The progress bar describes this file, as it does during verification.
 			// Manifest sizes are available even when HTTP omits a content length.
 			setProgress(Math.min(ev.loaded / entry.size, 1), name + ' · ' + (ev.loaded / 1048576).toFixed(1) + ' / ' + (entry.size / 1048576).toFixed(1) + ' MB');
 		};
 		xhr.onload = function()
 		{
+			clearDownloadTimer();
 			if (!loading(epoch)) return;
 			activeRequest = null;
 			if (xhr.status !== 200)
@@ -2005,9 +2021,11 @@
 		};
 		xhr.onerror = function()
 		{
+			clearDownloadTimer();
 			if (loading(epoch)) showFatal('Network error downloading ' + name + ' — is the server running?');
 		};
-		xhr.ontimeout = function() { if (loading(epoch)) showFatal('Downloading ' + name + ' timed out. Check the local server and retry.'); };
+		xhr.ontimeout = function() { clearDownloadTimer(); if (loading(epoch)) showFatal('Downloading ' + name + ' timed out. No new data arrived for three minutes. Check your connection and retry.'); };
+		waitForBytes();
 		xhr.send();
 	}
 

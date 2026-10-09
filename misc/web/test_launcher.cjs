@@ -77,7 +77,7 @@ function launcher(fault = {}) {
             constructor() { this.upload = {}; }
             open(_, url) { this.url = url; }
             setRequestHeader() {}
-            abort() { this.aborted = true; }
+            abort() { this.aborted = true; if (this.onabort) this.onabort(); }
             send() {
                 requests.push(this.url);
                 if (this.url.startsWith('assets/import/')) {
@@ -286,6 +286,43 @@ const corrupt = launcher({ corrupt: true });
 corrupt.start();
 assert.deepEqual(corrupt.requests, ['assets/custom.json', 'assets/manifest.json', 'assets/pak0.pk3']);
 assert.equal(corrupt.calls.length, 1);
+function slowDownload() {
+    const page=launcher({download:true,downloadLate:true});
+    let now=0,nextId=0;const deadlines=new Map();
+    page.context.setTimeout=(callback,delay)=>{const id=++nextId;deadlines.set(id,{callback,time:now+delay});return id;};
+    page.context.clearTimeout=id=>deadlines.delete(id);
+    page.advance=ms=>{
+        const end=now+ms;
+        while (true) {
+            const next=[...deadlines].sort((a,b)=>a[1].time-b[1].time)[0];
+            if (!next || next[1].time>end) break;
+            now=next[1].time;deadlines.delete(next[0]);next[1].callback();
+        }
+        now=end;
+    };
+    page.start();page.download=page.context.activeRequest;page.deadlines=deadlines;return page;
+}
+const progressing=slowDownload();
+assert.equal(progressing.download.timeout,0,'Progressing packs have no fixed whole-transfer deadline');
+for (let loaded=1;loaded<=4;loaded++) {
+    progressing.advance(120000);progressing.download.onprogress({loaded});
+    assert.equal(progressing.context.bootFailed,false,'A transfer may exceed three minutes while bytes keep arriving');
+}
+progressing.pending.shift()();assert.equal(progressing.calls.length,1);
+assert.equal(progressing.deadlines.size,0,'Completion cancels the inactivity deadline');
+const stalledDownload=slowDownload();stalledDownload.advance(120000);stalledDownload.download.onprogress({loaded:1});
+stalledDownload.advance(120000);stalledDownload.download.onprogress({loaded:1});
+stalledDownload.advance(60000);
+assert.equal(stalledDownload.download.aborted,true,'Repeated progress without new bytes cannot prolong a stalled transfer');
+assert.match(stalledDownload.elements.etl_status.textContent,/timed out/);
+stalledDownload.pending.shift()();assert.equal(stalledDownload.calls.length,0,'A late response cannot boot after inactivity failure');
+const cancelledDownload=slowDownload();cancelledDownload.elements.cancelload.click();
+assert.equal(cancelledDownload.deadlines.size,0,'Cancelling loading clears its transfer deadline');
+for (const event of ['onerror','ontimeout']) {
+    const failedDownload=slowDownload();failedDownload.download[event]();
+    assert.equal(failedDownload.deadlines.size,0,'Transfer errors clear their inactivity deadline');
+    assert.equal(failedDownload.download.aborted,true);
+}
 const configured = launcher({ query: '?map=radar&bots=6&difficulty=6', saved: { map: 'oasis', bots: 4 } });
 configured.start();
 assert.equal(configured.calls[0].at(-1), 'radar');

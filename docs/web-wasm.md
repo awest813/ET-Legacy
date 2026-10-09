@@ -3112,3 +3112,27 @@ and that checking a recovered selection permits a fresh connection. Launcher
 checks, all 90 Python service checks, the browser rebuild, generated JavaScript
 parsing and bundle/module identity verification passed. These are controlled
 failure tests; they do not establish public Internet gameplay or deployment.
+
+## Game-pack downloads on slow connections (October 9, 2026)
+
+Stock and custom game-pack requests now time out after three minutes without
+new bytes, rather than three minutes after the request began. Large packs can
+finish over slower connections while stalled downloads still expose Retry.
+Repeated progress events with the same byte count do not extend the deadline.
+Completion, errors, cancellation and fatal recovery clear the deadline; the
+existing size, CRC and custom-pack SHA-256 checks still gate engine startup.
+
+A deterministic regression reproduced the fixed whole-transfer deadline. The
+updated launcher completes an eight-minute simulated transfer with continuing
+progress, rejects a stall despite repeated unchanged progress events, and
+ignores a late response after failure. Cancellation and error cleanup also
+pass. All six JavaScript suites and rebuilt bundle/module verification pass.
+
+Live Chromium used a fresh loopback origin and a temporary server that sent
+pak0 in 1 MiB chunks with a 1.05-second delay. The transfer stayed active beyond
+three minutes and completed 228,138,631 bytes in 229.22 seconds. Verification
+then launched Radar with four Hard bots; all four entered and bot combat was
+visible during warmup. This verifies a slow desktop-browser transfer and match
+startup, not a physical Chromebook connection or a completed round. Evidence:
+`build_wasm/download-beyond-three-minutes.png`, `download-slow-radar-bots.png`
+and `download-slow-live-log.json`.
