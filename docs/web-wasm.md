@@ -2505,3 +2505,29 @@ round or physical-device benchmark. Raw sample and summary are in
 `build_wasm/goldrush-balanced-frame-sample.json` and
 `goldrush-balanced-frame-summary.json`. Public compatible hosting and physical
 device/browser validation remain outstanding.
+
+## Touchscreen laptop control defaults (October 9, 2026)
+
+Touch-capable Chromebooks and laptops no longer default to the touch overlay
+solely because `maxTouchPoints` is nonzero. The primary pointer's coarse/fine
+media query now determines the initial controls. Touch capability remains a
+fallback when media queries are unavailable or throw, and an explicit saved
+Touch on/off choice takes priority. The toolbar still allows either mode.
+
+The touch regression covers fine-pointer devices with ten touch points,
+coarse-pointer defaults, both saved overrides and failed-query fallbacks,
+alongside existing multi-pointer, cancellation, focus and native-menu gates.
+It passes; the browser rebuild and generated JavaScript parsing also pass.
+All seven local/served cache hashes match
+(`build_wasm/touch-primary-pointer-hashes.json`). These simulated pointer
+conditions do not establish physical Chromebook behavior.
+
+The rebuilt bundle was activated through the saved-update flow on an isolated
+origin. A twelve-Hard-bot Rail Gun match started with the human spectating.
+At 320x568 portrait and 568x320 landscape, the touch controls and toolbar stayed
+visible. Team opened native Limbo, gameplay actions disabled in that menu,
+and Menu returned to gameplay. Touch off and the ordinary viewport were then
+restored. Evidence: `build_wasm/touch-primary-portrait.png` and
+`touch-primary-landscape.png`. This checks layout and single-pointer menu
+integration, not physical multi-touch play or a completed Rail Gun round.
+The match remains available for objective-chain testing.

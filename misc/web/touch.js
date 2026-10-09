@@ -7,7 +7,14 @@
   var tools = doc.getElementById('touchtools'), pad = doc.getElementById('touchmove');
   var thumb = doc.getElementById('touchthumb'), aim = doc.getElementById('touchlook');
   var pointers = new Map(), move = [0, 0], look = [0, 0], pressed = 0, actions = 0;
-  var mode = 3, running = false, enabled = !!options.coarse;
+  var mode = 3, running = false, enabled;
+  // Touchscreen laptops can still use a precise primary mouse/trackpad.
+  // Prefer that pointer's mode; retain a capability fallback for older hosts.
+  if (typeof options.coarse === 'boolean') enabled = options.coarse;
+  else {
+   try { enabled = !!win.matchMedia('(pointer: coarse)').matches; }
+   catch (e) { enabled = !!(options.navigator && options.navigator.maxTouchPoints > 0); }
+  }
   try { var saved = options.storage.getItem('etl.touch'); if (saved === 'true' || saved === 'false') enabled = saved === 'true'; } catch (e) {}
   function held() { var bits = 0; pointers.forEach(function(p) { bits |= p.bit || 0; }); return bits; }
   function reset() {
@@ -108,6 +115,6 @@
  if (typeof module === 'object' && module.exports) module.exports = createTouch;
  else Module['browserTouch'] = createTouch({document: document, window: window, canvas: Module.canvas,
   storage: {getItem: function(key) { return localStorage.getItem(key); }, setItem: function(key, value) { localStorage.setItem(key, value); }},
-  coarse: navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches,
+  navigator: navigator,
   gesture: function() { Module['browserTouchGesture'](); }});
 })();

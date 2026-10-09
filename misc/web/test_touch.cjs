@@ -16,14 +16,16 @@ class Element {
   for (const fn of this.events[type] || []) fn(event);
  }
 }
-function fixture(coarse = true, saved, denied = false) {
+function fixture(coarse = true, saved, denied = false, primaryPointer) {
  const elements = Object.fromEntries(['touchbtn','touchcontrols','touchtools','touchmove','touchthumb','touchlook','canvas'].map(id => [id,new Element()]));
  elements.touchcontrols.children = [1,2,4,8,16,32,64].map(bit => new Element({'data-touch-bit':bit}));
  const alt = new Element({'data-touch-action':8});elements.touchcontrols.children.push(alt);
  elements.touchtools.children = [1,2,4,16,32].map(bit => new Element({'data-touch-action':bit}));
  const doc = new Element(), win = new Element(); doc.body = new Element(); doc.getElementById = id => elements[id];
+ if (primaryPointer) win.matchMedia = query => { assert.equal(query,'(pointer: coarse)'); if (primaryPointer.denied) throw Error('blocked'); return {matches:primaryPointer.coarse}; };
  let gestures = 0;
- const touch = createTouch({document:doc, window:win, canvas:elements.canvas, coarse,
+ const touch = createTouch({document:doc, window:win, canvas:elements.canvas, coarse:primaryPointer ? undefined : coarse,
+  navigator:{maxTouchPoints:primaryPointer ? primaryPointer.points : 0},
   storage:{getItem() { if (denied) throw Error(); return saved; },setItem() { if (denied) throw Error(); }}, gesture() { gestures++; }});
  touch.frame(0,true,true);
  return {touch, doc, win, ...elements, fire:elements.touchcontrols.children[0], jump:elements.touchcontrols.children[1], prone:elements.touchcontrols.children[6],alt, team:elements.touchtools.children[0], gestures:() => gestures};
@@ -93,5 +95,11 @@ f.touch.frame(0,true,true); f.touchbtn.send('click'); assert.equal(f.touch.enabl
 assert.equal(f.touchcontrols.hidden,true); assert.deepEqual(f.touch.poll(),[0,0,0,0,0]);
 assert.equal(fixture(false).touch.enabled(),false); assert.equal(fixture(true,'false').touch.enabled(),false);
 assert.equal(fixture(false,'true').touch.enabled(),true); assert.equal(fixture(true,undefined,true).touch.enabled(),true);
+assert.equal(fixture(false,undefined,false,{coarse:false,points:10}).touch.enabled(),false,'Touchscreen laptop retains primary mouse/trackpad controls');
+assert.equal(fixture(false,undefined,false,{coarse:true,points:5}).touch.enabled(),true,'Primary coarse pointer defaults to touch controls');
+assert.equal(fixture(false,'true',false,{coarse:false,points:10}).touch.enabled(),true,'Saved touch preference overrides a fine primary pointer');
+assert.equal(fixture(false,'false',false,{coarse:true,points:5}).touch.enabled(),false,'Saved mouse preference overrides a coarse primary pointer');
+assert.equal(fixture(false,undefined,false,{denied:true,points:5}).touch.enabled(),true,'Touch capability is the fallback when pointer queries fail');
+assert.equal(fixture(false,undefined,false,{denied:true,points:0}).touch.enabled(),false);
 assert.ok(f.gestures()>0);
-console.log('Touch: independent move/aim/fire pointers, quick taps, cancellation, dead zone, menu/loading gates, focus/resize resets and saved preferences passed.');
+console.log('Touch: primary-pointer defaults, touchscreen laptop preferences, independent move/aim/fire pointers, quick taps, cancellation, dead zone, menu/loading gates and focus/resize resets passed.');
