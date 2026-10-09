@@ -1756,12 +1756,30 @@
 		xhr.send();
 	}
 
-	var crcTable = new Uint32Array(256);
+	var crcTable = new Uint32Array(1024);
 	for (var t = 0; t < 256; t++)
 	{
 		var value = t;
 		for (var bit = 0; bit < 8; bit++) value = (value >>> 1) ^ ((value & 1) ? 0xedb88320 : 0);
 		crcTable[t] = value >>> 0;
+	}
+	for (var slice = 1; slice < 4; slice++) for (var t = 0; t < 256; t++)
+	{
+		var value = crcTable[(slice - 1) * 256 + t];
+		crcTable[slice * 256 + t] = (value >>> 8) ^ crcTable[value & 255];
+	}
+	function updatePackCRC(crc, bytes, count)
+	{
+		var n = 0;
+		// Four bytes per iteration; byte reads also support unaligned views.
+		for (; n + 4 <= count; n += 4)
+		{
+			var word = crc ^ (bytes[n] | bytes[n + 1] << 8 | bytes[n + 2] << 16 | bytes[n + 3] << 24);
+			crc = crcTable[768 + (word & 255)] ^ crcTable[512 + ((word >>> 8) & 255)] ^
+				crcTable[256 + ((word >>> 16) & 255)] ^ crcTable[word >>> 24];
+		}
+		for (; n < count; n++) crc = (crc >>> 8) ^ crcTable[(crc ^ bytes[n]) & 255];
+		return crc;
 	}
 	function verifyPack(path, entry, epoch, callback)
 	{
@@ -1809,7 +1827,7 @@
 			{
 				var count = Module.FS.read(stream, buffer, 0, Math.min(buffer.length, entry.size - offset), offset);
 				if (count <= 0) { finish(false); return; }
-				for (var n = 0; n < count; n++) crc = (crc >>> 8) ^ crcTable[(crc ^ buffer[n]) & 255];
+				crc = updatePackCRC(crc, buffer, count);
 				offset += count;
 				setProgress(offset / entry.size, 'Verifying ' + (entry.name || path.split('/').pop()) + ' · ' + Math.round(offset / entry.size * 100) + '%');
 				if (offset === entry.size) finish(((crc ^ 0xffffffff) >>> 0).toString(16).padStart(8, '0') === entry.crc32);

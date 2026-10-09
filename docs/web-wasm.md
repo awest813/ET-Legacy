@@ -2207,3 +2207,28 @@ Evidence is `build_wasm/final-offline-services-stopped.json`,
 This verifies this browser's saved app and already-installed assets with the
 local services unavailable; it does not establish offline downloads of new
 maps, physical-device behavior or cross-browser support.
+
+## Saved-pack verification performance (October 9, 2026)
+
+The launcher now updates its streaming CRC four bytes at a time with a 4 KiB
+lookup table, retaining the same CRC-32 result and chunked verification flow.
+This replaces the byte-at-a-time inner loop and leaves SHA-256 checks for custom
+and server packs in place. `node misc/web/test_pack_crc.cjs` runs the actual
+launcher implementation against independently generated Python zlib fixtures,
+unaligned views, partial buffers, varied chunk boundaries and corruption at
+word and tail offsets. The complete launcher fault suite also passes.
+
+`node misc/web/test_pack_crc.cjs --benchmark` checks 256 MiB using both loops.
+Three warmed Node CPU samples measured 450.0–451.2 ms for the original loop and
+214.9–219.5 ms for the four-byte loop, with identical checksums. This isolates
+CRC work; it does not measure IndexedDB reads, total startup time or Chromebook
+hardware. The browser build and generated-script parsing pass, and all seven
+local/served bundle hashes match (`build_wasm/pack-crc-bundle-hashes.json`).
+
+The saved update was applied through the regular localhost app dialog. Its
+existing Fuel Dump/twelve-Hard-bot preference and custom-map inventory survived.
+Fuel Dump then started and rendered after the updated loop verified the real
+cached stock packs; the HTTP log showed a manifest request and no pack
+redownload. Evidence: `build_wasm/pack-crc-live-fueldump.png` and
+`pack-crc-live-fueldump-log.json`. This startup check does not establish total
+load-time improvement or a complete Fuel Dump attacking round.
