@@ -2770,6 +2770,22 @@ bots emitted game-entry events at 1922000. Evidence:
 `railgun-oct9-next-round.png` and `railgun-oct9-next-round-log.json`. That next
 round was then ended through Match setup after saving its startup evidence.
 
+## Automated browser builds
+
+The Browser port workflow runs for browser-related changes on `main`, pull
+requests to `main`, and manual dispatch. It checks launcher/service regressions,
+builds with the pinned Emscripten 6.0.10 SDK, and exercises compiled input,
+connection, asset, pure-server, and bot handlers. Before publishing artifacts,
+`misc/web/verify_bundle.py` checks all seven service-worker file hashes and the
+published modules' archive hashes, output hashes, CRCs, and sizes.
+
+Successful runs provide a `browser-bundle-<commit>` artifact with the browser
+runtime, PWA files, module identity manifest, license, and build provenance.
+Original game PK3s are supplied separately. The separate
+`browser-module-publication-<commit>` artifact preserves the exact compiled
+modules and archives needed by `build_server_pack.py`. Downloading an artifact
+does not deploy it or establish public HTTPS/WSS connectivity.
+
 ## Undefended Gold Rush attack check (October 9, 2026)
 
 A separate Chromium match on build `f51442b` started with zero bots, disabled

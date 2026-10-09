@@ -1,0 +1,116 @@
+name: Browser port
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/web.yml'
+      - 'build_wasm.sh'
+      - 'CMakeLists.txt'
+      - 'VERSION.txt'
+      - 'cmake/**'
+      - 'src/**'
+      - 'etmain/**'
+      - 'libs/**'
+      - 'vendor/**'
+      - 'misc/web/**'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  launcher-and-services:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install relay dependency
+        run: python -m pip install -r misc/web/requirements.txt
+      - name: Check launcher, network, input, audio, PWA, and pack integrity
+        run: |
+          for suite in launcher network touch pwa pwa_worker pack_crc; do
+            node "misc/web/test_${suite}.cjs"
+          done
+      - name: Check discovery, relay, assets, runner, and module publication
+        run: python -m unittest discover -s misc/web -p 'test_*.py' -v
+
+  wasm:
+    needs: launcher-and-services
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the verified Emscripten SDK
+        run: |
+          git clone --depth 1 --branch 6.0.10 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          test "$(git -C "$RUNNER_TEMP/emsdk" rev-parse HEAD)" = a2b92777574c2feda07994cd4f1079a3dfc151f8
+          "$RUNNER_TEMP/emsdk/emsdk" install 6.0.10
+          "$RUNNER_TEMP/emsdk/emsdk" activate 6.0.10
+      - name: Build engine, renderer, modules, bots, and PWA
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          ./build_wasm.sh configure
+          ./build_wasm.sh etl -j2
+      - name: Exercise production native and browser handlers
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          for suite in console_text input_focus menu_mouse connect_timeout missing_assets pure_assets; do
+            python "misc/web/test_${suite}.py"
+          done
+          pwsh -NoProfile -File misc/web/test_bots.ps1
+      - name: Verify bundle and publication bytes
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          node misc/web/test_built_launcher.cjs build_wasm
+          python misc/web/verify_bundle.py build_wasm
+          cp COPYING.txt build_wasm/COPYING.txt
+          cp docs/web-wasm.md build_wasm/README.md
+          printf 'Source: %s\nCommit: %s\nSDK: Emscripten 6.0.10\nOriginal game PK3s are supplied separately.\n' "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$GITHUB_SHA" > build_wasm/BUILD_INFO.txt
+      - name: Save deployable browser bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-bundle-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            build_wasm/etl.html
+            build_wasm/etl.js
+            build_wasm/etl.wasm
+            build_wasm/etl.data
+            build_wasm/sw.js
+            build_wasm/manifest.webmanifest
+            build_wasm/icon-192.png
+            build_wasm/icon-512.png
+            build_wasm/web-modules/identity.json
+            build_wasm/COPYING.txt
+            build_wasm/README.md
+            build_wasm/BUILD_INFO.txt
+      - name: Save exact modules and archives for matching server packs
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-module-publication-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            build_wasm/libcgame.a
+            build_wasm/libui.a
+            build_wasm/libbundled_cjson.a
+            build_wasm/web-modules/identity.json
+            build_wasm/web-modules/cgame.mp.wasm32.so
+            build_wasm/web-modules/ui.mp.wasm32.so
