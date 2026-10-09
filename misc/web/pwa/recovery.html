@@ -3,7 +3,7 @@
  <main><h1>Restore offline play</h1><p id="status" role="status">If the app cannot start or offline files are missing, reconnect and retry saving. This repair keeps saved game packs and settings.</p><button id="retry">Retry offline saving</button><p><a id="launcherlink" href="./" style="color:#e8c766">Return to the launcher</a></p></main>
  <script>
  (()=>{
- const button=document.getElementById('retry'),status=document.getElementById('status');let pending='',deadline,attempt=0;
+ const button=document.getElementById('retry'),status=document.getElementById('status');let pending='',deadline,attempt=0,repairLoaded=0;
  if((location.pathname||'').endsWith('/network/recovery'))document.getElementById('launcherlink').href='../';
  let serviceWorker=null;
  try{serviceWorker=navigator.serviceWorker;}catch(error){}
@@ -14,6 +14,10 @@
    'This browser does not allow offline saving here. Use an updated browser that allows service workers, or return to the launcher to play while connected.';
   return;
  }
+ function armDeadline(epoch,repair=false){
+  clearTimeout(deadline);
+  deadline=setTimeout(()=>{if(epoch===attempt)finish(repair?'Saving stopped receiving data for three minutes. Check your connection and storage, then retry.':'Saving did not finish. Reconnect and retry.');},repair?180000:30000);
+ }
  function reopen(){if((location.pathname||'').endsWith('/network/recovery'))location.replace('../');else location.reload();}
  function finish(message){attempt++;clearTimeout(deadline);pending='';button.disabled=false;status.textContent=message;}
  serviceWorker.addEventListener('controllerchange',()=>{if(pending==='update')reopen();});
@@ -21,13 +25,18 @@
   const type=event.data&&event.data.type;
   if(event.data&&event.data.requestId!==undefined&&(pending!=='repair'||event.data.requestId!==attempt))return;
   if(pending==='repair'&&['APP_READY','APP_SAVE_FAILED','APP_MISSING'].includes(type)&&event.data.requestId!==attempt)return;
+  if(type==='APP_SAVE_PROGRESS'&&pending==='repair'&&event.data.requestId===attempt){
+   const loaded=event.data.loaded,total=event.data.total;
+   if(!Number.isSafeInteger(loaded)||!Number.isSafeInteger(total)||loaded<=repairLoaded||total<=0||loaded>total)return;
+   repairLoaded=loaded;armDeadline(attempt,true);status.textContent='Checking and saving app files… '+Math.floor(loaded/total*100)+'%';return;
+  }
   if(type==='APP_READY'&&pending==='repair')reopen();
   if(type==='APP_SAVE_FAILED'&&pending)finish('Saving did not finish. Check your connection and available storage, then retry.');
   if(type==='APP_OTHER_TABS'&&pending)finish('Close other app tabs or windows, then retry.');
  });
  button.addEventListener('click',async()=>{
   if(button.disabled)return;const epoch=++attempt;button.disabled=true;status.textContent='Checking and saving app files…';pending='checking';
-  deadline=setTimeout(()=>{if(epoch===attempt)finish('Saving did not finish. Reconnect and retry.');},30000);
+  armDeadline(epoch);
   try{
    const registration=await serviceWorker.getRegistration((location.pathname||'').endsWith('/network/recovery')?'../':'./');
    if(epoch!==attempt||pending!=='checking')return;
@@ -37,7 +46,7 @@
    if(worker)await new Promise((resolve,reject)=>{function check(){if(worker.state==='installed'||worker.state==='activated')resolve();else if(worker.state==='redundant')reject(Error());}worker.addEventListener('statechange',check);check();});
    if(epoch!==attempt||pending!=='checking')return;
    if(registration.waiting){pending='update';registration.waiting.postMessage({type:'ACTIVATE_UPDATE'});}
-   else if(registration.active){pending='repair';registration.active.postMessage({type:'REPAIR_CACHE',requestId:epoch});}
+   else if(registration.active){pending='repair';repairLoaded=0;armDeadline(epoch,true);registration.active.postMessage({type:'REPAIR_CACHE',requestId:epoch});}
    else throw Error();
   }catch(error){if(epoch===attempt)finish('Saving did not finish. Check your connection and available storage, then retry.');}
  });

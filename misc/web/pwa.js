@@ -9,7 +9,7 @@
   var fullButtons = [doc.getElementById('fullscreenbtn'), doc.getElementById('launchfullscreen')];
   var registration = null, prompt = null, saved = false, packs = false, installing = false, updateRequested = false;
   var fullscreenPending = false, fullscreenTimer = null, fullEpoch = 0;
-  var updateTimer = null, repairTimer = null, repairing = false, repairSerial = 0, repairRequest = 0, updateFailed = false;
+  var updateTimer = null, repairTimer = null, repairing = false, repairSerial = 0, repairRequest = 0, repairLoaded = 0, updateFailed = false;
   var workers = new WeakSet(), registrations = new WeakSet();
   var installed = !!(win.matchMedia && win.matchMedia('(display-mode: standalone)').matches) || !!nav.standalone;
   var message = '', fullMessage = '';
@@ -87,6 +87,14 @@
   });
   function clearUpdate() { options.clearTimeout.call(win, updateTimer); updateTimer = null; updateRequested = false; }
   function clearRepair() { options.clearTimeout.call(win, repairTimer); repairTimer = null; repairing = false; repairRequest = 0; }
+  function armRepairTimer() {
+   options.clearTimeout.call(win, repairTimer);
+   var request = repairRequest;
+   repairTimer = options.setTimeout.call(win, function() {
+    if (!repairing || repairRequest !== request) return;
+    clearRepair(); message = 'Saving stopped receiving data for three minutes. Check your connection and available storage, then retry.'; retry.hidden = false; render();
+   }, 180000);
+  }
   function requestStatus(worker) {
    try { worker.postMessage({type:'APP_STATUS'}); }
    catch (e) { if (!saved) { message = 'Offline saving is unavailable. Reconnect and retry when ready.'; retry.hidden = false; render(); } }
@@ -124,6 +132,12 @@
     // Repair replies belong to one attempt; status/activation replies do not.
     if (event.data.requestId !== undefined && (!repairing || event.data.requestId !== repairRequest)) return;
     if (repairing && event.data.requestId === undefined && ['APP_READY','APP_MISSING','APP_SAVE_FAILED'].indexOf(event.data.type) !== -1) return;
+    if (event.data.type === 'APP_SAVE_PROGRESS' && repairing && event.data.requestId === repairRequest) {
+     var loaded = event.data.loaded, total = event.data.total;
+     if (!Number.isSafeInteger(loaded) || !Number.isSafeInteger(total) || loaded <= repairLoaded || total <= 0 || loaded > total) return;
+     repairLoaded = loaded; armRepairTimer();
+     message = 'Saving app files for offline play… ' + Math.floor(loaded / total * 100) + '%'; render(); return;
+    }
     if (event.data.type === 'APP_READY') { clearRepair(); saved = true; retry.hidden = !updateFailed; if (!updateFailed && (!registration || !registration.waiting)) message = ''; render(); }
     if (event.data.type === 'APP_SAVE_FAILED' || (event.data.type === 'APP_MISSING' && (!repairing || event.data.requestId === repairRequest))) { clearRepair(); saved = false; message = 'Some offline app files are unavailable. Reconnect and retry offline saving.'; retry.hidden = false; render(); }
     if (event.data.type === 'APP_OTHER_TABS') { clearUpdate(); message = 'Close the other app tabs or windows, then reload to update. Your current match can continue.'; render(); }
@@ -136,8 +150,8 @@
    updateFailed = false;
    if (registration && registration.active && !saved) {
     // Also discover a newer bundle if this cache belongs to an older deployment.
-    register(true); repairing = true; repairRequest = ++repairSerial; retry.hidden = false; message = 'Saving app files for offline play…'; render();
-    repairTimer = options.setTimeout.call(win, function() { clearRepair(); message = 'Saving did not finish. Check your connection and available storage, then retry.'; retry.hidden = false; render(); }, 30000);
+    register(true); repairing = true; repairRequest = ++repairSerial; repairLoaded = 0; retry.hidden = false; message = 'Saving app files for offline play…'; render();
+    armRepairTimer();
     try { registration.active.postMessage({type:'REPAIR_CACHE', requestId:repairRequest}); }
     catch (e) { clearRepair(); message = 'Offline saving is unavailable. Reconnect and retry when ready.'; retry.hidden = false; render(); }
     return;

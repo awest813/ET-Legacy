@@ -18,8 +18,8 @@ class BundleTests(unittest.TestCase):
         for name in sorted(CORE):
             data = name.encode()
             (self.build / name).write_bytes(data)
-            entries.append("{url:'%s',sha256:'%s'}" %
-                           (name, hashlib.sha256(data).hexdigest()))
+            entries.append("{url:'%s',sha256:'%s',size:%s}" %
+                           (name, hashlib.sha256(data).hexdigest(), len(data)))
         (self.build / 'sw.js').write_text(','.join(entries), encoding='utf-8')
         publication = self.build / 'web-modules'
         publication.mkdir()
@@ -45,8 +45,15 @@ class BundleTests(unittest.TestCase):
         self.assertEqual(verify(self.build), 7)
 
     def test_changed_browser_file(self):
-        (self.build / 'etl.wasm').write_bytes(b'corrupted')
+        (self.build / 'etl.wasm').write_bytes(b'x' * len(b'etl.wasm'))
         with self.assertRaisesRegex(ValueError, 'Browser bundle changed'):
+            verify(self.build)
+
+    def test_incorrect_core_size_metadata(self):
+        worker = self.build / 'sw.js'
+        original = worker.read_text(encoding='utf-8')
+        worker.write_text(original.replace('size:8}', 'size:9}'), encoding='utf-8')
+        with self.assertRaisesRegex(ValueError, 'size changed'):
             verify(self.build)
 
     def test_missing_browser_file(self):

@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 const {webcrypto,createHash} = require('node:crypto');
 const names=['etl.html','etl.js','etl.wasm','etl.data','manifest.webmanifest','icon-192.png','icon-512.png'];
-const entries=names.map(url=>({url,sha256:createHash('sha256').update(`bundle:${url}`).digest('hex')}));
+const entries=names.map(url=>({url,size:Buffer.byteLength(`bundle:${url}`),sha256:createHash('sha256').update(`bundle:${url}`).digest('hex')}));
 const source=fs.readFileSync(`${__dirname}/sw.js.in`,'utf8').replace('@PWA_VERSION@','fixture').replace('@PWA_ENTRIES@',entries.map(e=>JSON.stringify(e)).join(',')).replace('@PWA_RECOVERY_JSON@',JSON.stringify(fs.readFileSync(`${__dirname}/pwa/recovery.html`,'utf8')));
 function fixture(failure) {
  const fault=typeof failure==='object' ? failure : {kind:failure};
@@ -10,9 +10,19 @@ function fixture(failure) {
   async put(url,response) { map.set(url,response.clone()); },async match(url) { return map.get(url)?.clone(); }
  }; },async keys(){return [...storage.keys()];},async delete(key){return storage.delete(key);} };
  const self={location:{href:'https://game.test/play/sw.js'},addEventListener(n,fn){events[n]=fn;},clients:{async matchAll(){return clients;}},async skipWaiting(){skipped++;}};
- vm.runInNewContext(source,{self,caches,URL,Response,crypto:webcrypto,Uint8Array,fetch:async url=>{
+ vm.runInNewContext(source,{self,caches,URL,Response,crypto:webcrypto,Uint8Array,performance,fetch:async url=>{
   network++; const name=new URL(url).pathname.split('/').pop(); if(fault.kind==='network'&&name==='etl.wasm') throw Error('Disconnected');
-  return new Response(fault.kind==='corrupt'&&name==='etl.wasm'?'changed':`bundle:${name}`,{headers:{'Cross-Origin-Embedder-Policy':'require-corp'}});
+  let body=`bundle:${name}`;
+  if(name==='etl.wasm') {
+   if(fault.kind==='corrupt')body=body.replace('bundle:','tamper:');
+   if(fault.kind==='short')body=body.slice(0,-1);
+   if(fault.kind==='long')body+='extra bytes';
+  }
+  if(fault.kind==='stream') {
+   const bytes=Buffer.from(body);
+   body=new ReadableStream({start(controller){controller.enqueue(bytes.subarray(0,3));controller.enqueue(bytes.subarray(3));controller.close();}});
+  }
+  return new Response(body,{headers:{'Cross-Origin-Embedder-Policy':'require-corp'}});
  }});
  async function dispatch(name,extra={}) {let pending;events[name]({waitUntil(p){pending=p;},...extra});await pending;}
  async function request(path,extra={}) {let pending;events.fetch({request:{url:new URL(path,'https://game.test/play/').href,method:'GET',mode:'cors',headers:new Headers(),...extra},respondWith(p){pending=p;}});return pending?await pending:null;}
@@ -66,7 +76,7 @@ function fixture(failure) {
   if(kind==='lateRegistration')sw.getRegistration=()=>new Promise(resolve=>delayed.push(resolve));
   vm.runInNewContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],{
    document:{getElementById:id=>elements[id]},navigator:nav,isSecureContext:kind!=='insecure',location:{pathname:kind==='standalone'?'/network/recovery':'/play/',replace(url){assert.equal(url,'../');reloads++;},reload(){reloads++;}},
-   setTimeout(fn){const id=++serial;timers.set(id,fn);return id;},clearTimeout(id){timers.delete(id);}
+   setTimeout(fn,ms){fn.delay=ms;const id=++serial;timers.set(id,fn);return id;},clearTimeout(id){timers.delete(id);}
   });
   const clicked=elements.retry.click ? elements.retry.click() : undefined;if(kind!=='late'&&kind!=='lateRegistration')await clicked;
   return {events,e:elements,posts,timers,clicked,delayed,get reloads(){return reloads;}};
@@ -87,6 +97,20 @@ function fixture(failure) {
  assert.equal(lateRegistration.e.retry.disabled,true,'A late missing registration cannot cancel a newer repair');
  lateRegistration.delayed[1](null);await nextRegistration;
  assert.equal(lateRegistration.e.retry.disabled,false);assert.equal(lateRegistration.timers.size,0);
+ const progressing=await recoveryUI('repair'), progressId=progressing.posts.at(-1).requestId;
+ const firstDeadline=[...progressing.timers.keys()][0];
+ progressing.events.message({data:{type:'APP_SAVE_PROGRESS',requestId:progressId,loaded:10,total:100}});
+ assert.match(progressing.e.status.textContent,/10%/);
+ const advancedDeadline=[...progressing.timers.keys()][0];assert.notEqual(firstDeadline,advancedDeadline);
+ assert.equal(progressing.timers.get(advancedDeadline).delay,180000);
+ for(const values of [{loaded:10,total:100},{loaded:9,total:100},{loaded:NaN,total:100},{loaded:101,total:100}]) {
+  progressing.events.message({data:{type:'APP_SAVE_PROGRESS',requestId:progressId,...values}});
+  assert.equal([...progressing.timers.keys()][0],advancedDeadline);
+ }
+ progressing.events.message({data:{type:'APP_SAVE_PROGRESS',requestId:progressId-1,loaded:20,total:100}});
+ assert.equal([...progressing.timers.keys()][0],advancedDeadline,'Old repair progress cannot renew a current deadline');
+ progressing.timers.get(advancedDeadline)();assert.equal(progressing.e.retry.disabled,false);
+ assert.match(progressing.e.status.textContent,/three minutes/);
  let ui=await recoveryUI('offline');assert.equal(ui.posts.at(-1).type,'REPAIR_CACHE');
  ui.events.message({data:{type:'APP_SAVE_FAILED',requestId:ui.posts.at(-1).requestId}});assert.equal(ui.e.retry.disabled,false);assert.equal(ui.timers.size,0);
  ui=await recoveryUI('repair');ui.events.message({data:{type:'APP_READY',requestId:ui.posts.at(-1).requestId}});assert.equal(ui.reloads,1);
@@ -113,7 +137,7 @@ function fixture(failure) {
  assert.equal(ui.posts.length,0,'A timed-out update cannot send commands during a newer attempt');
  ui.delayed[1]();await second;assert.equal(ui.posts.length,1);
  await f.dispatch('message',{data:{type:'REPAIR_CACHE',requestId:17},source:f.clients[0]});assert.equal(f.messages.at(-1).type,'APP_READY');assert.equal(f.messages.at(-1).requestId,17);
- for(const failure of ['network','corrupt']) {const broken=fixture(failure);broken.storage.set('unrelated',new Map());broken.storage.set('etl-app-%2Fplay%2F-old',new Map());await assert.rejects(broken.dispatch('install'));assert.deepEqual([...broken.storage.keys()],['unrelated','etl-app-%2Fplay%2F-old']);}
+ for(const failure of ['network','corrupt','short','long']) {const broken=fixture(failure);broken.storage.set('unrelated',new Map());broken.storage.set('etl-app-%2Fplay%2F-old',new Map());await assert.rejects(broken.dispatch('install'));assert.deepEqual([...broken.storage.keys()],['unrelated','etl-app-%2Fplay%2F-old']);}
  const broken=fixture('network');await broken.dispatch('message',{data:{type:'REPAIR_CACHE',requestId:18},source:broken.clients[0]});assert.equal(broken.messages.at(-1).type,'APP_SAVE_FAILED');assert.equal(broken.messages.at(-1).requestId,18);
  const resumed=fixture();await resumed.dispatch('install');
  const resumedCache=resumed.storage.get('etl-app-%2Fplay%2F-fixture');
@@ -143,6 +167,13 @@ function fixture(failure) {
  assert.equal(transient.network,8,'Retry after a failed shared transfer retains its two verified files');
  assert.equal(transient.messages.at(-1).type,'APP_READY');
  assert.equal(transient.messages.at(-1).requestId,42);
+ const streamed=fixture('stream');
+ await streamed.dispatch('message',{data:{type:'REPAIR_CACHE',requestId:50},source:streamed.clients[0]});
+ const progress=streamed.messages.filter(m=>m.type==='APP_SAVE_PROGRESS');
+ assert.ok(progress.length>=2,'Streamed core reads report byte progress and completion');
+ assert.ok(progress.every((m,i)=>m.requestId===50&&m.loaded<=m.total&&(!i||m.loaded>progress[i-1].loaded)));
+ assert.equal(progress.at(-1).loaded,entries.reduce((sum,e)=>sum+e.size,0));
+ assert.equal(streamed.messages.at(-1).type,'APP_READY');
  const denied=fixture('storage');await denied.dispatch('message',{data:{type:'APP_STATUS'},source:denied.clients[0]});assert.equal(denied.messages.at(-1).type,'APP_SAVE_FAILED');
  assert.match(await (await denied.request('./',{mode:'navigate'})).text(),/Restore offline play/);
  console.log('PWA worker: atomic verified bundle, offline navigation/code, version consistency, live network isolation, scoped cleanup, update-tab guard, eviction and repair passed.');

@@ -23,7 +23,7 @@ function fixture(fault={}){
   doc.body.webkitRequestFullscreen=()=>{requests++;doc.webkitFullscreenElement=doc.body;doc.send('webkitfullscreenchange');};
   doc.webkitExitFullscreen=()=>{doc.webkitFullscreenElement=null;doc.send('webkitfullscreenchange');};
  }
- const app=createApp({document:doc,window:win,navigator:nav,modalOpen(){return !!fault.modal;},pause(){pause++;},gesture(){},resume(){resume++;},reload(){reload++;},setTimeout(fn){assert.equal(this,win,'Browser timers require a Window receiver');const id=++serial;timers.set(id,fn);return id;},clearTimeout(id){assert.equal(this,win);timers.delete(id);}});
+ const app=createApp({document:doc,window:win,navigator:nav,modalOpen(){return !!fault.modal;},pause(){pause++;},gesture(){},resume(){resume++;},reload(){reload++;},setTimeout(fn,ms){fn.delay=ms;assert.equal(this,win,'Browser timers require a Window receiver');const id=++serial;timers.set(id,fn);return id;},clearTimeout(id){assert.equal(this,win);timers.delete(id);}});
  return {app,doc,win,sw,e:elements,registration,timers,posts,get requests(){return requests;},get reload(){return reload;},get pause(){return pause;},get resume(){return resume;}};
 }
 (async()=>{
@@ -74,7 +74,7 @@ function fixture(fault={}){
  const repairs=f.posts.filter(m=>m.type==='REPAIR_CACHE').length;
  f.e.retryapp.send('click');assert.equal(f.posts.filter(m=>m.type==='REPAIR_CACHE').length,repairs,'Repeated repair clicks share one operation');
  f.sw.send('message',{data:{type:'APP_MISSING'}});assert.equal(f.e.retryapp.disabled,true,'An old status reply cannot cancel an active repair');
- for(const fn of [...f.timers.values()])fn();assert.equal(f.e.retryapp.disabled,false);assert.match(f.e.appstatus.textContent,/did not finish/);
+ for(const fn of [...f.timers.values()])fn();assert.equal(f.e.retryapp.disabled,false);assert.match(f.e.appstatus.textContent,/three minutes/);
  const oldRepair=f.posts.filter(m=>m.type==='REPAIR_CACHE').at(-1);
  f.e.retryapp.send('click');
  const newRepair=f.posts.filter(m=>m.type==='REPAIR_CACHE').at(-1);
@@ -84,6 +84,15 @@ function fixture(fault={}){
  assert.equal(f.e.retryapp.disabled,true,'A timed-out repair success cannot finish a newer retry');
  f.sw.send('message',{data:{type:'APP_READY'}});
  assert.equal(f.e.retryapp.disabled,true,'Unrelated status replies cannot finish a repair');
+ const beforeProgress=[...f.timers.keys()][0];
+ f.sw.send('message',{data:{type:'APP_SAVE_PROGRESS',requestId:newRepair.requestId,loaded:10,total:100}});
+ assert.match(f.e.appstatus.textContent,/10%/,'Repair reports actual advancing bytes');
+ const afterProgress=[...f.timers.keys()][0];assert.notEqual(afterProgress,beforeProgress,'Advancing bytes renew the inactivity deadline');
+ assert.equal(f.timers.get(afterProgress).delay,180000,'Repair is bounded by inactivity rather than a 30-second whole-transfer limit');
+ for(const progress of [{loaded:10,total:100},{loaded:9,total:100},{loaded:NaN,total:100},{loaded:101,total:100}]) {
+  f.sw.send('message',{data:{type:'APP_SAVE_PROGRESS',requestId:newRepair.requestId,...progress}});
+  assert.equal([...f.timers.keys()][0],afterProgress,'Invalid or repeated progress cannot extend a stalled repair');
+ }
  f.sw.send('message',{data:{type:'APP_READY',requestId:newRepair.requestId}});assert.equal(f.timers.size,0);assert.equal(f.e.retryapp.hidden,true);
  f.sw.send('message',{data:{type:'APP_SAVE_FAILED',requestId:newRepair.requestId}});
  assert.equal(f.e.retryapp.hidden,true,'Late repair replies cannot replace a completed result');

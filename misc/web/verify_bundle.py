@@ -13,11 +13,13 @@ CORE = {'etl.html', 'etl.js', 'etl.wasm', 'etl.data', 'manifest.webmanifest',
 
 
 def verify(build):
-    entries = re.findall(r"\{url:'([^']+)',sha256:'([0-9a-f]{64})'\}",
+    entries = re.findall(r"\{url:'([^']+)',sha256:'([0-9a-f]{64})',size:([0-9]+)\}",
                          (build / 'sw.js').read_text(encoding='utf-8'))
-    if len(entries) != len(CORE) or {name for name, _ in entries} != CORE:
+    if len(entries) != len(CORE) or {name for name, _, _ in entries} != CORE:
         raise ValueError('Worker must describe each of the seven browser files exactly once')
-    for name, expected in entries:
+    for name, expected, size in entries:
+        if (build / name).stat().st_size != int(size):
+            raise ValueError('Browser bundle size changed: ' + name)
         if hashlib.sha256((build / name).read_bytes()).hexdigest() != expected:
             raise ValueError('Browser bundle changed: ' + name)
     manifest = json.loads((build / 'web-modules/identity.json').read_text(encoding='utf-8'))

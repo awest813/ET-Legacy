@@ -3358,3 +3358,31 @@ that live run does not prove simultaneous held-key/right-release behavior; the
 controlled event regression covers that sequence. Evidence:
 `build_wasm/aim-release-input-times.json`, `build_wasm/aim-release-after-movement.png`,
 and `build_wasm/aim-release-fallback-fire.png`. Test tab and server were closed.
+
+
+### Progress-aware offline app repair, October 9
+
+The launcher and recovery page now use a three-minute inactivity deadline for
+app repair instead of a fixed 30-second transfer deadline. Only increasing,
+valid byte counts from the current repair renew it. Progress shows a percentage;
+repeated, malformed, unrelated, and old-attempt messages cannot keep a stalled
+repair alive. Update-check timeouts remain separate.
+
+The worker reads core files in bounded streams using decoded sizes published
+alongside their SHA-256 hashes. Short and oversized bodies fail verification;
+progress does not authorize a cache write. Completed bodies must still match
+the published hash. Valid cached files count toward completion after hash
+verification, and shared repairs notify each current caller. Progress messages
+are throttled using a monotonic clock to avoid per-chunk UI work. The release
+verifier now checks core sizes as well as hashes.
+
+All 95 Python tests and six JavaScript suites passed, including size metadata,
+same-size corruption, short/oversized streams, advancing progress, stale replies,
+and inactivity recovery. The WebAssembly build and generated bundle checks
+passed. A live isolated browser test evicted only etl.data, throttled replacement
+to approximately one MiB per second, transferred 58,521,327 bytes in 56.198
+seconds, returned to the launcher, and reported App saved. The intermediate
+screenshot window was missed; transfer duration and successful recovery provide
+the live evidence. Artifacts: `build_wasm/pwa-progress-transfer.json`,
+`build_wasm/pwa-progress-live.log`, `build_wasm/pwa-progress-repaired.png`, and
+`build_wasm/pwa-progress-service-tests.log`. Temporary server and tab were closed.

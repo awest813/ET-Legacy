@@ -15,30 +15,65 @@ function appClient(client) {
    new URL('etl.html', base).pathname, new URL('network/recovery', base).pathname].includes(url.pathname);
  } catch (error) { return false; }
 }
-async function verifiedResponse(response, entry) {
+async function verifiedResponse(response, entry, progress) {
  if (!response || !response.ok || response.status !== 200 || response.type === 'opaque' || response.redirected) return false;
- const bytes = await response.clone().arrayBuffer();
+ const copy = response.clone();
+ let bytes;
+ if (copy.body && copy.body.getReader) {
+  // Published decoded sizes bound allocation and streamed reads, including gzip.
+  bytes = new Uint8Array(entry.size);
+  const reader = copy.body.getReader(); let loaded = 0;
+  try {
+   while (true) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    if (chunk.value.byteLength > entry.size - loaded) { reader.cancel().catch(() => {}); if (response.body) response.body.cancel().catch(() => {}); return false; }
+    bytes.set(chunk.value, loaded); loaded += chunk.value.byteLength;
+    if (progress && chunk.value.byteLength) progress(loaded);
+   }
+  } finally { reader.releaseLock(); }
+  if (loaded !== entry.size) return false;
+ } else {
+  bytes = new Uint8Array(await copy.arrayBuffer());
+  if (bytes.byteLength !== entry.size) return false;
+  if (progress) progress(bytes.byteLength);
+ }
  const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2,'0')).join('');
  return hash === entry.sha256;
 }
-let repairInFlight = null;
-function repairBundle() {
- // One worker may receive retries from several tabs before a slow fetch ends.
- if (!repairInFlight) repairInFlight = installBundle(true).finally(() => { repairInFlight = null; });
- return repairInFlight;
+let repairInFlight = null, repairProgress = null, repairReportedAt = 0;
+const repairSubscribers = new Set();
+function repairBundle(client, requestId) {
+ const notify = value => { try { client.postMessage({type:'APP_SAVE_PROGRESS', requestId, ...value}); } catch (error) {} };
+ repairSubscribers.add(notify);
+ if (!repairInFlight) {
+  repairProgress = null; repairReportedAt = 0;
+  repairInFlight = installBundle(true, value => {
+   repairProgress = value;
+   const now = performance.now();
+   if (repairReportedAt && now - repairReportedAt < 250 && value.loaded !== value.total) return;
+   repairReportedAt = now; repairSubscribers.forEach(subscriber => subscriber(value));
+  }).finally(() => { repairInFlight = null; repairProgress = null; });
+ } else if (repairProgress) notify(repairProgress);
+ return repairInFlight.finally(() => { repairSubscribers.delete(notify); });
 }
-async function installBundle(repair = false) {
- const cache = await caches.open(CACHE);
+async function installBundle(repair = false, progress) {
+ const cache = await caches.open(CACHE), total = CORE.reduce((sum, entry) => sum + entry.size, 0);
+ let completed = 0, highest = 0;
  try {
   for (const entry of CORE) {
+   const advancing = loaded => {
+    const value = completed + loaded;
+    if (progress && value > highest) { highest = value; progress({loaded:value, total}); }
+   };
    if (repair) {
     const saved = await cache.match(absolute(entry.url));
-    try { if (await verifiedResponse(saved, entry)) continue; }
+    try { if (await verifiedResponse(saved, entry)) { advancing(entry.size); completed += entry.size; continue; } }
     catch (error) { /* Unreadable saved bytes must be downloaded and verified again. */ }
    }
    const response = await fetch(absolute(entry.url), {cache:'reload', credentials:'same-origin'});
-   if (!await verifiedResponse(response, entry)) throw Error('App download failed or bundle changed');
-   await cache.put(absolute(entry.url), response);
+   if (!await verifiedResponse(response, entry, progress ? advancing : null)) throw Error('App download failed or bundle changed');
+   await cache.put(absolute(entry.url), response); completed += entry.size;
   }
  } catch (error) { if (!repair) await caches.delete(CACHE); throw error; }
 }
@@ -69,7 +104,7 @@ self.addEventListener('message', event => {
  })());
  if (event.data && event.data.type === 'APP_STATUS' && event.source) event.waitUntil(status(event.source));
  if (event.data && event.data.type === 'REPAIR_CACHE' && event.source) event.waitUntil((async () => {
-  try { await repairBundle(); await status(event.source, event.data.requestId); }
+  try { await repairBundle(event.source, event.data.requestId); await status(event.source, event.data.requestId); }
   catch (e) { event.source.postMessage({type:'APP_SAVE_FAILED', ...(event.data.requestId === undefined ? {} : {requestId:event.data.requestId})}); }
  })());
 });
