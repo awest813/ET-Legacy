@@ -6,6 +6,15 @@ const base = new URL('./', self.location.href);
 const PREFIX = 'etl-app-' + encodeURIComponent(base.pathname) + '-';
 const CACHE = PREFIX + VERSION;
 const absolute = path => new URL(path, base).href;
+function appClient(client) {
+ // includeUncontrolled also returns unrelated pages hosted on this origin.
+ // Only launcher/game and recovery pages participate in app update handling.
+ try {
+  const url = new URL(client.url);
+  return url.origin === base.origin && [base.pathname,
+   new URL('etl.html', base).pathname, new URL('network/recovery', base).pathname].includes(url.pathname);
+ } catch (error) { return false; }
+}
 async function installBundle(repair = false) {
  const cache = await caches.open(CACHE);
  try {
@@ -33,14 +42,14 @@ function recoveryPage() {
 self.addEventListener('install', event => event.waitUntil(installBundle()));
 self.addEventListener('activate', event => event.waitUntil((async () => {
  // A waiting update activates only after old tabs close or an explicit reload.
- const clients = await self.clients.matchAll({type:'window', includeUncontrolled:true});
+ const clients = (await self.clients.matchAll({type:'window', includeUncontrolled:true})).filter(appClient);
  clients.forEach(client => client.postMessage({type:'APP_READY', version:VERSION}));
  for (const key of await caches.keys()) if (key.startsWith(PREFIX) && key !== CACHE) await caches.delete(key);
  // The first install takes control on the next navigation, preserving in-flight startup.
 })()));
 self.addEventListener('message', event => {
  if (event.data && event.data.type === 'ACTIVATE_UPDATE') event.waitUntil((async () => {
-  const clients = await self.clients.matchAll({type:'window', includeUncontrolled:true});
+  const clients = (await self.clients.matchAll({type:'window', includeUncontrolled:true})).filter(appClient);
   if (clients.length > 1) { if (event.source) event.source.postMessage({type:'APP_OTHER_TABS'}); return; }
   await self.skipWaiting();
  })());

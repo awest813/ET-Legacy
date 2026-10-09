@@ -2867,6 +2867,24 @@ The victory screen was not captured. Evidence:
 `fueldump-undefended-objective-log.json`, and
 `fueldump-undefended-next-round-playing.png`.
 
+## PWA update guard scope (October 9, 2026)
+
+The service worker's uncontrolled-client inventory includes unrelated pages
+on the same origin. Update activation now counts only the launcher, `etl.html`
+and app recovery pages, ignoring query strings and fragments. Activation
+notifications use the same filter. Other open game pages still prevent an
+explicit update from replacing their cached engine files.
+
+The regression failed before the change and passes afterward, covering a
+second game URL, an app recovery page, unrelated paths, a similar path prefix,
+another origin and `about:blank`. An isolated Chromium test on port 8088
+installed the real bundle, staged a second service-worker version, and opened
+both another game page and an unrelated same-origin 404 page. Reload to update
+correctly displayed the other-app-tabs warning. Closing only the second game
+page allowed the update to activate and reload; App & offline then reported
+the app saved while the unrelated page remained open. No game was running in
+these test tabs. PWA worker, fullscreen/UI and generated-bundle checks passed.
+
 ## Selected releases and live relay recovery (October 9, 2026)
 
 Use `python misc/web/run_online.py --config <file> --build-dir <release>` to

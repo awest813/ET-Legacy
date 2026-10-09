@@ -4,7 +4,7 @@ const names=['etl.html','etl.js','etl.wasm','etl.data','manifest.webmanifest','i
 const entries=names.map(url=>({url,sha256:createHash('sha256').update(`bundle:${url}`).digest('hex')}));
 const source=fs.readFileSync(`${__dirname}/sw.js.in`,'utf8').replace('@PWA_VERSION@','fixture').replace('@PWA_ENTRIES@',entries.map(e=>JSON.stringify(e)).join(',')).replace('@PWA_RECOVERY_JSON@',JSON.stringify(fs.readFileSync(`${__dirname}/pwa/recovery.html`,'utf8')));
 function fixture(failure) {
- const events={}, storage=new Map(), messages=[], clients=[{postMessage:m=>messages.push(m)}]; let skipped=0, network=0;
+ const events={}, storage=new Map(), messages=[], clients=[{url:'https://game.test/play/?map=radar',postMessage:m=>messages.push(m)}]; let skipped=0, network=0;
  const caches={async open(key) { if(failure==='storage')throw Error('Storage denied'); if(!storage.has(key)) storage.set(key,new Map()); const map=storage.get(key); return {
   async put(url,response) { map.set(url,response.clone()); },async match(url) { return map.get(url)?.clone(); }
  }; },async keys(){return [...storage.keys()];},async delete(key){return storage.delete(key);} };
@@ -28,9 +28,23 @@ function fixture(failure) {
  assert.equal(await f.request('etl.wasm',{headers:new Headers({Range:'bytes=0-4'})}),null);
  assert.equal(await f.request('etl.js',{method:'POST'}),null);assert.equal(await f.request('other',{mode:'navigate'}),null);
  await f.dispatch('message',{data:{type:'APP_STATUS'},source:f.clients[0]});assert.equal(f.messages.at(-1).type,'APP_READY');
- f.clients.push({postMessage(){}});await f.dispatch('message',{data:{type:'ACTIVATE_UPDATE'},source:f.clients[0]});
+ f.clients.push({url:'https://game.test/play/etl.html?map=oasis#game',postMessage(){}});await f.dispatch('message',{data:{type:'ACTIVATE_UPDATE'},source:f.clients[0]});
  assert.equal(f.skipped,0);assert.equal(f.messages.at(-1).type,'APP_OTHER_TABS');
  f.clients.pop();await f.dispatch('message',{data:{type:'ACTIVATE_UPDATE'},source:f.clients[0]});assert.equal(f.skipped,1);
+ const scoped=fixture(), unrelatedMessages=[];
+ for(const url of ['https://game.test/docs/', 'https://game.test/playground/',
+                  'https://game.test/play/assets/map-guide.html', 'https://other.test/play/', 'about:blank']) {
+  scoped.clients.push({url,postMessage:m=>unrelatedMessages.push(m)});
+ }
+ await scoped.dispatch('message',{data:{type:'ACTIVATE_UPDATE'},source:scoped.clients[0]});
+ assert.equal(scoped.skipped,1,'Unrelated pages on the origin cannot block a game update');
+ await scoped.dispatch('install');await scoped.dispatch('activate');
+ assert.equal(unrelatedMessages.length,0,'App activation only notifies game pages');
+ assert.equal(scoped.messages.at(-1).type,'APP_READY');
+ scoped.clients.push({url:'https://game.test/play/network/recovery',postMessage(){}});
+ await scoped.dispatch('message',{data:{type:'ACTIVATE_UPDATE'},source:scoped.clients[0]});
+ assert.equal(scoped.skipped,1,'An open app recovery page still protects the other game tab');
+ assert.equal(scoped.messages.at(-1).type,'APP_OTHER_TABS');
  f.storage.get('etl-app-%2Fplay%2F-fixture').delete('https://game.test/play/etl.wasm');
  await f.dispatch('message',{data:{type:'APP_STATUS'},source:f.clients[0]});assert.equal(f.messages.at(-1).type,'APP_MISSING');
  assert.equal((await f.request('etl.wasm')).status,503,'Missing cached code does not fall back to another version');
