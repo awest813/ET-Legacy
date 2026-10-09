@@ -2888,8 +2888,9 @@ generated-code/bundle integrity and input-focus checks passed.
 The preceding player-controlled Hard-bot session verified Axis Soldier spawning,
 touch camera turning, stair movement, one-shot touch firing (30 to 29 rounds),
 enemy Thompson/flamethrower damage, wounded-player presentation and bot medic
-interaction. A screenshot captured the explicit `[BOT]Cledus` revival message
-and 95 HP during warmup. The live round also returned to first-person play after
+interaction. The UI displayed an explicit `[BOT]Cledus` revival message and
+95 HP during warmup. The saved screenshot shortly afterward shows 95 HP; the
+revival message had already expired. The live round also returned to first-person play after
 being wounded. This short session does not prove sustained touch firing, player
 hit accuracy, physical multitouch support or a complete human-played round.
 No cheats were used. Temporary test tabs were closed and touch mode restored.
