@@ -1072,6 +1072,29 @@ assert.equal(lostGraphics.elements.wrap.inert,true);
 assert.equal(lostGraphics.elements.gamebar.hidden,true);
 lostGraphics.context.Module.onRuntimeInitialized();assert.equal(lostGraphics.calls.length,1);
 lostGraphics.start();assert.equal(lostGraphics.calls.at(-1),'retry');
+const lowRecovery=launcher({query:'?map=radar&bots=2&foo=one',hash:'#controls'});
+lowRecovery.start();lowRecovery.elements.canvas.webglcontextlost({preventDefault(){}});
+assert.equal(lowRecovery.elements.retrygraphics.hidden,false,'Context loss offers a lower-memory graphics recovery');
+lowRecovery.elements.retrygraphics.click();
+const recoveredURL=new URL(lowRecovery.context.window.location.href);
+assert.equal(recoveredURL.searchParams.get('graphics'),'chromebook');
+assert.equal(recoveredURL.searchParams.get('map'),'radar');assert.equal(recoveredURL.searchParams.get('foo'),'one');
+assert.equal(recoveredURL.hash,'#controls');
+const recoveredGraphics=launcher({query:recoveredURL.search,hash:recoveredURL.hash,storage:true});
+assert.equal(recoveredGraphics.elements.graphicspreset.value,'chromebook','Low graphics recovery works when browser storage is unavailable');
+assert.match(recoveredGraphics.elements.graphicshint.textContent,/960.*540/);
+assert.equal(new URL(recoveredGraphics.context.window.location.href).searchParams.has('graphics'),false,'Recovery override is consumed so later reloads respect custom settings');
+recoveredGraphics.start();assert.ok(recoveredGraphics.calls[0].includes('960'));assert.ok(recoveredGraphics.calls[0].includes('540'));
+const deniedRecoveryHistory=launcher({query:'?graphics=chromebook&map=radar',history:true});
+assert.equal(deniedRecoveryHistory.elements.graphicspreset.value,'chromebook','History denial cannot block the recovered preset');
+deniedRecoveryHistory.start();assert.ok(deniedRecoveryHistory.calls[0].includes('960'));
+for (const value of ['__proto__','constructor','quality; quit']) {
+ const rejectedPreset=launcher({query:'?graphics='+encodeURIComponent(value)});
+ assert.equal(rejectedPreset.elements.graphicspreset.value,'saved','Unrecognized graphics parameters never generate startup commands');
+}
+const otherFatal=launcher();otherFatal.context.showFatal('Download unavailable');
+assert.equal(otherFatal.elements.retrygraphics.hidden,true,'An unrelated loading error does not suggest graphics recovery');
+
 
 const setupUI=launcher();
 setupUI.elements.botcount.value='0'; setupUI.elements.botcount.input();

@@ -80,6 +80,7 @@
 	#barwrap { width: 440px; height: 6px; background: #292c2f; border-radius: 3px; margin-top: 16px; overflow: hidden; }
 	#bar { height: 100%; width: 0%; background: var(--gold); transition: width .15s; }
 	#bartext { margin-top: 8px; font-size: 12px; color: var(--muted); min-height: 16px; }
+	#retrygraphics { width: 100%; min-height: 44px; margin-top: 12px; padding: 10px; background: #222429; color: #eee; border: 1px solid #58544a; border-radius: 6px; }
 	#cancelload { min-height: 44px; padding: 8px 16px; margin-top: 12px; background: #222429; color: #eee; border: 1px solid #58544a; border-radius: 6px; }
 	#controls { width: 440px; margin: 20px 0 auto; color: var(--muted); font-size: 13px; line-height: 1.65; }
 	#controls summary { cursor: pointer; color: #ddd; display: list-item; padding: 8px; }
@@ -277,6 +278,7 @@
 		</fieldset>
 		<p id="matchsummary">Oasis &middot; 4 bots &middot; Normal</p>
 		<button id="playbtn" type="submit" disabled>LOADING&hellip;</button>
+		<button id="retrygraphics" type="button" hidden aria-describedby="etl_status">Reload with low graphics</button>
 	</form>
 	<div id="etl_status" role="status" aria-live="polite"></div>
 	<ol id="loadsteps" aria-label="Loading stages"><li id="stage-engine" data-stage="active" aria-current="step">Engine</li><li id="stage-files">Game files</li><li id="stage-match">Match</li></ol>
@@ -373,6 +375,7 @@
 	var serverCompatible = true, serverPasswordRequired = false, serverVerified = false;
 	var graphicsPreset = document.getElementById('graphicspreset');
 	graphicsPreset.value = 'saved';
+	var retryGraphics = document.getElementById('retrygraphics'); retryGraphics.hidden = true;
 	function graphicsStartupArgs(preset)
 	{
 		var names = ['r_mode','r_customwidth','r_customheight','r_picmip','r_texturemode','r_ext_texture_filter_anisotropic','r_dynamiclight','cg_shadows','cg_skybox','r_fastsky','com_maxfps'];
@@ -385,15 +388,16 @@
 		if (values) names.forEach(function(name, index) { args.push('+set', name, values[index]); });
 		return args;
 	}
-	graphicsPreset.addEventListener('change', function() {
+	function updateGraphicsHint() {
 		var hints = {
 			saved:'Keeps your saved graphics settings. Change individual settings in game: Options > System.',
 			chromebook:'960×540, Medium textures, simpler sky and fewer effects, 60 FPS cap. Reduces rendering and texture memory before the map loads.',
 			balanced:'1280×720, High textures, trilinear/4× filtering, single-pass lights, 60 FPS cap.',
 			quality:'1920×1080, Very High textures, trilinear/16× filtering, multi-pass lights, 60 FPS cap. Uses more graphics memory.'
 		};
-		controlText(document.getElementById('graphicshint'), hints[this.value] || hints.saved);
-	});
+		controlText(document.getElementById('graphicshint'), hints[graphicsPreset.value] || hints.saved);
+	}
+	graphicsPreset.addEventListener('change', updateGraphicsHint);
 	var bootFailed = false;
 	var cacheEnabled = false;
 	var loadState = 'engine-loading';
@@ -416,6 +420,17 @@
 	var savedOptions = {};
 	try { savedOptions = JSON.parse(localStorage.getItem('etl.offlineMatch')) || {}; } catch (e) {}
 	var queryOptions = new URLSearchParams(window.location.search);
+	// A recovery reload applies the preset once; later reloads keep native customization.
+	if (['chromebook', 'balanced', 'quality'].includes(queryOptions.get('graphics')))
+	{
+		graphicsPreset.value = queryOptions.get('graphics'); updateGraphicsHint();
+		try { var graphicsURL = new URL(window.location.href); graphicsURL.searchParams.delete('graphics'); window.history.replaceState(window.history.state, '', graphicsURL.href); } catch (e) {}
+	}
+	retryGraphics.addEventListener('click', function() {
+		if (!bootFailed || retryGraphics.hidden || retryGraphics.disabled) return;
+		var url = new URL(window.location.href); url.searchParams.set('graphics', 'chromebook');
+		retryGraphics.disabled = true; window.location.href = url.href;
+	});
 	function optionValue(name, fallback)
 	{
 		return queryOptions.has(name) ? queryOptions.get(name) : (savedOptions[name] == null ? fallback : savedOptions[name]);
@@ -1625,7 +1640,7 @@
 	Module.canvas.addEventListener('webglcontextlost', function(event)
 	{
 		if (event) event.preventDefault();
-		showFatal('The graphics context was lost. Retry to rebuild the renderer and start a new match.');
+		showFatal('The graphics context was lost. Retry to rebuild the renderer, or reload with low graphics to reduce memory and effects for your next match.', true);
 	});
 
 	matchform.addEventListener('submit', function(event)
@@ -1652,10 +1667,11 @@
 		startGame();
 	});
 
-	function showFatal(msg)
+	function showFatal(msg, graphicsLost)
 	{
 		if (bootFailed) return;
 		bootFailed = true;
+		retryGraphics.hidden = !graphicsLost;
 		catalogEpoch++; catalogBusy = false;
 		if (catalogRequest) { var catalog = catalogRequest; catalogRequest = null; try { catalog.abort(); } catch (e) {} }
 		cancelServerAssets();
