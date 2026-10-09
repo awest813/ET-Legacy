@@ -216,6 +216,9 @@ qboolean GLimp_GetModeInfo(int *width, int *height, float *windowAspect, int mod
 {
 	vidmode_t *vm;
 	float     pixelAspect;
+#ifdef __EMSCRIPTEN__
+	floatint_t aspectBits;
+#endif
 
 	if (mode < -1)
 	{
@@ -241,7 +244,27 @@ qboolean GLimp_GetModeInfo(int *width, int *height, float *windowAspect, int mod
 		pixelAspect = vm->pixelAspect;
 	}
 
+#ifdef __EMSCRIPTEN__
+	// Invalid saved/custom settings must reach the normal mode fallback before
+	// SDL creates a zero-sized canvas or the renderer receives a nonfinite ratio.
+	// Release builds use fast-math; inspect IEEE bits instead of isfinite(),
+	// which the compiler may assume is always true under that option.
+	aspectBits.f = pixelAspect;
+	if (*width <= 0 || *height <= 0 || aspectBits.ui == 0 ||
+	    (aspectBits.ui & 0x80000000u) || (aspectBits.ui & 0x7f800000u) == 0x7f800000u)
+	{
+		return qfalse;
+	}
+#endif
 	*windowAspect = (float)*width / (*height * pixelAspect);
+#ifdef __EMSCRIPTEN__
+	aspectBits.f = *windowAspect;
+	if (aspectBits.ui == 0 || (aspectBits.ui & 0x80000000u) ||
+	    (aspectBits.ui & 0x7f800000u) == 0x7f800000u)
+	{
+		return qfalse;
+	}
+#endif
 
 	return qtrue;
 }

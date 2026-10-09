@@ -3018,3 +3018,33 @@ Evidence is saved in `build_wasm/unavailable-online-log.json`,
 `unavailable-online-fixed.png` and `unavailable-online-fixed-log.json`.
 This is local failure/recovery
 validation, not proof of public online gameplay.
+
+## Invalid custom display settings (October 9, 2026)
+
+Browser video-mode selection now rejects zero/negative custom dimensions and
+invalid pixel or resulting window aspect ratios before creating the SDL
+window. Invalid settings follow the existing safe-mode fallback. Float checks
+inspect IEEE bits because the release build uses fast-math, which can remove
+ordinary `isfinite` checks. Desktop mode selection remains unchanged.
+
+The compiled production-function regression failed before the fix and passes
+afterward. It compiles the handler with `-O3 -ffast-math`, using a separate
+test driver for adversarial inputs. Coverage includes zero/negative dimensions,
+NaN/infinite/overflowing aspect values, valid custom sizes, stock modes and
+desktop parity. The fixture is included in hosted browser CI. The browser
+build, seven-file bundle/module verifier, launcher checks and 90 service tests
+also passed.
+
+In live Chromium, setting custom width/height to zero and running
+`vid_restart` rejected mode -1, selected fallback mode 4 at 800x600, and
+returned to rendered Radar. The canvas dimensions matched the native log.
+Evidence: `build_wasm/video-mode-fallback.png` and
+`video-mode-fallback-log.json`. This verifies recovery from invalid display
+settings, not physical Chromebook performance.
+
+Returning to the launcher and selecting Chromebook / Low power then replaced
+the saved invalid dimensions before the next Radar map loaded. The native log
+reported 960x540, `GL_LINEAR_MIPMAP_NEAREST` and picmip 2; the canvas was
+960x540 and rendered the map. Evidence:
+`build_wasm/video-mode-chromebook-recovery.png` and
+`video-mode-chromebook-recovery-log.json`. The temporary test tab was closed.

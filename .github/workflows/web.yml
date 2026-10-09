@@ -70,7 +70,7 @@ jobs:
       - name: Exercise production native and browser handlers
         run: |
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
-          for suite in console_text input_focus menu_mouse connect_timeout missing_assets pure_assets client_identity; do
+          for suite in console_text input_focus menu_mouse connect_timeout missing_assets pure_assets client_identity video_mode; do
             python "misc/web/test_${suite}.py"
           done
           pwsh -NoProfile -File misc/web/test_bots.ps1
