@@ -24,6 +24,9 @@ restart_start=commands.index('static qboolean SV_RestartLoadingClient(')
 restart_end=commands.index('/**',restart_start)
 restart_loading=commands[restart_start:restart_end]
 server_client=(ROOT/'src/server/sv_client.c').read_text(encoding='utf-8')
+verify_start=server_client.index('static void SV_VerifyPaks_f(')
+verify_end=server_client.index('/**',verify_start)
+verify=server_client[verify_start:verify_end]
 move_start=server_client.index('\tif (cl->state == CS_PRIMED)',server_client.index('static void SV_UserMove('))
 move_end=server_client.index('#ifdef LEGACY_AUTH',move_start)
 move_gate=server_client[move_start:move_end]
@@ -40,6 +43,7 @@ HARNESS=r'''
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #define BIG_INFO_STRING 8192
 #define MAX_INFO_VALUE 8192
 #define Com_sprintf snprintf
@@ -64,7 +68,8 @@ static void CL_AddReliableCommand(const char *text) { strcpy(reliable,text); }
 #define CS_PRIMED 3
 #define CS_ACTIVE 4
 #define Com_DPrintf(...) ((void)0)
-typedef struct { int state, pureAuthentic, gotCP, deltaMessage; char *name; struct { int serverTime; } lastUsercmd; } client_t;
+typedef struct { int state, pureAuthentic, gotCP, deltaMessage; char *name; struct { int serverTime; } lastUsercmd; int ettvClient,lastSnapshotTime; } client_t;
+static struct { int checksumFeedServerId,checksumFeed; } sv={100,7};
 static struct { int integer; } pureCvar={1};
 #define Com_Memset memset
 #define sv_pure (&pureCvar)
@@ -72,6 +77,23 @@ static int dropped, entered, resent;
 static void SV_DropClient(client_t *cl,const char *reason) { dropped++; }
 static void SV_ClientEnterWorld(client_t *cl,int *cmd) { entered++;cl->state=CS_ACTIVE; }
 static void SV_SendClientGameState(client_t *cl) { resent++; }
+static void SV_SendClientSnapshot(client_t *cl) { }
+static char commandBuffer[8192];
+static char *commandArgs[1100];
+static int commandCount;
+static void Cmd_TokenizeString(const char *text) {
+ strcpy(commandBuffer,text);commandCount=0;
+ for(char *token=strtok(commandBuffer," ");token;token=strtok(NULL," ")) {
+  assert(commandCount<1100);commandArgs[commandCount++]=token;
+ }
+}
+static int Cmd_Argc(void) { return commandCount; }
+static const char *Cmd_Argv(int index) { return index<commandCount?commandArgs[index]:""; }
+static int Q_atoi(const char *text) { return text?atoi(text):0; }
+static const char *serverPakList="101 201";
+static const char *FS_LoadedPakPureChecksums(void) { return serverPakList; }
+#define rc(x) (x)
+#define Com_Printf(...) ((void)0)
 static int Q_stricmp(const char *a,const char *b) { return strcmp(a,b); }
 static int FS_FilenameCompare(const char *a,const char *b) { return strcmp(a,b); }
 static int FS_PakIsPure(pack_t *p) { return p->pure; }
@@ -86,6 +108,13 @@ static void Com_Error(int code,const char *text) { assert(0); }
 /* NEXT ID */
 static void movement_gate(client_t *cl) { int cmds[]={0}; /* MOVE GATE */ }
 /* RESTART LOADING */
+/* VERIFY */
+static void verify_report(const char *report,int valid) {
+ client_t player={CS_PRIMED,0,0,0,"test"};int before=dropped;
+ Cmd_TokenizeString(report);SV_VerifyPaks_f(&player);
+ assert(player.gotCP && player.pureAuthentic==valid);
+ assert(dropped==before+!valid);
+}
 int main(void) {
  fileInPack_t ui={"ui.mp.wasm32.so",NULL},cg={"cgame.mp.wasm32.so",&ui};fileInPack_t *table[]={&cg},*empty[]={NULL};
  pack_t rejected={"legacy",0,999,1,0,table},wrongGame={"etmain",0,888,1,1,table},absent={"legacy",0,777,1,1,empty},valid={"legacy",1,101,1,1,table},map={"etmain",1,201,1,1,empty};
@@ -110,6 +139,20 @@ int main(void) {
  fs_searchpaths=&split;assert(!SV_HasWebClientModulePaks()); /* A companion wasm PK3 cannot pass native pure checks. */
  fs_searchpaths=&paths[1];assert(!SV_HasWebClientModulePaks()); /* A higher-priority etmain DLL package cannot impersonate Legacy wasm modules. */
  fs_searchpaths=&paths[3];ui.next=NULL;assert(!SV_HasWebClientModulePaks());
+ ui.next=&nativeCg;
+ verify_report("cp 100 101 101 @ 101 201 169",1);
+ verify_report("cp 100 101 101 @ 201 207",1); /* Last allowlist entry. */
+ verify_report("cp 100 101 101 @ 999 993",0); /* Valid encoding, unauthorized pack. */
+ verify_report("cp 100 101 101 @ 101 999 903",0);
+ verify_report("cp 100 101 101 @ 101 101 5",0); /* Duplicate references. */
+ verify_report("cp 100 101 101 @ 101 201 170",0); /* Bad encoded checksum. */
+ verify_report("cp 100 999 101 @ 101 201 169",0); /* Wrong module pack. */
+ serverPakList="";verify_report("cp 100 101 101 @ 101 99",0);serverPakList="101 201";
+ client_t pending={CS_PRIMED,0,0,0,"pending"};int before=dropped;
+ Cmd_TokenizeString("cp 99 101 101 @ 999 993");SV_VerifyPaks_f(&pending);
+ assert(!pending.gotCP && !pending.pureAuthentic && dropped==before);
+ dropped=0;
+ ui.next=NULL;
  cl.serverId=200;clc.checksumFeedServerId=100;
  CL_SendPureChecksums();assert(strncmp(reliable,"cp 100 ",7)==0);
  cl.serverId=300;CL_SendPureChecksums();assert(strncmp(reliable,"cp 100 ",7)==0);
@@ -133,7 +176,7 @@ int main(void) {
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--compiler',default='emcc');parser.add_argument('--node',default='node');args=parser.parse_args()
     fixture=ROOT/'build_wasm/test_pure_assets.c';fixture.write_text(HARNESS.replace('/* FUNCTIONS */',functions)
-        .replace('/* LOOKUP */',lookup).replace('/* ADVERTISEMENT */',advertisement).replace('/* SEND */',send).replace('/* NEXT ID */',next_id).replace('/* MOVE GATE */',move_gate).replace('/* RESTART LOADING */',restart_loading),encoding='utf-8')
+        .replace('/* LOOKUP */',lookup).replace('/* ADVERTISEMENT */',advertisement).replace('/* SEND */',send).replace('/* NEXT ID */',next_id).replace('/* MOVE GATE */',move_gate).replace('/* RESTART LOADING */',restart_loading).replace('/* VERIFY */',verify),encoding='utf-8')
     for name,flags in [('web',[]),('desktop',['-U__EMSCRIPTEN__'])]:
         output=ROOT/('build_wasm/test_pure_assets_'+name+'.cjs')
         subprocess.run([args.compiler,str(fixture),'-O2','-sENVIRONMENT=node','-sWASM_ASYNC_COMPILATION=0',*flags,'-o',str(output)],check=True)

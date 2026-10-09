@@ -2043,3 +2043,11 @@ the existing repair/update/fullscreen flows. The launcher suite, 26 HTTP checks,
 native dedicated-server build, browser build and compiled pure-state tests pass.
 Public server deployment, full attacker objective completion and physical mobile
 and ChromeOS testing remain outstanding before the whole port can be complete.
+
+The subsequent pure-package audit corrected an exhausted allowlist search that
+accepted unlisted client packages. Compiled tests now execute the complete
+production verifier: valid packages (including the final list entry), unlisted
+packages with correctly encoded checksums, duplicates, incorrect encoding,
+incorrect module packages, an empty allowlist and outdated reports. The unlisted
+package regression fails against the original condition and passes after the
+correction. Both browser and desktop test configurations and engine builds pass.

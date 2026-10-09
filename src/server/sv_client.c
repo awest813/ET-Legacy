@@ -1890,7 +1890,7 @@ static void SV_VerifyPaks_f(client_t *cl)
 						break;
 					}
 				}
-				if (j > nServerPaks)
+				if (j == nServerPaks)
 				{
 					bGood = qfalse;
 					break;
