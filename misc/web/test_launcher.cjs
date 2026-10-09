@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = fs.readFileSync(`${__dirname}/etl_shell.html`, 'utf8')
+const source = new TextDecoder('utf-8', {fatal:true}).decode(fs.readFileSync(`${__dirname}/etl_shell.html`))
     .match(/<script type="text\/javascript">([\s\S]*?)<\/script>/)[1];
 const packs = ['etloose.pk3', 'pak0.pk3', 'pak1.pk3', 'pak2.pk3'];
 const zip = Uint8Array.from([80, 75, 3, 4, ...Array(28).fill(0)]);
@@ -772,6 +772,19 @@ for (const [changed, guidance] of [
     fault.onlineOverride=null;page.elements.refreshonline.click();page.elements.joinbtn.click();
     assert.equal(page.networkCalls.length,1,'Checking a recovered selection permits a fresh connection');
 }
+const changedPasswordFault={publicCatalog},changedPassword=publicReady(changedPasswordFault);
+changedPasswordFault.onlineInfo={...publicEntries[0].info,map:'radar',players:9,password:true};
+changedPassword.elements.joinbtn.focus();changedPassword.elements.joinbtn.click();
+assert.equal(changedPassword.networkCalls.length,0,'A newly password-protected public server must ask for its password before opening the relay');
+assert.equal(changedPassword.elements.servermap.textContent,'Map: radar','Join refreshes changed public server details');
+assert.match(changedPassword.elements.serverpopulation.textContent,/9 \/ 16/);
+assert.equal(changedPassword.elements.serverpassword.open,true);
+assert.equal(changedPassword.elements.joinbtn.disabled,true);
+assert.equal(changedPassword.context.document.activeElement,changedPassword.elements.onlinepassword,'A newly required password receives keyboard focus');
+changedPassword.elements.onlinepassword.value='new password';changedPassword.elements.onlinepassword.input();changedPassword.elements.joinbtn.click();
+assert.equal(changedPassword.networkCalls.length,1,'Entering the newly required password permits a fresh join');
+assert.equal(changedPassword.files.get('/browser/legacy/browser-connect.cfg'),'set password \"new password\"\n');
+assert.equal(changedPassword.elements.onlinepassword.value,'');
 const initialTimeoutFault={publicCatalog},initialTimeout=publicReady(initialTimeoutFault);initialTimeoutFault.onlineTimeout=true;
 initialTimeout.elements.joinbtn.click();
 assert.equal(initialTimeout.networkCalls.length,0);

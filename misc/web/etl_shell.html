@@ -258,7 +258,7 @@
 			</label>
 			<p id="mapbrief">Infiltrate the desert garrison and destroy its two anti-tank guns.</p>
 			<details id="custommaps"><summary>Custom maps &amp; assets</summary>
-				<p id="customimporthint">Checking whether this launcher supports map imports� Installed maps can still be played.</p>
+				<p id="customimporthint">Checking whether this launcher supports map imports… Installed maps can still be played.</p>
 				<label for="customfile">Map pack (.pk3, up to 256 MB)<input id="customfile" type="file" accept=".pk3" aria-describedby="customimporthint" disabled></label>
 				<button id="refreshmaps" type="button">Refresh map list</button>
 				<p id="customstatus" role="status">Checking installed custom maps…</p>
@@ -1136,7 +1136,7 @@
 			var restoreJoinFocus = document.activeElement === document.getElementById('canceljoin');
 			joiningOnline = false; networkText(message); updateOnlineJoin();
 			document.getElementById('offlinebtn').disabled = false; document.getElementById('onlinebtn').disabled = false;
-			if (restoreJoinFocus) joinbtn.focus();
+			if (restoreJoinFocus) (serverPasswordRequired && !document.getElementById('onlinepassword').value ? document.getElementById('onlinepassword') : joinbtn).focus();
 		}
 		refreshSelectedConnection(function()
 		{
@@ -1201,6 +1201,11 @@
 				retryConfigRequest = null;
 				Module['browserNetwork'].configure(config, Module.canvas.ownerDocument.baseURI);
 				configuredRelay = config.relay; selectedServerLabel = config.serverLabel; autoServerAssets = config.autoAssets === true;
+				if (atLauncher)
+				{
+					networkText(showServerInfo(config));
+					if (serverPasswordRequired && !document.getElementById('onlinepassword').value) throw new Error('This server now requires a password. Enter its password below, then join.');
+				}
 				done();
 			} catch (error) { failed(error.message); }
 		};
