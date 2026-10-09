@@ -2177,3 +2177,33 @@ counter read 59 in that scene; this is a spot check, not a sustained performance
 benchmark. Evidence: `build_wasm/vertex-pack-live-oasis.png` and
 `vertex-pack-live-oasis-log.json`. The human then returned to spectator so the
 bot round could continue.
+
+## Integrated saved-app cold start (October 9, 2026)
+
+The latest optimized bundle was applied to the regular localhost launcher using
+its saved-update dialog. Fuel Dump, twelve Hard bots and all eight custom-map
+choices survived the update. The launcher and relay process was then stopped;
+TCP checks confirmed ports 8081 and 8082 unavailable before and after gameplay.
+An entirely new tab opened the cached launcher with ETL Supply, four Hard bots,
+and the installed custom-map inventory while both services remained stopped.
+The custom map rendered, bots joined, and an Allied medic moved and fired the
+Thompson from 30 to 27 rounds using the capture fallback. App & offline reported
+"Offline ready in this browser." Fullscreen entered and exited with the game
+controls accessible. Ending the match returned to the cached launcher and
+restored the custom-map selection and inventory.
+
+Still with the services stopped, the same launcher then loaded stock Fuel Dump
+with twelve Hard bots. Native `status` confirmed map `fueldump`, the spectator
+and twelve bot clients; the snow scene rendered normally. The original Fuel
+Dump/twelve-Hard-bot match preference was restored through this selection.
+Evidence: `final-offline-stock-status.png`, `final-offline-stock-log.json` and
+`final-offline-stock-render.png`. The temporary test tab was closed and the
+regular launcher and relay were restarted afterward.
+
+Evidence is `build_wasm/final-offline-services-stopped.json`,
+`final-offline-services-stopped-after-play.json`, `final-offline-custom-play.png`,
+`final-offline-custom-log.json`, `final-offline-fullscreen.png` and
+`final-offline-return.png`. The PWA UI and worker regression suites also pass.
+This verifies this browser's saved app and already-installed assets with the
+local services unavailable; it does not establish offline downloads of new
+maps, physical-device behavior or cross-browser support.
