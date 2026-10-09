@@ -2344,3 +2344,41 @@ failure; editing the search to Radar retained that error. The regular launcher,
 relay and bot matches were left running. Evidence:
 `build_wasm/public-status-live-empty.png`, `public-status-live-empty-ax.txt`,
 `public-status-live-failure.png` and `public-status-live-failure-ax.txt`.
+
+## Graphics selection before the first map (October 9, 2026)
+
+The launcher now exposes Graphics & performance for both play modes. Players
+can select Chromebook / Low power, Balanced or Quality before starting the
+renderer and loading textures. Use saved game settings is the default on each
+launcher visit, so later in-game customizations are not overwritten by an old
+preset selection. Selected presets become ordinary native graphics settings
+and use the existing settings snapshot/persistence flow after startup.
+
+Preset startup arguments precede the first map or connection command. The
+launcher regression suite checks all presets on both startup paths, compares
+their actual values against the native System-menu implementation, preserves
+saved custom graphics, rejects unknown preset names, prevents a cancelled late
+load from starting, and covers unavailable storage. Browser build and emitted
+script parsing pass. No native modules changed in this launcher-only addition.
+
+Live selection of Chromebook / Low power started the first solo Oasis map at
+an actual 960x540 canvas size, with Medium textures, bilinear filtering, no
+anisotropy or dynamic lights/shadows, simple sky and a 60 FPS cap. No Apply or
+renderer restart was needed. Evidence: `build_wasm/startup-graphics-first-map.png`
+and `startup-graphics-first-map-log.json`.
+
+Visual inspection caught and corrected an overly wide graphics panel. The
+final panel aligns with the match form. At a 320x568 test viewport, document
+scroll width was 320, panel width 273, summary height 45 and selector height 44
+pixels. The viewport override was reset. Evidence:
+`startup-graphics-final-launcher.png` and `startup-graphics-narrow.png`.
+These are desktop browser viewport checks, not physical Chromebook or mobile
+performance measurements.
+After changing the native FPS cap from 60 to 76 and applying it, End match and
+return preserved the settings. The final launcher build defaulted to Use saved
+game settings and started another Oasis match with four Hard bots. All four
+joined; the System menu retained 960x540, the low-power graphics values and the
+custom 76 FPS cap. Evidence: `startup-graphics-customization.png` and
+`startup-graphics-customization-log.json`. The final bundle's seven local and
+served hashes match (`startup-graphics-bundle-hashes.json`). The temporary test
+tab and HTTP service were cleaned up; the existing bot-round tabs were retained.

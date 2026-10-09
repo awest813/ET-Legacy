@@ -54,6 +54,11 @@
 	#matchsettings select, #matchsettings input { width: 100%; min-height: 44px; padding: 10px 12px; background: #111316; color: #eee; border: 1px solid #5b5c5d; border-radius: 6px; font-size: 15px; }
 	#matchsettings select:hover:not(:disabled), #matchsettings input:hover:not(:disabled) { border-color: #b19b6c; }
 	#matchsettings select:disabled, #matchsettings input:disabled { opacity: .55; }
+	#launchgraphics { width: min(440px, 100%); min-width: 0; margin: 0 0 18px; border: 1px solid #414344; border-radius: 8px; padding: 0 18px; text-align: left; }
+	#launchgraphics summary { cursor: pointer; min-height: 44px; padding: 12px 0; font-weight: 600; }
+	#launchgraphics label { display: grid; gap: 8px; font-size: 13px; }
+	#launchgraphics select { width: 100%; min-height: 44px; padding: 10px 12px; background: #111316; color: #eee; border: 1px solid #5b5c5d; border-radius: 6px; font-size: 15px; }
+	#launchgraphics p { font-size: 13px; line-height: 1.6; color: #bbb; margin: 12px 0 16px; }
 	#mapbrief { margin: -6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; min-height: 39px; }
 	#custommaps { grid-column: 1 / -1; font-size: 13px; color: var(--muted); }
 	#custommaps summary { cursor: pointer; min-height: 44px; padding: 12px 0; color: #ddd; }
@@ -71,7 +76,7 @@
 	#loadsteps [data-stage="active"]::before { border-color: var(--gold); }
 	#loadsteps [data-stage="complete"] { color: #bcc9b8; }
 	#overlay[data-state="ready"] #loadsteps, #overlay[data-state="failed"] #loadsteps { display: none; }
-	#overlay[data-state="failed"] #modebar, #overlay[data-state="failed"] #matchsettings, #overlay[data-state="failed"] #matchsummary { display: none; }
+	#overlay[data-state="failed"] #modebar, #overlay[data-state="failed"] #launchgraphics, #overlay[data-state="failed"] #matchsettings, #overlay[data-state="failed"] #matchsummary { display: none; }
 	#barwrap { width: 440px; height: 6px; background: #292c2f; border-radius: 3px; margin-top: 16px; overflow: hidden; }
 	#bar { height: 100%; width: 0%; background: var(--gold); transition: width .15s; }
 	#bartext { margin-top: 8px; font-size: 12px; color: var(--muted); min-height: 16px; }
@@ -199,6 +204,17 @@
 		<button id="offlinebtn" type="button" aria-pressed="true">Offline with bots</button>
 		<button id="onlinebtn" type="button" aria-pressed="false">Online</button>
 	</div>
+	<details id="launchgraphics"><summary>Graphics &amp; performance</summary>
+		<label for="graphicspreset">Graphics for the next match
+			<select id="graphicspreset" aria-describedby="graphicshint">
+				<option value="saved" selected>Use saved game settings</option>
+				<option value="chromebook">Chromebook / Low power</option>
+				<option value="balanced">Balanced</option>
+				<option value="quality">Quality</option>
+			</select>
+		</label>
+		<p id="graphicshint" role="status">Keeps your saved graphics settings. Change individual settings in game: Options &gt; System.</p>
+	</details>
 	<section id="onlinepanel" aria-labelledby="online-title" hidden>
 		<h2 id="online-title">Online server</h2>
 		<p id="onlineintro">Choose a compatible Legacy server, or play offline with bots.</p>
@@ -354,6 +370,29 @@
 	var publicEnabled = false, publicEntries = [], publicRequest = null, publicTimer = null, publicEpoch = 0, publicBusy = false, selectedServerId = '', selectedServerLabel = '';
 	var publicCatalogState = null, publicListFailed = false;
 	var serverCompatible = true, serverPasswordRequired = false, serverVerified = false;
+	var graphicsPreset = document.getElementById('graphicspreset');
+	graphicsPreset.value = 'saved';
+	function graphicsStartupArgs(preset)
+	{
+		var names = ['r_mode','r_customwidth','r_customheight','r_picmip','r_texturemode','r_ext_texture_filter_anisotropic','r_dynamiclight','cg_shadows','cg_skybox','r_fastsky','com_maxfps'];
+		var presets = {
+			chromebook:['-1','960','540','2','GL_LINEAR_MIPMAP_NEAREST','0','0','0','0','1','60'],
+			balanced:['-1','1280','720','1','GL_LINEAR_MIPMAP_LINEAR','4','1','1','1','0','60'],
+			quality:['-1','1920','1080','0','GL_LINEAR_MIPMAP_LINEAR','16','2','1','1','0','60']
+		};
+		var args = [], values = Object.prototype.hasOwnProperty.call(presets, preset) ? presets[preset] : null;
+		if (values) names.forEach(function(name, index) { args.push('+set', name, values[index]); });
+		return args;
+	}
+	graphicsPreset.addEventListener('change', function() {
+		var hints = {
+			saved:'Keeps your saved graphics settings. Change individual settings in game: Options > System.',
+			chromebook:'960×540, Medium textures, simpler sky and fewer effects, 60 FPS cap. Reduces rendering and texture memory before the map loads.',
+			balanced:'1280×720, High textures, trilinear/4× filtering, single-pass lights, 60 FPS cap.',
+			quality:'1920×1080, Very High textures, trilinear/16× filtering, multi-pass lights, 60 FPS cap. Uses more graphics memory.'
+		};
+		controlText(document.getElementById('graphicshint'), hints[this.value] || hints.saved);
+	});
 	var bootFailed = false;
 	var cacheEnabled = false;
 	var loadState = 'engine-loading';
@@ -507,6 +546,7 @@
 	function setLoadState(state, message)
 	{
 		loadState = state;
+		graphicsPreset.disabled = !['ready','engine-loading'].includes(state) || joiningOnline;
 		document.getElementById('cancelload').hidden = !['cache-loading','manifest-loading','downloading','verifying'].includes(state);
 		document.getElementById('customfile').disabled = state !== 'ready' || catalogBusy;
 		document.getElementById('refreshmaps').disabled = state !== 'ready' || catalogBusy;
@@ -809,6 +849,7 @@
 	}
 	function updateOnlineJoin()
 	{
+		graphicsPreset.disabled = !['ready','engine-loading'].includes(loadState) || joiningOnline;
 		var password = document.getElementById('onlinepassword');
 		var passwordValid = password.value.length <= 64 && password.value.split('').every(function(char) {
 			return char.charCodeAt(0) >= 32 && char.charCodeAt(0) !== 127 && ['\\','"',';'].indexOf(char) === -1;
@@ -1083,7 +1124,7 @@
 			Module['browserNetwork'].connect(function(error)
 			{
 				if (error) { joinFailed(error.message); return; }
-				matchOptions = {online:true, password:document.getElementById('onlinepassword').value};
+				matchOptions = {online:true, password:document.getElementById('onlinepassword').value, graphics:graphicsPreset.value};
 				document.getElementById('onlinepassword').value = ''; startGame();
 				updateOnlineJoin();
 			});
@@ -1546,8 +1587,8 @@
 		if (playMode !== 'offline') return;
 		if (catalogBusy) return;
 		updateMatchSummary();
-		matchOptions = { map: mapselect.value, bots: Number(botcount.value), difficulty: Number(difficulty.value) };
-		try { localStorage.setItem('etl.offlineMatch', JSON.stringify(matchOptions)); } catch (e) {}
+		matchOptions = { map: mapselect.value, bots: Number(botcount.value), difficulty: Number(difficulty.value), graphics:graphicsPreset.value };
+		try { localStorage.setItem('etl.offlineMatch', JSON.stringify({map:matchOptions.map, bots:matchOptions.bots, difficulty:matchOptions.difficulty})); } catch (e) {}
 		matchsettings.disabled = true;
 		document.getElementById('offlinebtn').disabled = true; document.getElementById('onlinebtn').disabled = true;
 		primeAudio();
@@ -1948,6 +1989,7 @@
 			var args = ['+set', 'com_motd', '0', '+set', 'fs_game', 'legacy', '+set', 'fs_homepath', '/browser',
 				'+set', 'sv_pure', '0', '+set', 'r_fullscreen', '0', '+set', 's_initsound', '1',
 				'+set', 'cl_allowDownload', '0', '+set', 'cl_wwwDownload', '0', '+set', 's_muteWhenUnfocused', '1'];
+			args = args.concat(graphicsStartupArgs(matchOptions.graphics));
 			if (matchOptions.online)
 			{
 				// Pass the password through a transient config, never through the
