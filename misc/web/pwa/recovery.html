@@ -18,7 +18,7 @@
   clearTimeout(deadline);
   deadline=setTimeout(()=>{if(epoch===attempt)finish(repair?'Saving stopped receiving data for three minutes. Check your connection and storage, then retry.':'Saving did not finish. Reconnect and retry.');},repair?180000:30000);
  }
- function reopen(){if((location.pathname||'').endsWith('/network/recovery'))location.replace('../');else location.reload();}
+ function reopen(){attempt++;clearTimeout(deadline);pending='';if((location.pathname||'').endsWith('/network/recovery'))location.replace('../');else location.reload();}
  function finish(message){attempt++;clearTimeout(deadline);pending='';button.disabled=false;status.textContent=message;}
  serviceWorker.addEventListener('controllerchange',()=>{if(pending==='update')reopen();});
  serviceWorker.addEventListener('message',event=>{
@@ -31,6 +31,7 @@
    repairLoaded=loaded;armDeadline(attempt,true);status.textContent='Checking and saving app files… '+Math.floor(loaded/total*100)+'%';return;
   }
   if(type==='APP_READY'&&pending==='repair')reopen();
+  if(type==='APP_MISSING'&&pending==='repair')finish('Some app files are still missing. Check your connection and available storage, then retry.');
   if(type==='APP_SAVE_FAILED'&&pending)finish('Saving did not finish. Check your connection and available storage, then retry.');
   if(type==='APP_OTHER_TABS'&&pending)finish('Close other app tabs or windows, then retry.');
  });
