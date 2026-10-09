@@ -4,14 +4,15 @@ const names=['etl.html','etl.js','etl.wasm','etl.data','manifest.webmanifest','i
 const entries=names.map(url=>({url,sha256:createHash('sha256').update(`bundle:${url}`).digest('hex')}));
 const source=fs.readFileSync(`${__dirname}/sw.js.in`,'utf8').replace('@PWA_VERSION@','fixture').replace('@PWA_ENTRIES@',entries.map(e=>JSON.stringify(e)).join(',')).replace('@PWA_RECOVERY_JSON@',JSON.stringify(fs.readFileSync(`${__dirname}/pwa/recovery.html`,'utf8')));
 function fixture(failure) {
+ const fault=typeof failure==='object' ? failure : {kind:failure};
  const events={}, storage=new Map(), messages=[], clients=[{url:'https://game.test/play/?map=radar',postMessage:m=>messages.push(m)}]; let skipped=0, network=0;
- const caches={async open(key) { if(failure==='storage')throw Error('Storage denied'); if(!storage.has(key)) storage.set(key,new Map()); const map=storage.get(key); return {
+ const caches={async open(key) { if(fault.kind==='storage')throw Error('Storage denied'); if(!storage.has(key)) storage.set(key,new Map()); const map=storage.get(key); return {
   async put(url,response) { map.set(url,response.clone()); },async match(url) { return map.get(url)?.clone(); }
  }; },async keys(){return [...storage.keys()];},async delete(key){return storage.delete(key);} };
  const self={location:{href:'https://game.test/play/sw.js'},addEventListener(n,fn){events[n]=fn;},clients:{async matchAll(){return clients;}},async skipWaiting(){skipped++;}};
  vm.runInNewContext(source,{self,caches,URL,Response,crypto:webcrypto,Uint8Array,fetch:async url=>{
-  network++; const name=new URL(url).pathname.split('/').pop(); if(failure==='network'&&name==='etl.wasm') throw Error('Disconnected');
-  return new Response(failure==='corrupt'&&name==='etl.wasm'?'changed':`bundle:${name}`,{headers:{'Cross-Origin-Embedder-Policy':'require-corp'}});
+  network++; const name=new URL(url).pathname.split('/').pop(); if(fault.kind==='network'&&name==='etl.wasm') throw Error('Disconnected');
+  return new Response(fault.kind==='corrupt'&&name==='etl.wasm'?'changed':`bundle:${name}`,{headers:{'Cross-Origin-Embedder-Policy':'require-corp'}});
  }});
  async function dispatch(name,extra={}) {let pending;events[name]({waitUntil(p){pending=p;},...extra});await pending;}
  async function request(path,extra={}) {let pending;events.fetch({request:{url:new URL(path,'https://game.test/play/').href,method:'GET',mode:'cors',headers:new Headers(),...extra},respondWith(p){pending=p;}});return pending?await pending:null;}
@@ -114,6 +115,34 @@ function fixture(failure) {
  await f.dispatch('message',{data:{type:'REPAIR_CACHE',requestId:17},source:f.clients[0]});assert.equal(f.messages.at(-1).type,'APP_READY');assert.equal(f.messages.at(-1).requestId,17);
  for(const failure of ['network','corrupt']) {const broken=fixture(failure);broken.storage.set('unrelated',new Map());broken.storage.set('etl-app-%2Fplay%2F-old',new Map());await assert.rejects(broken.dispatch('install'));assert.deepEqual([...broken.storage.keys()],['unrelated','etl-app-%2Fplay%2F-old']);}
  const broken=fixture('network');await broken.dispatch('message',{data:{type:'REPAIR_CACHE',requestId:18},source:broken.clients[0]});assert.equal(broken.messages.at(-1).type,'APP_SAVE_FAILED');assert.equal(broken.messages.at(-1).requestId,18);
+ const resumed=fixture();await resumed.dispatch('install');
+ const resumedCache=resumed.storage.get('etl-app-%2Fplay%2F-fixture');
+ resumedCache.delete('https://game.test/play/icon-512.png');
+ await resumed.dispatch('message',{data:{type:'REPAIR_CACHE',requestId:30},source:resumed.clients[0]});
+ assert.equal(resumed.network,8,'Repair downloads only the missing file after verifying saved bytes');
+ resumedCache.set('https://game.test/play/etl.wasm',new Response('corrupted cached engine'));
+ await resumed.dispatch('message',{data:{type:'REPAIR_CACHE',requestId:31},source:resumed.clients[0]});
+ assert.equal(resumed.network,9,'A corrupt saved file is replaced instead of being trusted');
+ assert.equal(await (await resumed.request('etl.wasm')).text(),'bundle:etl.wasm');
+ const concurrent=fixture(), peerMessages=[];
+ const peer={url:'https://game.test/play/network/recovery',postMessage:m=>peerMessages.push(m)};
+ await Promise.all([
+  concurrent.dispatch('message',{data:{type:'REPAIR_CACHE',requestId:40},source:concurrent.clients[0]}),
+  concurrent.dispatch('message',{data:{type:'REPAIR_CACHE',requestId:41},source:peer})
+ ]);
+ assert.equal(concurrent.network,7,'Concurrent repairs share one verified bundle download');
+ assert.equal(concurrent.messages.at(-1).requestId,40);
+ assert.equal(peerMessages.at(-1).requestId,41);
+ assert.equal(peerMessages.at(-1).type,'APP_READY');
+ const transientFault={kind:'network'}, transient=fixture(transientFault);
+ await Promise.all([40,41].map(requestId=>transient.dispatch('message',{data:{type:'REPAIR_CACHE',requestId},source:transient.clients[0]})));
+ assert.equal(transient.network,3,'Failed concurrent repairs also share their transfer');
+ assert.equal(transient.messages.filter(m=>m.type==='APP_SAVE_FAILED').length,2);
+ transientFault.kind=null;
+ await transient.dispatch('message',{data:{type:'REPAIR_CACHE',requestId:42},source:transient.clients[0]});
+ assert.equal(transient.network,8,'Retry after a failed shared transfer retains its two verified files');
+ assert.equal(transient.messages.at(-1).type,'APP_READY');
+ assert.equal(transient.messages.at(-1).requestId,42);
  const denied=fixture('storage');await denied.dispatch('message',{data:{type:'APP_STATUS'},source:denied.clients[0]});assert.equal(denied.messages.at(-1).type,'APP_SAVE_FAILED');
  assert.match(await (await denied.request('./',{mode:'navigate'})).text(),/Restore offline play/);
  console.log('PWA worker: atomic verified bundle, offline navigation/code, version consistency, live network isolation, scoped cleanup, update-tab guard, eviction and repair passed.');

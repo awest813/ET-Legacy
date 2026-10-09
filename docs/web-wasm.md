@@ -3293,3 +3293,25 @@ all seven verified core files, returned to the launcher, and reported App saved.
 The timing race itself was exercised with controlled asynchronous regression
 tests. Browser evidence: `build_wasm/pwa-repair-generation.png`. The temporary
 server and test tab were closed afterward.
+
+
+### Incremental offline app repair, October 9
+
+Repair now checks saved core files against their published SHA-256 hashes and
+fetches only missing, unreadable, or corrupt files. Concurrent repair requests
+share one transfer while retaining each caller's reply identifier. Failed
+transfers release that shared operation, so a later retry resumes from files
+already verified and saved. Initial bundle installation retains its full
+verification and failed-install cleanup.
+
+Tests reproduce the old seven-file redownload after removing one icon, and
+cover corrupt saved bytes, simultaneous callers, shared failures, and retrying
+from a partial verified cache. All six JavaScript suites, the WebAssembly build,
+and generated bundle checks passed. In a real browser on an isolated loopback
+origin, removing only icon-512.png triggered recovery. Repair returned to the
+launcher with App saved. Server request deltas were exactly one icon-512.png
+request and zero for each of the other six core files. This verifies reduced
+network transfer; saved files are still read and hashed locally during repair.
+Evidence: `build_wasm/pwa-resume-request-proof.json`,
+`build_wasm/pwa-resume-live.log`, and `build_wasm/pwa-resume-repaired.png`.
+The temporary server and tab were closed.

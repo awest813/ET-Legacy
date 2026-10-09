@@ -15,15 +15,29 @@ function appClient(client) {
    new URL('etl.html', base).pathname, new URL('network/recovery', base).pathname].includes(url.pathname);
  } catch (error) { return false; }
 }
+async function verifiedResponse(response, entry) {
+ if (!response || !response.ok || response.status !== 200 || response.type === 'opaque' || response.redirected) return false;
+ const bytes = await response.clone().arrayBuffer();
+ const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2,'0')).join('');
+ return hash === entry.sha256;
+}
+let repairInFlight = null;
+function repairBundle() {
+ // One worker may receive retries from several tabs before a slow fetch ends.
+ if (!repairInFlight) repairInFlight = installBundle(true).finally(() => { repairInFlight = null; });
+ return repairInFlight;
+}
 async function installBundle(repair = false) {
  const cache = await caches.open(CACHE);
  try {
   for (const entry of CORE) {
+   if (repair) {
+    const saved = await cache.match(absolute(entry.url));
+    try { if (await verifiedResponse(saved, entry)) continue; }
+    catch (error) { /* Unreadable saved bytes must be downloaded and verified again. */ }
+   }
    const response = await fetch(absolute(entry.url), {cache:'reload', credentials:'same-origin'});
-   if (!response.ok || response.status !== 200 || response.type === 'opaque' || response.redirected) throw Error('App download failed');
-   const bytes = await response.clone().arrayBuffer();
-   const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2,'0')).join('');
-   if (hash !== entry.sha256) throw Error('App bundle changed during download');
+   if (!await verifiedResponse(response, entry)) throw Error('App download failed or bundle changed');
    await cache.put(absolute(entry.url), response);
   }
  } catch (error) { if (!repair) await caches.delete(CACHE); throw error; }
@@ -55,7 +69,7 @@ self.addEventListener('message', event => {
  })());
  if (event.data && event.data.type === 'APP_STATUS' && event.source) event.waitUntil(status(event.source));
  if (event.data && event.data.type === 'REPAIR_CACHE' && event.source) event.waitUntil((async () => {
-  try { await installBundle(true); await status(event.source, event.data.requestId); }
+  try { await repairBundle(); await status(event.source, event.data.requestId); }
   catch (e) { event.source.postMessage({type:'APP_SAVE_FAILED', ...(event.data.requestId === undefined ? {} : {requestId:event.data.requestId})}); }
  })());
 });
