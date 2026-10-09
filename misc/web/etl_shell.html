@@ -1614,6 +1614,14 @@
 		updateMatchSummary();
 		matchOptions = { map: mapselect.value, bots: Number(botcount.value), difficulty: Number(difficulty.value), graphics:graphicsPreset.value };
 		try { localStorage.setItem('etl.offlineMatch', JSON.stringify({map:matchOptions.map, bots:matchOptions.bots, difficulty:matchOptions.difficulty})); } catch (e) {}
+		// A deep link must follow the match the player actually chose, or its
+		// original parameters override saved choices when returning/reloading.
+		try
+		{
+			var matchURL = new URL(window.location.href);
+			['map', 'bots', 'difficulty'].forEach(function(name) { matchURL.searchParams.set(name, matchOptions[name]); });
+			window.history.replaceState(window.history.state, '', matchURL.pathname + matchURL.search + matchURL.hash);
+		} catch (e) {}
 		matchsettings.disabled = true;
 		document.getElementById('offlinebtn').disabled = true; document.getElementById('onlinebtn').disabled = true;
 		primeAudio();

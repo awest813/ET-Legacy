@@ -50,7 +50,13 @@ function launcher(fault = {}) {
             }};
         }, hidden:false, hasFocus() { return !this.blurred; },
             addEventListener(name, callback) { events[name] = callback; } },
-        window: { location: { search: fault.query || '' },
+        window: { location: { search: fault.query || '', href:'http://localhost:8081/etl.html'+(fault.query||'')+(fault.hash||'') },
+            history: {state:{launcher:true},replaceState(state, title, value) {
+                if (fault.history) throw Error('History denied');
+                fault.historyUpdate={state,title,value};
+                const url=new URL(value,context.window.location.href);
+                context.window.location.href=url.href;context.window.location.search=url.search;
+            }},
             addEventListener(name, callback) { events[name] = callback; } },
         localStorage: {
             removeItem(key) { if (fault.storage) throw Error('Denied'); if (key === 'etl.assetResume') fault.assetResume = null; },
@@ -58,7 +64,7 @@ function launcher(fault = {}) {
             setItem(key, value) { if (fault.storage) throw Error('Denied'); if (key === 'etl.playerKey') fault.playerKey = value; if (key === 'etl.assetResume') fault.assetResume = JSON.parse(value); if (key === 'etl.sound') fault.sound = JSON.parse(value); if (key === 'etl.offlineMatch') fault.saved = JSON.parse(value); if (key === 'etl.engineSettings') fault.engineSettings = JSON.parse(value); }
         },
         location: { reload() { calls.push('retry'); } },
-        URLSearchParams, Uint8Array, Uint32Array,
+        URL, URLSearchParams, Uint8Array, Uint32Array,
         WebAssembly: fault.noWasm ? undefined : fault.blockedWasm ? {instantiate(){},validate(){throw Error('Blocked');}} : WebAssembly,
         crypto: {getRandomValues(bytes) { bytes.fill(7); return bytes; },subtle:{digest:async (_, bytes)=> {
             const hash=require('node:crypto').createHash('sha256').update(bytes).digest();
@@ -861,6 +867,27 @@ const invalidIdentity=launcher({playerKey:'broken'});invalidIdentity.start();
 assert.match(invalidIdentity.files.get('/browser/etmain/etkey'),/^0000001002\d{18}$/);
 
 const matchPreferences={};
+const linkedPreferences={query:'?map=goldrush&bots=12&difficulty=6&extra=keep',hash:'#controls'};
+const linkedMatch=launcher(linkedPreferences);
+linkedMatch.elements.mapselect.value='battery';linkedMatch.elements.botcount.value='4';linkedMatch.elements.difficulty.value='4';
+linkedMatch.start();
+assert.equal(linkedPreferences.historyUpdate.value,'/etl.html?map=battery&bots=4&difficulty=4&extra=keep#controls');
+assert.equal(linkedPreferences.historyUpdate.state,linkedMatch.context.window.history.state,'Replacing match parameters preserves history state');
+linkedMatch.elements.matchbtn.click();linkedMatch.elements.returnlauncher.click();
+const linkedReload=launcher({query:linkedMatch.context.window.location.search,saved:linkedPreferences.saved});
+assert.equal(linkedReload.elements.mapselect.value,'battery');assert.equal(linkedReload.elements.botcount.value,4);assert.equal(linkedReload.elements.difficulty.value,'4');
+const deniedMatchStorage=launcher({storage:true});deniedMatchStorage.elements.mapselect.value='radar';deniedMatchStorage.elements.botcount.value='0';deniedMatchStorage.start();
+assert.match(deniedMatchStorage.context.window.location.search,/map=radar&bots=0/,'URL state survives denied local storage');
+const deniedMatchHistory=launcher({history:true});deniedMatchHistory.elements.mapselect.value='railgun';deniedMatchHistory.start();
+assert.equal(deniedMatchHistory.calls[0].at(-1),'railgun','Denied history cannot block match startup');
+const invalidMatchURL={query:'?map=goldrush&bots=12&difficulty=6'};
+const invalidMatchForm=launcher(invalidMatchURL);invalidMatchForm.elements.matchform.reportValidity=()=>false;
+invalidMatchForm.elements.mapselect.value='battery';invalidMatchForm.start();
+assert.equal(invalidMatchURL.historyUpdate,undefined,'Invalid forms cannot replace deep-link choices');
+assert.equal(invalidMatchForm.calls.length,0);
+const onlineMatchURL={query:'?map=goldrush&bots=12&difficulty=6'};
+const onlineLinkedMatch=launcher(onlineMatchURL);onlineLinkedMatch.elements.onlinebtn.click();onlineLinkedMatch.elements.joinbtn.click();
+assert.equal(onlineMatchURL.historyUpdate,undefined,'Online joins do not rewrite offline match choices');
 const returning=launcher(matchPreferences);
 returning.elements.matchbtn.click(); assert.equal(returning.elements.matchdialog.open,undefined,'Match return is unavailable before boot');
 returning.elements.mapselect.value='battery'; returning.elements.botcount.value='0'; returning.start();

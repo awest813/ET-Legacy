@@ -2672,3 +2672,25 @@ The automatic next-round load rendered Gold Rush again; all twelve bots emitted
 new game-entry events at 1922000 and the next warmup appeared normally. Evidence:
 `build_wasm/goldrush-oct9-next-round.png` and
 `goldrush-oct9-next-round-log.json`.
+
+## Match return from deep links (October 9, 2026)
+
+Starting with a Gold Rush / twelve Hard bots deep link, choosing Battery / four
+Normal bots and then returning to setup restored the original query choices.
+Validated offline Play now replaces the URL's map, bots, and difficulty with
+the selected match, preserving other parameters, the fragment, and history
+state. It does not add a navigation entry. Storage and history failures remain
+nonfatal; invalid forms and online joins do not rewrite offline choices.
+
+The launcher and PWA regression suites pass, and all seven rebuilt bundle files
+match their local and served manifest hashes. Live Chromium started Battery
+with four Normal bots, then the isolated port 8085 host was stopped. End match
+and return loaded the cached launcher with those same choices. Playing again
+without editing the form rendered Battery and produced four bot-entry events.
+This verifies cached startup with that host unavailable, not whole-device
+Internet disconnection or a completed Battery round. The isolated tab was
+closed afterward; the separate Rail Gun round remained running.
+
+Evidence: `build_wasm/match-query-battery-start.png`,
+`match-query-offline-return.png`, `match-query-offline-restart.png`,
+`match-query-offline-log.json`, and `match-query-hashes.json`.
