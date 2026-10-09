@@ -59,13 +59,33 @@ function fixture(failure) {
   if(kind==='update')registration.waiting={postMessage(m){posts.push(m);}};
   if(kind==='storage')registration.active.postMessage=()=>{throw Error('Storage denied');};
   let reloads=0;const timers=new Map();let serial=0;
+  const nav={serviceWorker:kind==='noWorker'||kind==='insecure'?undefined:sw};
+  if(kind==='blockedWorker')Object.defineProperty(nav,'serviceWorker',{get(){throw Error('SecurityError');}});
+  if(kind==='unregistered')sw.getRegistration=async()=>null;
+  if(kind==='lateRegistration')sw.getRegistration=()=>new Promise(resolve=>delayed.push(resolve));
   vm.runInNewContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],{
-   document:{getElementById:id=>elements[id]},navigator:{serviceWorker:sw},location:{pathname:kind==='standalone'?'/network/recovery':'/play/',replace(url){assert.equal(url,'../');reloads++;},reload(){reloads++;}},
+   document:{getElementById:id=>elements[id]},navigator:nav,isSecureContext:kind!=='insecure',location:{pathname:kind==='standalone'?'/network/recovery':'/play/',replace(url){assert.equal(url,'../');reloads++;},reload(){reloads++;}},
    setTimeout(fn){const id=++serial;timers.set(id,fn);return id;},clearTimeout(id){timers.delete(id);}
   });
-  const clicked=elements.retry.click();if(kind!=='late')await clicked;
+  const clicked=elements.retry.click ? elements.retry.click() : undefined;if(kind!=='late'&&kind!=='lateRegistration')await clicked;
   return {events,e:elements,posts,timers,clicked,delayed,get reloads(){return reloads;}};
  }
+ for(const kind of ['noWorker','blockedWorker','insecure']) {
+  const unavailable=await recoveryUI(kind);
+  assert.equal(unavailable.e.retry.disabled,true,'Unavailable offline APIs cannot leave an inert repair action');
+  assert.match(unavailable.e.status.textContent,kind==='insecure'?/HTTPS|localhost/:/browser|offline saving/i);
+  assert.equal(unavailable.posts.length,0);assert.equal(unavailable.timers.size,0);
+ }
+ let unregistered=await recoveryUI('unregistered');
+ assert.match(unregistered.e.status.textContent,/launcher.*connected/i);
+ assert.equal(unregistered.e.retry.disabled,false);assert.equal(unregistered.timers.size,0);
+ const lateRegistration=await recoveryUI('lateRegistration');
+ for(const fn of [...lateRegistration.timers.values()])fn();
+ const nextRegistration=lateRegistration.e.retry.click();
+ lateRegistration.delayed[0](null);await lateRegistration.clicked;
+ assert.equal(lateRegistration.e.retry.disabled,true,'A late missing registration cannot cancel a newer repair');
+ lateRegistration.delayed[1](null);await nextRegistration;
+ assert.equal(lateRegistration.e.retry.disabled,false);assert.equal(lateRegistration.timers.size,0);
  let ui=await recoveryUI('offline');assert.equal(ui.posts.at(-1).type,'REPAIR_CACHE');
  ui.events.message({data:{type:'APP_SAVE_FAILED'}});assert.equal(ui.e.retry.disabled,false);assert.equal(ui.timers.size,0);
  ui=await recoveryUI('repair');ui.events.message({data:{type:'APP_READY'}});assert.equal(ui.reloads,1);

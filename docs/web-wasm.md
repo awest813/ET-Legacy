@@ -3048,3 +3048,29 @@ reported 960x540, `GL_LINEAR_MIPMAP_NEAREST` and picmip 2; the canvas was
 960x540 and rendered the map. Evidence:
 `build_wasm/video-mode-chromebook-recovery.png` and
 `video-mode-chromebook-recovery-log.json`. The temporary test tab was closed.
+
+## Recovery in restricted browsers (October 9, 2026)
+
+The standalone offline-repair page now guards access to the service-worker
+API. Missing or security-restricted APIs display an explanation and disable
+the unavailable repair action while retaining the launcher link. Insecure
+contexts explain the HTTPS/localhost requirement. A browser with no registered
+app is directed to open the launcher while connected, rather than receiving
+a generic storage failure. Stale registration lookups cannot cancel a newer
+repair attempt after the original deadline.
+
+The regression reproduced an exception before the fix and passes afterward
+for missing APIs, a throwing API getter, an insecure context, absent
+registration and delayed registration results. Existing worker repair/update,
+cache-integrity, timeout, tab-guard and fullscreen tests pass. The browser
+bundle rebuilt successfully and its seven files and module archives verified.
+
+Live Chromium on an unused origin showed the no-registration guidance.
+Following its launcher link saved the app; returning to the repair page and
+retrying repaired the cache and automatically returned to the launcher.
+A separate sandboxed frame without same-origin permission denied service-worker
+access and displayed the restricted-browser guidance with the repair button
+disabled, without an uncaught error. This tests Chromium sandbox restrictions,
+not Firefox/Safari private-mode behavior. Evidence:
+`build_wasm/recovery-unregistered.png` and `recovery-restricted-browser.png`.
+Temporary test tabs and their local services were closed.
