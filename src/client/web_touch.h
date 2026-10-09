@@ -1,16 +1,24 @@
 /* Shared browser touch-to-usercmd conversion; keyboard state is never modified. */
 #ifndef ETL_WEB_TOUCH_H
 #define ETL_WEB_TOUCH_H
-static float WebTouch_Bound(float value, float limit)
+#include <stdint.h>
+#include <string.h>
+static float WebTouch_Bound(const float *input, float limit)
 {
-	if (!(value >= -limit && value <= limit)) return 0; /* Reject NaN/infinite input. */
+	uint32_t bits;
+	float value;
+	/* Release fast-math can assume floating-point comparisons never see NaN. */
+	memcpy(&bits, input, sizeof(bits));
+	if ((bits & 0x7f800000u) == 0x7f800000u) return 0;
+	memcpy(&value, &bits, sizeof(value));
+	if (!(value >= -limit && value <= limit)) return 0;
 	return value;
 }
 static void WebTouch_Apply(usercmd_t *cmd, float *angles, const float *input, int buttons,
                            float sensitivity, float yaw, float pitch)
 {
-	float x = WebTouch_Bound(input[0], 1), y = WebTouch_Bound(input[1], 1);
-	float dx = WebTouch_Bound(input[2], 500), dy = WebTouch_Bound(input[3], 500);
+	float x = WebTouch_Bound(&input[0], 1), y = WebTouch_Bound(&input[1], 1);
+	float dx = WebTouch_Bound(&input[2], 500), dy = WebTouch_Bound(&input[3], 500);
 	int speed = (cmd->buttons & BUTTON_WALKING) ? 64 : 127;
 	cmd->rightmove = ClampChar(cmd->rightmove + (int)(x * speed));
 	cmd->forwardmove = ClampChar(cmd->forwardmove + (int)(y * speed));

@@ -73,6 +73,8 @@ jobs:
           for suite in console_text input_focus menu_mouse connect_timeout missing_assets pure_assets client_identity video_mode; do
             python "misc/web/test_${suite}.py"
           done
+          emcc misc/web/test_touch.c -O3 -ffast-math -sENVIRONMENT=node -sWASM_ASYNC_COMPILATION=0 -o build_wasm/test_touch_release.cjs
+          node build_wasm/test_touch_release.cjs
           pwsh -NoProfile -File misc/web/test_bots.ps1
       - name: Verify bundle and publication bytes
         run: |
