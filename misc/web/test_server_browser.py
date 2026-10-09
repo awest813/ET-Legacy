@@ -2,20 +2,56 @@
 import socket
 import threading
 import unittest
+import json
+import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 import server_browser as browser
 
 
 def packet(challenge='audit', **values):
-    info = dict(challenge=challenge, protocol='84', gamename='et', game='legacy', version='ET Legacy v2.86.0-34-g50cffc8 linux-x86_64 Oct 3 2026', pure='1', wasmModules='1',
+    info = dict(challenge=challenge, protocol='84', gamename='et', game='legacy', version='ET Legacy v2.86.0-34-g50cffc8 linux-x86_64 Oct 3 2026', pure='1', wasmModules='1', wasmCgame='000004d2:100', wasmUI='0000162e:200',
                 hostname='^1Audit ^7server', mapname='oasis', clients='8', humans='3',
                 sv_maxclients='16', needpass='0')
     info.update(values)
     return b'\xff\xff\xff\xffinfoResponse\n' + ''.join('\\'+key+'\\'+value for key, value in info.items()).encode()
 
 
+class ModuleMetadata(unittest.TestCase):
+    def test_build_metadata_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'identity.json'
+            with patch.object(browser, 'MODULE_MANIFEST', path):
+                self.assertEqual(browser.browser_module_identities(), {})
+                valid = {'modules': {'cgame': {'crc':1234, 'size':100}, 'ui': {'crc':5678, 'size':200}}}
+                path.write_text(json.dumps(valid), encoding='utf-8')
+                self.assertEqual(browser.browser_module_identities(), {'wasmCgame':'000004d2:100', 'wasmUI':'0000162e:200'})
+                for field, value in (('crc', -1), ('crc', 0x100000000), ('crc', True),
+                                     ('size', 0), ('size', '200'), ('size', None)):
+                    invalid = json.loads(json.dumps(valid))
+                    invalid['modules']['ui'][field] = value
+                    path.write_text(json.dumps(invalid), encoding='utf-8')
+                    self.assertEqual(browser.browser_module_identities(), {})
+                for text in ('invalid JSON', '[]', '{}', '{"modules":null}'):
+                    path.write_text(text, encoding='utf-8')
+                    self.assertEqual(browser.browser_module_identities(), {})
+
+
 class ServerInfo(unittest.TestCase):
+    def setUp(self):
+        identity = patch.object(browser, 'browser_module_identities', return_value={'wasmCgame':'000004d2:100', 'wasmUI':'0000162e:200'})
+        identity.start()
+        self.addCleanup(identity.stop)
+
+    def test_pure_requires_both_current_module_identities(self):
+        for values in ({'wasmCgame':''}, {'wasmUI':''}, {'wasmCgame':'000004d3:100'},
+                       {'wasmUI':'0000162e:201'}, {'wasmUI':'garbage'}):
+            self.assertFalse(browser.parse_info(packet(**values), 'audit', 0)['compatible'])
+        with patch.object(browser, 'browser_module_identities', return_value={}):
+            self.assertFalse(browser.parse_info(packet(), 'audit', 0)['compatible'])
+            self.assertTrue(browser.parse_info(packet(pure='0'), 'audit', 0)['compatible'])
+
     def test_details_and_compatibility(self):
         info = browser.parse_info(packet(), 'audit', 12.5)
         self.assertEqual((info['hostname'], info['players'], info['humans'], info['capacity']), ('Audit server', 8, 3, 16))

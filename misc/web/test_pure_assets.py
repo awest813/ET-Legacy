@@ -5,7 +5,7 @@ import re
 import subprocess
 ROOT=Path(__file__).resolve().parents[2]
 source=(ROOT/'src/qcommon/files.c').read_text(encoding='utf-8')
-start=source.index('static qboolean FS_WebReferenceStaticModule')
+start=source.index('#ifdef __EMSCRIPTEN__\nextern const unsigned long etlWebModuleCRC')
 end=source.index('/**\n * @brief FS_ClearPakReferences',start)
 functions=source[start:end]
 lookup_start=source.index('int FS_FileIsInPAK(')
@@ -37,6 +37,10 @@ client=(ROOT/'src/client/cl_main.c').read_text(encoding='utf-8')
 send_start=client.index('void CL_SendPureChecksums(void)')
 send_end=client.index('/**',send_start)
 send=client[send_start:send_end]
+download=(ROOT/'src/qcommon/download.c').read_text(encoding='utf-8')
+gate_start=download.index('#ifdef __EMSCRIPTEN__\n\tif (cl_connectedToPureServer && !FS_WebClientModulePaks')
+gate_end=download.index('#endif',gate_start)+len('#endif')
+load_gate=download[gate_start:gate_end]
 gamestate=(ROOT/'src/client/cl_parse.c').read_text(encoding='utf-8')
 feed_read=gamestate.index('clc.checksumFeed = MSG_ReadLong(msg);')
 feed_id=gamestate.index('clc.checksumFeedServerId = cl.serverId;',feed_read)
@@ -56,9 +60,11 @@ HARNESS=r'''
 #define qtrue 1
 #define qfalse 0
 #define ERR_FATAL 1
+#define ERR_DROP 2
+static int cl_connectedToPureServer,loadErrors,loadContinued;
 #define Sys_GetDLLName(x) x ".mp.x86_64.so"
 typedef int qboolean;
-typedef struct entry { const char *name; struct entry *next; } fileInPack_t;
+typedef struct entry { const char *name; struct entry *next; unsigned long crc,len; } fileInPack_t;
 typedef struct pack { const char *pakGamename; int referenced,pure_checksum,hashSize,pure; fileInPack_t **hashTable; } pack_t;
 typedef struct search { pack_t *pack; struct search *next; } searchpath_t;
 static searchpath_t *fs_searchpaths;
@@ -108,11 +114,16 @@ static int FS_PakIsPure(pack_t *p) { return p->pure; }
 static long FS_HashFileName(const char *name,int size) { return 0; }
 static void Q_strcat(char *out,size_t size,const char *text) { assert(strlen(out)+strlen(text)<size);strcat(out,text); }
 static char *va(const char *format,...) { static char buf[80];va_list args;va_start(args,format);vsnprintf(buf,sizeof(buf),format,args);va_end(args);return buf; }
-static void Com_Error(int code,const char *text) { assert(0); }
+static void Com_Error(int code,const char *text) { assert(code==ERR_DROP && strstr(text,"matching WebAssembly client modules"));loadErrors++; }
+const unsigned long etlWebModuleCRC[2]={1234,5678},etlWebModuleSize[2]={100,200};
 /* FUNCTIONS */
 /* LOOKUP */
 /* ADVERTISEMENT */
 /* SEND */
+static void loading_gate(void) {
+/* LOAD GATE */
+ loadContinued++;
+}
 /* NEXT ID */
 static void movement_gate(client_t *cl) { int cmds[]={0}; /* MOVE GATE */ }
 /* RESTART LOADING */
@@ -125,11 +136,26 @@ static void verify_report(const char *report,int valid) {
  assert(dropped==before+!valid);
 }
 int main(void) {
- fileInPack_t ui={"ui.mp.wasm32.so",NULL},cg={"cgame.mp.wasm32.so",&ui};fileInPack_t *table[]={&cg},*empty[]={NULL};
+ fileInPack_t ui={"ui.mp.wasm32.so",NULL,5678,200},cg={"cgame.mp.wasm32.so",&ui,1234,100};fileInPack_t *table[]={&cg},*empty[]={NULL};
  pack_t rejected={"legacy",0,999,1,0,table},wrongGame={"etmain",0,888,1,1,table},absent={"legacy",0,777,1,1,empty},valid={"legacy",1,101,1,1,table},map={"etmain",1,201,1,1,empty};
  searchpath_t paths[5]={{&rejected,&paths[1]},{&wrongGame,&paths[2]},{&absent,&paths[3]},{&valid,&paths[4]},{&map,NULL}};
  fs_searchpaths=paths;
  assert(FS_WebClientModulePaks(NULL,NULL));assert(valid.referenced==1);
+ char cgIdentity[32],uiIdentity[32];
+ assert(FS_WebClientModuleIdentities(cgIdentity,uiIdentity,sizeof(cgIdentity)));
+ assert(!strcmp(cgIdentity,"000004d2:100") && !strcmp(uiIdentity,"0000162e:200"));
+#ifdef __EMSCRIPTEN__
+ cg.crc++;assert(!FS_WebClientModulePaks(NULL,NULL));cg.crc--;
+ ui.len++;assert(!FS_WebClientModulePaks(NULL,NULL));
+ cl_connectedToPureServer=1;loading_gate();assert(loadErrors==1 && !loadContinued);
+ cl_connectedToPureServer=0;loading_gate();assert(loadErrors==1 && loadContinued==1);
+ ui.len--;cl_connectedToPureServer=1;loading_gate();assert(loadErrors==1 && loadContinued==2);
+ valid.referenced=0;cg.crc++;ui.crc++;
+ FS_ReferencedPakPureChecksums();assert(valid.referenced==0);
+ cg.crc--;ui.crc--;valid.referenced=1;
+#else
+ cg.crc++;assert(FS_WebClientModulePaks(NULL,NULL));cg.crc--;
+#endif
  cg.next=NULL;assert(!FS_WebClientModulePaks(NULL,NULL));cg.next=&ui;
  fs_searchpaths=&paths[2];paths[2].next=&paths[4];assert(!FS_WebClientModulePaks(NULL,NULL));paths[2].next=&paths[3];fs_searchpaths=paths;
  const char *checksums=FS_ReferencedPakPureChecksums();
@@ -197,7 +223,7 @@ int main(void) {
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--compiler',default='emcc');parser.add_argument('--node',default='node');args=parser.parse_args()
     fixture=ROOT/'build_wasm/test_pure_assets.c';fixture.write_text(HARNESS.replace('/* FUNCTIONS */',functions)
-        .replace('/* LOOKUP */',lookup).replace('/* ADVERTISEMENT */',advertisement).replace('/* SEND */',send).replace('/* NEXT ID */',next_id).replace('/* MOVE GATE */',move_gate).replace('/* RESTART LOADING */',restart_loading).replace('/* MESSAGE GATE */',message_gate).replace('/* VERIFY */',verify),encoding='utf-8')
+        .replace('/* LOOKUP */',lookup).replace('/* ADVERTISEMENT */',advertisement).replace('/* SEND */',send).replace('/* LOAD GATE */',load_gate).replace('/* NEXT ID */',next_id).replace('/* MOVE GATE */',move_gate).replace('/* RESTART LOADING */',restart_loading).replace('/* MESSAGE GATE */',message_gate).replace('/* VERIFY */',verify),encoding='utf-8')
     for name,flags in [('web',[]),('desktop',['-U__EMSCRIPTEN__'])]:
         output=ROOT/('build_wasm/test_pure_assets_'+name+'.cjs')
         subprocess.run([args.compiler,str(fixture),'-O2','-sENVIRONMENT=node','-sWASM_ASYNC_COMPILATION=0',*flags,'-o',str(output)],check=True)

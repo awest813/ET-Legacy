@@ -86,6 +86,22 @@ if(EMSCRIPTEN)
 		set_property(TARGET etl APPEND PROPERTY LINK_DEPENDS ${OB_PRELOAD_FILES})
 	endif()
 	target_link_libraries(etl cgame ui qagame)
+	# Publish side modules from the same archives as the static client, and
+	# compile their identities into that client for pure-server validation.
+	find_package(Python3 REQUIRED COMPONENTS Interpreter)
+	find_program(WEB_MODULE_NODE NAMES node nodejs REQUIRED)
+	set(WEB_MODULE_DIR "${CMAKE_CURRENT_BINARY_DIR}/web-modules")
+	add_custom_command(
+		OUTPUT "${WEB_MODULE_DIR}/identity.c" "${WEB_MODULE_DIR}/identity.json"
+		       "${WEB_MODULE_DIR}/cgame.mp.wasm32.so" "${WEB_MODULE_DIR}/ui.mp.wasm32.so"
+		COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/misc/web/build_web_modules.py"
+		        --compiler "${CMAKE_C_COMPILER}" --node "${WEB_MODULE_NODE}"
+		        --cgame "$<TARGET_FILE:cgame>" --ui "$<TARGET_FILE:ui>"
+		        --cjson "$<TARGET_FILE:bundled_cjson>" --output "${WEB_MODULE_DIR}"
+		DEPENDS cgame ui bundled_cjson "${CMAKE_SOURCE_DIR}/misc/web/build_web_modules.py"
+		VERBATIM
+	)
+	target_sources(etl PRIVATE "${WEB_MODULE_DIR}/identity.c")
 	target_link_options(etl PRIVATE
 		"--profiling-funcs"
 		"-sALLOW_MEMORY_GROWTH=1"

@@ -5,6 +5,25 @@ import socket
 import threading
 import time
 import unicodedata
+import json
+from pathlib import Path
+
+MODULE_MANIFEST = Path(__file__).resolve().parents[2] / 'build_wasm/web-modules/identity.json'
+
+
+def browser_module_identities():
+    """Missing build metadata must fail closed for pure-server discovery."""
+    try:
+        modules = json.loads(MODULE_MANIFEST.read_text(encoding='utf-8'))['modules']
+        result = {}
+        for name, key in (('cgame', 'wasmCgame'), ('ui', 'wasmUI')):
+            crc, size = modules[name]['crc'], modules[name]['size']
+            if type(crc) is not int or not 0 <= crc <= 0xffffffff or type(size) is not int or not 0 < size <= 0xffffffff:
+                return {}
+            result[key] = f'{crc:08x}:{size}'
+        return result
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
 
 # Engine and mod versions do not identify the actual package selected by a
 # server. Patched servers advertise wasmModules only after checking their PK3
@@ -43,9 +62,11 @@ def parse_info(packet, challenge, latency):
     legacy = protocol == 84 and info.get('gamename', '').lower() == 'et' and info.get('game', '').lower() == 'legacy'
     version = re.match(r'^ET Legacy v?(2)\.([0-9]{1,2})(?:\.([0-9]{1,2}))?(?:[- ]|$)', info.get('version', ''))
     modern = bool(version and tuple(int(part or 0) for part in version.groups()) >= (2, 86, 0))
-    web_modules = info.get('wasmModules') == '1'
+    identities = browser_module_identities()
+    web_modules = (info.get('wasmModules') == '1' and len(identities) == 2 and
+                   all(info.get(key) == value for key, value in identities.items()))
     compatible = legacy and modern and (info.get('pure') == '0' or (info.get('pure') == '1' and web_modules))
-    reason = '' if compatible else ('This server build has not been verified for this static browser client. Pure servers need published WebAssembly module packages.' if legacy else 'This browser build needs an ET: Legacy server with protocol 84 and the Legacy mod.')
+    reason = '' if compatible else ('This server build has not been verified for this static browser client. Pure servers need WebAssembly modules matching this browser version.' if legacy else 'This browser build needs an ET: Legacy server with protocol 84 and the Legacy mod.')
     return {'status': 'online', 'hostname': clean_text(info.get('hostname', '')),
             'map': clean_text(info.get('mapname', ''), 64),
             'players': number('clients', 128), 'capacity': number('sv_maxclients', 128),

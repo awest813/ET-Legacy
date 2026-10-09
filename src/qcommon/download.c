@@ -483,7 +483,7 @@ void Com_InitDownloads(void)
 #ifdef __EMSCRIPTEN__
 	if (cl_connectedToPureServer && !FS_WebClientModulePaks(NULL, NULL))
 	{
-		Com_Error(ERR_DROP, "This pure server's allowed packs do not contain WebAssembly client modules. Choose a browser-compatible Legacy server, or play offline.");
+		Com_Error(ERR_DROP, "This pure server's allowed packs do not contain matching WebAssembly client modules for this browser version. Update the browser app or choose a compatible server.");
 		return;
 	}
 #endif

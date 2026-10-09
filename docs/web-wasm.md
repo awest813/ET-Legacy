@@ -2572,3 +2572,52 @@ to launcher pages. Saved logs retain tank theft/both tank-barrier destruction
 for Gold Rush and depot/track-switch activity for Rail Gun. Neither interrupted
 round proves a complete attacking objective chain or final round result; both
 still require continuous full-round testing.
+
+## Browser module identities for pure servers (October 9, 2026)
+
+Checking only `cgame.mp.wasm32.so` and `ui.mp.wasm32.so` filenames could reference
+a different build's package while executing the browser's statically linked
+modules. The browser build now publishes both side modules from its cgame/UI
+archives and compiles their ZIP CRC and byte length into the engine. Only
+entries matching both fields may satisfy its pure-module references. The
+existing download-stage gate rejects a missing or different build before map
+loading, with update/server selection guidance. Normal server package allowlists
+and pure checksum verification remain required; desktop loading is unchanged.
+
+Patched servers advertise `wasmCgame` and `wasmUI` alongside `wasmModules` only
+when their native and browser modules occupy the required checksum containers.
+Discovery compares both identities with `build_wasm/web-modules/identity.json`.
+Missing metadata, missing fields, and CRC/length mismatches cannot qualify a
+pure server. Non-pure discovery keeps its existing protocol/mod/version checks.
+CRC and length follow the engine's ZIP integrity scheme; they are not
+cryptographic code attestation.
+
+Build `etl` before running `misc/web/build_server_pack.py`. The pack builder uses
+the exact published side modules and checks SHA-256 digests of archives and
+outputs, refusing stale or modified artifacts. Deploy the matching
+`web-modules/identity.json` with the launcher's build directory for server-side
+discovery. The browser also checks its installed pack, including when an older
+cached app is used.
+
+Browser and native dedicated-server builds passed. Production-code fixtures pass
+in web and desktop configurations, covering CRC/size mismatches, pure/non-pure
+download gates, ordinary pure allowlists, and restart recovery. All 77 Python
+catalog/relay/asset/publication tests and launcher checks passed. All seven
+local/served bundle hashes match (`build_wasm/module-identity-hashes.json`). The
+matching native/WASM package retains checksum 168848376.
+
+Live Chromium verification used the final build and a loopback `sv_pure 1` Radar
+server. Its matching advertisement qualified for Join; the client reached
+Online, rendered Radar, joined Allies as a medic, moved through the spawn
+building, and fired six rounds (30 to 24). An initial older local pack correctly
+stopped at the required-pack gate. The final attempt used a dedicated matching
+asset directory. Native logs record ClientConnect at 33950, ClientBegin at 40150
+and 76750, and explicit disconnect at 180750. The isolated server, launcher,
+relay, and tab were stopped after testing.
+
+Evidence: `build_wasm/module-identity-online-play.png`,
+`module-identity-browser-log.json`, `module-identity-build.log`,
+`module-identity-tests.log`, `module-identity-launcher-tests.log`, and
+`build_native/fixture/module-identity-info.json` /
+`module-identity-native-events.json`. This verifies controlled local pure-server
+play; it does not establish public hosting or physical Chromebook behavior.

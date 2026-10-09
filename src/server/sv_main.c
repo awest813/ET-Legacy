@@ -857,7 +857,13 @@ static void SVC_Info(const netadr_t *from)
 	Info_SetValueForKey(infostring, "pure", va("%i", sv_pure->integer));
 	if (SV_HasWebClientModulePaks())
 	{
-		Info_SetValueForKey(infostring, "wasmModules", "1");
+		char cgameIdentity[32], uiIdentity[32];
+		if (FS_WebClientModuleIdentities(cgameIdentity, uiIdentity, sizeof(cgameIdentity)))
+		{
+			Info_SetValueForKey(infostring, "wasmModules", "1");
+			Info_SetValueForKey(infostring, "wasmCgame", cgameIdentity);
+			Info_SetValueForKey(infostring, "wasmUI", uiIdentity);
+		}
 	}
 
 	if (sv_minPing->integer)
