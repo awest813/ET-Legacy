@@ -3136,3 +3136,27 @@ visible during warmup. This verifies a slow desktop-browser transfer and match
 startup, not a physical Chromebook connection or a completed round. Evidence:
 `build_wasm/download-beyond-three-minutes.png`, `download-slow-radar-bots.png`
 and `download-slow-live-log.json`.
+
+## Keeping completed packs after a later download failure (October 9, 2026)
+
+Each newly downloaded pack is now saved to IndexedDB with its manifest after
+size and integrity verification, before fetching the next pack. Retry can reuse
+these completed files when a later request fails. Saves are serialized with
+loading, so a late callback cannot advance a cancelled match. The existing
+storage deadline and quota-error handling still allow in-memory play when
+persistence is unavailable.
+
+The regression reproduced the earlier loss: pak0 completed, pak1 failed, and
+no files had been persisted. It now verifies the checkpoint, reloads its saved
+files, and downloads only pak1. Quota failure, a hung save, late completion and
+cancellation checks also pass. All six JavaScript suites, the browser rebuild,
+generated JavaScript parsing and bundle/module verification passed.
+
+Live Chromium on a fresh origin received an intentional HTTP 503 for pak1
+after pak0 had finished. Retry returned to setup, then Radar loaded with all
+four requested Hard bots. The fixture counted one request each for etloose,
+pak0 and pak2, and two for pak1, confirming the completed large pack was reused
+across reload. Evidence: `build_wasm/pack-checkpoint-later-failure.png`,
+`pack-checkpoint-recovered-radar.png`, `pack-checkpoint-request-counts.json`
+and `pack-checkpoint-live-log.json`. This verifies desktop-browser recovery
+and warmup startup, not a completed match or physical mobile storage behavior.

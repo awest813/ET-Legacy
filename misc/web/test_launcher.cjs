@@ -21,6 +21,8 @@ const packManifest = {version:1, packs:Object.fromEntries(packs.map(name => [nam
 function launcher(fault = {}) {
     const elements = {};
     const files = new Map(packs.map(name => [`/idb/etmain/${name}`, zip]));
+    if (fault.persistedFiles) { files.clear(); for (const [name,data] of fault.persistedFiles) files.set(name,data); }
+    for (const name of fault.missingPacks || []) files.delete('/idb/etmain/'+name);
     if (fault.missing || fault.download) files.delete('/idb/etmain/pak0.pk3');
     if (fault.corrupt) files.set('/idb/etmain/pak0.pk3', new Uint8Array([1, 2]));
     if (fault.corruptBody) { const bytes = zip.slice(); bytes[bytes.length - 1] ^= 1; files.set('/idb/etmain/pak0.pk3', bytes); }
@@ -29,7 +31,7 @@ function launcher(fault = {}) {
     if (fault.cachedCustom && fault.catalog) for (const pack of fault.catalog.packs) files.set('/idb/etmain/'+pack.sha256+'.pk3',zip);
     for (const [name,size] of fault.cacheFiles || []) files.set('/idb/etmain/'+name,{length:size});
     const calls = [], requests = [], events = {};
-    const pending = [], timers = new Map(); let timerId = 0, writes = 0;
+    const pending = [], timers = new Map(), savedFiles = []; let timerId = 0, writes = 0;
     const element = id => elements[id] ||= {
         value: '', style: {}, disabled: id === 'playbtn', textContent: '',
         addEventListener(name, callback) { this[name === 'close' ? 'closeEvent' : name] = callback; },
@@ -134,7 +136,7 @@ function launcher(fault = {}) {
                 }
                 if (fault.download === 'timeout') return this.ontimeout();
                 if (fault.download === 'network') return this.onerror();
-                this.status = fault.download === '404' ? 404 : 200;
+                this.status = fault.download === '404' || this.url === fault.failPack ? 404 : 200;
                 this.response = fault.download === 'invalid' ? new ArrayBuffer(30) : zip.buffer;
                 if (fault.download === 'corrupt') { const bytes = zip.slice(); bytes[bytes.length - 1] ^= 1; this.response = bytes.buffer; }
                 if (fault.downloadLate) { pending.push(()=>this.onload()); return; }
@@ -174,8 +176,11 @@ function launcher(fault = {}) {
         syncfs(populate, callback) {
             if (!populate) writes++;
             if (fault.syncHang && populate) { pending.push(() => callback(null)); return; }
+            if (fault.syncSaveHang && !populate) { pending.push(() => callback(null)); return; }
             if (fault.syncThrow) throw Error('Cache unavailable');
-            callback(fault.syncError ? Error('Quota exhausted') : null);
+            const failed=fault.syncError || (!populate && fault.syncSaveError);
+            if (!populate && !failed) savedFiles.push(new Map(files));
+            callback(failed ? Error('Quota exhausted') : null);
         },
         analyzePath(path) { return { exists: files.has(path) }; },
         readdir(path) { return [...files.keys()].filter(name=>name.startsWith(path+'/')).map(name=>name.slice(path.length+1)).filter(name=>!name.includes('/')); },
@@ -198,7 +203,7 @@ function launcher(fault = {}) {
         if (fault.engine) throw Error('engine failure');
     };
     context.Module.onRuntimeInitialized();
-    return { context, elements, files, calls, requests, events, pending, timers, networkCalls, networkConfigs, probeReleased, get writes() { return writes; },
+    return { context, elements, files, savedFiles, calls, requests, events, pending, timers, networkCalls, networkConfigs, probeReleased, get writes() { return writes; },
         get networkCloses() { return networkCloses; },
         start() { elements.matchform.submit({ preventDefault() {} }); } };
 }
@@ -286,6 +291,29 @@ const corrupt = launcher({ corrupt: true });
 corrupt.start();
 assert.deepEqual(corrupt.requests, ['assets/custom.json', 'assets/manifest.json', 'assets/pak0.pk3']);
 assert.equal(corrupt.calls.length, 1);
+const interruptedPacks=launcher({missingPacks:['pak0.pk3','pak1.pk3'],failPack:'assets/pak1.pk3'});
+interruptedPacks.start();
+assert.equal(interruptedPacks.calls.length,0,'A later failed download cannot start an incomplete match');
+assert.equal(interruptedPacks.savedFiles.length,1,'The earlier verified pack is persisted before the next download can fail');
+assert.ok(interruptedPacks.savedFiles[0].has('/idb/asset-manifest.json'),'The checkpoint includes the verified pack manifest');
+assert.ok(interruptedPacks.savedFiles[0].has('/idb/etmain/pak0.pk3'));
+assert.equal(interruptedPacks.savedFiles[0].has('/idb/etmain/pak1.pk3'),false,'Missing packs are not represented as saved');
+const resumedPacks=launcher({persistedFiles:interruptedPacks.savedFiles[0]});resumedPacks.start();
+assert.equal(resumedPacks.calls.length,1);
+assert.equal(resumedPacks.requests.includes('assets/pak0.pk3'),false,'Retry reuses the earlier saved verified pack');
+assert.equal(resumedPacks.requests.includes('assets/pak1.pk3'),true,'Retry downloads the pack that did not finish');
+const checkpointQuota=launcher({download:true,syncSaveError:true});checkpointQuota.start();
+assert.equal(checkpointQuota.calls.length,1,'A saving quota failure still permits in-memory play');
+assert.equal(checkpointQuota.context.cacheEnabled,false);
+const checkpointHang=launcher({download:true,syncSaveHang:true});checkpointHang.start();
+assert.equal(checkpointHang.calls.length,0,'Checkpoint completion precedes the next loading stage');
+assert.match(checkpointHang.elements.etl_status.textContent,/Saving verified game files/);
+Array.from(checkpointHang.timers.values())[0]();
+assert.equal(checkpointHang.calls.length,1,'A stuck save falls back to in-memory play after its storage deadline');
+checkpointHang.pending.shift()();assert.equal(checkpointHang.calls.length,1,'Late persistence cannot boot twice');
+const checkpointCancel=launcher({download:true,syncSaveHang:true});checkpointCancel.start();checkpointCancel.elements.cancelload.click();
+assert.deepEqual(checkpointCancel.calls,['retry']);checkpointCancel.pending.shift()();
+assert.deepEqual(checkpointCancel.calls,['retry'],'Late persistence cannot resume a cancelled match');
 function slowDownload() {
     const page=launcher({download:true,downloadLate:true});
     let now=0,nextId=0;const deadlines=new Map();

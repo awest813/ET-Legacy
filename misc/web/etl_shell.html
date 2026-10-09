@@ -1936,15 +1936,28 @@
 		step();
 	}
 	function packCachePath(pack) { return cacheRoot + '/' + (pack.custom ? pack.entry.sha256 + '.pk3' : pack.name); }
+	function saveVerifiedAssets(epoch, done)
+	{
+		if (!loading(epoch)) return;
+		try { Module.FS.writeFile('/idb/asset-manifest.json', JSON.stringify(manifest)); }
+		catch (e) { cacheEnabled = false; }
+		if (cacheDirty && cacheEnabled)
+		{
+			setLoadState('verifying', 'Saving verified game files for offline play…');
+			syncCache(false, function(error)
+			{
+				if (!error) cacheDirty = false;
+				if (loading(epoch)) done();
+			});
+		}
+		else done();
+	}
 	function fetchMissing(i, epoch)
 	{
 		if (!loading(epoch)) return;
 		if (i >= PAKS.length)
 		{
-			try { Module.FS.writeFile('/idb/asset-manifest.json', JSON.stringify(manifest)); }
-			catch (e) { cacheEnabled = false; }
-			if (cacheDirty) syncCache(false, function() { if (loading(epoch)) copyPaksAndBoot(); });
-			else copyPaksAndBoot();
+			saveVerifiedAssets(epoch, copyPaksAndBoot);
 			return;
 		}
 		var pack = PAKS[i], name = pack.name;
@@ -2011,7 +2024,8 @@
 				verifyPack(cached, entry, epoch, function(valid)
 				{
 					if (!valid) { try { Module.FS.unlink(cached); } catch (e) {} showFatal(name + ' failed its integrity check. Check the local game pack and retry.'); return; }
-					fetchMissing(i + 1, epoch);
+					// Keep completed downloads across a failure in a later pack.
+					saveVerifiedAssets(epoch, function() { fetchMissing(i + 1, epoch); });
 				});
 			}
 			catch (e)
