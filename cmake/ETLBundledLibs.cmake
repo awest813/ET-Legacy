@@ -4,9 +4,10 @@
 
 # Check if the libs submodule exists and add the directory
 # or error out the build
-if(EXISTS "${CMAKE_SOURCE_DIR}/libs/CMakeLists.txt")
-	message(STATUS "Using bundled libraries located at ${CMAKE_SOURCE_DIR}/libs")
-    include(libs/CMakeLists.txt)
+set(ETL_BUNDLED_LIBS_DIR "${CMAKE_SOURCE_DIR}/libs" CACHE PATH "Directory containing the official bundled dependency sources")
+if(EXISTS "${ETL_BUNDLED_LIBS_DIR}/CMakeLists.txt")
+	message(STATUS "Using bundled libraries located at ${ETL_BUNDLED_LIBS_DIR}")
+    include("${ETL_BUNDLED_LIBS_DIR}/CMakeLists.txt")
 else()
 	message(STATUS "======================================================")
 	message(STATUS "Bundled libraries were not found on your system!")

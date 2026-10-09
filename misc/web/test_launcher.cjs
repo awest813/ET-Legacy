@@ -460,6 +460,8 @@ assert.equal(onlineUI.elements.joinbtn.disabled,false);
 onlineUI.elements.joinbtn.click();onlineUI.elements.joinbtn.click();
 assert.equal(onlineUI.calls.length,1,'Repeated joins cannot boot twice');
 assert.ok(onlineUI.calls[0].includes('+connect'));
+assert.equal(onlineUI.calls[0][onlineUI.calls[0].lastIndexOf('cl_allowDownload') + 1], '0', 'Native download installation stays disabled');
+assert.equal(onlineUI.calls[0][onlineUI.calls[0].lastIndexOf('cl_wwwDownload') + 1], '1', 'Online userinfo permits metadata-only redirect discovery');
 assert.equal(onlineUI.calls[0].at(-1),'192.0.2.1:27960');
 assert.equal(onlineUI.calls[0].includes('+map'),false);
 assert.equal(onlineUI.calls[0].includes('g_gametype'),false,'The online server owns its match mode');

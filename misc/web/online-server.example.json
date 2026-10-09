@@ -8,6 +8,7 @@
   "autoAssets": true,
   "downloadBase": "https://download.hirntot.org",
   "assetSources": {
+    "legacy/legacy_v2.86.1.pk3": "https://game.etlegacy.com/legacy/legacy_v2.86.1.pk3",
     "etmain/goldrush-gals.pk3": "https://et.clan-etc.de/etmain/goldrush-gals.pk3"
   }
 }

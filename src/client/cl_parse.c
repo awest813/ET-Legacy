@@ -872,6 +872,9 @@ void CL_ParseGamestate(msg_t *msg)
  */
 void CL_ParseDownload(msg_t *msg)
 {
+#ifdef __EMSCRIPTEN__
+	Com_WebPackSourceMessage(msg);
+#else
 	int           size;
 	unsigned char data[MAX_MSGLEN];
 	int           block;
@@ -1054,6 +1057,7 @@ void CL_ParseDownload(msg_t *msg)
 		// get another file if needed
 		Com_NextDownload();
 	}
+#endif
 }
 
 /**

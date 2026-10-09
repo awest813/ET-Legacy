@@ -780,6 +780,17 @@ static void SVC_Status(const netadr_t *from, qboolean force)
  *
  * @param[in] from
  */
+static qboolean SV_HasWebClientModulePaks(void)
+{
+	int nativeCgame, nativeUI, webCgame, webUI;
+	// Pure validation expects the server architecture's module-package checksums.
+	// A separate browser-only companion PK3 cannot satisfy that requirement.
+	return FS_WebClientModulePaks(&webCgame, &webUI) &&
+	       FS_FileIsInPAK(Sys_GetDLLName("cgame"), &nativeCgame) == 1 &&
+	       FS_FileIsInPAK(Sys_GetDLLName("ui"), &nativeUI) == 1 &&
+	       nativeCgame == webCgame && nativeUI == webUI;
+}
+
 static void SVC_Info(const netadr_t *from)
 {
 	int  i, clients = 0, humans = 0;
@@ -844,6 +855,10 @@ static void SVC_Info(const netadr_t *from)
 	Info_SetValueForKey(infostring, "sv_privateclients", va("%i", sv_privateClients->integer));
 	Info_SetValueForKey(infostring, "gametype", va("%i", sv_gametype->integer));
 	Info_SetValueForKey(infostring, "pure", va("%i", sv_pure->integer));
+	if (SV_HasWebClientModulePaks())
+	{
+		Info_SetValueForKey(infostring, "wasmModules", "1");
+	}
 
 	if (sv_minPing->integer)
 	{

@@ -207,7 +207,7 @@
 			<label for="publicserver">Server <select id="publicserver"><option value="">Launcher default</option></select></label>
 			<p id="publicstatus" role="status">Discovering public servers…</p>
 			<button id="refreshpublic" type="button">Refresh public list</button>
-			<p>Only servers that replied with a compatible Legacy protocol appear. Response times are measured from the relay host. Custom maps may need matching packs from an approved source or a local import.</p>
+			<p>Pure servers must advertise WebAssembly client modules. Matching packs are verified during connection. Response times are measured from the relay host. Custom maps may need packs from an approved source or a local import.</p>
 		</section>
 		<p id="onlinestatus" role="status">Checking online configuration…</p>
 		<section id="serverdetails" aria-labelledby="servername" hidden>
@@ -1861,7 +1861,7 @@
 				Module.FS.writeFile('/browser/legacy/browser-connect.cfg', 'set password "' + (matchOptions.password || '') + '"\n');
 				args.push('+exec', 'browser-connect.cfg'); matchOptions.password = '';
 				if (!Module['browserNetwork'].begin(false)) throw new Error('The relay disconnected while game files were loading. Retry the online connection.');
-				args.push('+set', 'cl_allowDownload', '0', '+set', 'cl_wwwDownload', '0', '+set', 'cl_timeout', '20', '+connect', '192.0.2.1:27960');
+				args.push('+set', 'cl_allowDownload', '0', '+set', 'cl_wwwDownload', '1', '+set', 'cl_timeout', '20', '+connect', '192.0.2.1:27960');
 				networkbtn.hidden = false;
 			}
 			else

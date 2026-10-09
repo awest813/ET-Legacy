@@ -42,6 +42,8 @@
 #define Com_AddReliableCommand(x) CL_AddReliableCommand(x)
 #endif
 
+#include "web_pack_source.h"
+
 #if defined(FEATURE_PAKISOLATION) && !defined(DEDICATED)
 /**
  * @brief Com_ContainerizePath target destination path to container if needed
@@ -94,6 +96,9 @@ void Com_ClearDownload(void)
  */
 void Com_ClearStaticDownload(void)
 {
+#if defined(__EMSCRIPTEN__) && !defined(DEDICATED)
+	Com_WebPackSourceReset();
+#endif
 	etl_assert(!dld.bWWWDlDisconnected);    // reset before calling
 	dld.noReconnect             = qfalse;
 	dld.downloadRestart         = qfalse;
@@ -440,10 +445,10 @@ void Com_InitDownloads(void)
 		{
 			Cvar_Set("com_missingFiles", missingFiles);
 #ifdef __EMSCRIPTEN__
-			// The browser installs validated packs before engine startup. Do not
-			// continue into cgame with required assets filtered out by sv_pure.
-			NET_WebMissingAssets(missingFiles, Cvar_VariableString("sv_referencedPakNames"), Cvar_VariableString("sv_referencedPaks"));
-			Com_Error(ERR_DROP, "Server assets missing:\n%s\nInstall these exact PK3 packs in the local launcher's custom asset directory, then reload and join again.", missingFiles);
+			// Inspect a bounded server redirect before handing exact packs back
+			// to the launcher. Native HTTP/UDP installation remains disabled.
+			if (Com_WebPackSourceRequest(missingFiles)) return;
+			Com_WebPackSourceFinish();
 			return;
 #endif
 		}
@@ -475,6 +480,13 @@ void Com_InitDownloads(void)
 		return;
 	}
 
+#ifdef __EMSCRIPTEN__
+	if (cl_connectedToPureServer && !FS_WebClientModulePaks(NULL, NULL))
+	{
+		Com_Error(ERR_DROP, "This pure server's allowed packs do not contain WebAssembly client modules. Choose a browser-compatible Legacy server, or play offline.");
+		return;
+	}
+#endif
 	Com_DownloadsComplete();
 }
 
@@ -484,6 +496,10 @@ void Com_InitDownloads(void)
 void Com_WebDownloadLoop(void)
 {
 	static qboolean bAbort = qfalse;
+
+#if defined(__EMSCRIPTEN__) && !defined(DEDICATED)
+	Com_WebPackSourceFrame();
+#endif
 
 	DL_DownloadLoop();
 

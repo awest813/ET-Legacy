@@ -1860,7 +1860,7 @@ The expanded port goal remains open. Its next checks and deliverables are:
 | Offline play and assets | Recheck saved-app cold starts with the preview unavailable after the final bundle and ensure custom-map recovery still preserves packs and settings |
 | Online play | Play, respawn and verify match/map transitions on a compatible live server, beyond the earlier spectator connection and asset-recovery proof |
 | PWA | Recheck offline cold start, update/recovery and fullscreen against the final integrated changes |
-| Server browser | Verify the newly integrated public discovery, filtering and selection in the live launcher, including selected-server asset recovery and mobile layout |
+| Server browser | Public discovery, filtering, selection and pack recovery are live-tested; verify a native server with matching WebAssembly module packages and then a compatible public entry |
 | Graphics and Chromebook settings | Add and verify browser-facing graphics controls and Chromebook presets after the preceding integration work, including persistence and safe renderer restart |
 
 Physical multitouch and cross-browser/device rendering remain device checks;
@@ -1903,16 +1903,25 @@ Live testing exposed a compatibility limit hidden by protocol-only discovery:
 native Legacy releases can speak protocol 84 but omit the published wasm32 cgame
 and UI entries required by this static client's pure-package validation. Legacy
 2.84.0 and stable 2.86.0 archives were inspected and do not contain those entries.
-The native pure check remains unchanged. Public eligibility is now conservative:
-pure servers need a build listed in `WEB_MODULE_BUILDS` after inspecting its mod
-archive; known Legacy 2.86-or-newer non-pure servers can also be offered. Currently
-the inspected pure build is `2.86.0-34-g50cffc8`. Engine version alone cannot prove
-the server's selected mod/asset packages; connection still validates actual packs.
-Do not add a pure build solely because its version number is newer.
+The native pure check remains unchanged. An initial engine-build allowlist proved
+insufficient: the official server still reports `2.86.0-34-g50cffc8` while requiring
+a different native-only `legacy_v2.86.1.pk3`. Public eligibility now requires
+Legacy protocol 84, a 2.86-or-newer engine and either explicit non-pure status or
+`wasmModules=1`. The patched native server emits that field only when its exact
+Legacy WebAssembly module entries reside in the same pure packages as its native
+cgame and UI modules. A separate companion PK3 cannot satisfy normal server pure
+validation. The browser still checks the actual server-allowed entries before
+loading cgame; a missing entry produces an explicit compatibility error.
+
+Server operators must publish a matching Legacy PK3 containing native modules
+and `cgame.mp.wasm32.so` / `ui.mp.wasm32.so`, built from the same module sources
+as this static browser client. The capability declaration does not add support
+for arbitrary executable mods. Standard native-only releases do not satisfy it.
+Live deployment of this native server/package combination remains to be tested.
 
 An initial 399-entry master query had 144 protocol-compatible replies. The final
-411-entry query yielded one eligible public entry after the stricter module
-filter, the official development server. These are snapshots, not permanent
+411-entry query yielded one candidate under the earlier engine-build filter,
+the official development server. These are snapshots, not permanent
 availability counts. Earlier signed-route checks reached two distinct upstreams,
 End of Existence (Gold Rush) and LinuxGSM (Radar); these establish routing only.
 Both were subsequently excluded from the pure browser list after package review.
@@ -1927,17 +1936,31 @@ rejection. A LinuxGSM attempt recovered 2.86.0, 2.85.0 and 2.83.2 packs but its
 2.78.1 mod-only archive was unavailable through this resolver. That server is now
 excluded from the compatible list; broad old-release recovery remains unverified.
 
-The final official-server attempt reached its native handshake but required
-`legacy_v2.86.1.pk3` with checksum `1005389300`. The configured approved source
-and official release/package catalog did not provide this exact pack. The
-launcher shows an actionable failure and preserves verified installed packs.
-That server's engine build therefore remains only a candidate; its current mod
-package and a playable online session have not been verified. The earlier
-successful spectator connection used a different package and does not establish
-current availability. Evidence is saved in
-`public-browser-missing-official-pack.png` and its corresponding log.
+The official-server attempt required `legacy_v2.86.1.pk3` with checksum
+`1005389300`. The approved mirror and official release/package catalog did not
+provide it. A new bounded metadata-only native request discovered the server's
+exact source: `https://game.etlegacy.com/legacy/legacy_v2.86.1.pk3`. The pack was
+downloaded through the production verifier and matched that checksum, all ZIP
+entry CRCs and SHA-256
+`dcd43143fa4412a80780eb142373996ee849bace5fbb230aa22ecf9cc71c4238`.
+Its 34,333,739 bytes contain native modules but no wasm32 entries. A subsequent
+real join was rejected by the server's normal pure validation. The old spectator
+connection used a different package and does not establish current availability.
+The exact verified URL is now in the operator example's approved asset sources.
 
-Validation: 12 public discovery/catalog/ticket checks, eight server-info checks,
+Source discovery requests only the first missing safe PK3 name, waits at most
+three seconds, reads the redirect metadata and stops the native download. It
+never writes UDP file data, fetches a redirect, opens a fallback page or installs
+native DLLs. Cancellation and a fresh gamestate clear pending discovery. Online
+userinfo enables WWW redirect replies while `cl_allowDownload` remains zero.
+Redirects appear in native diagnostic logs; automatic recovery still accepts
+only operator-approved sources and verifies exact server checksums.
+
+Evidence includes `public-official-pack-verification.json`,
+`public-browser-native-only-pack.png` and its native log. The earlier missing-pack
+failure remains recorded in `public-browser-missing-official-pack.png`.
+
+Validation: 12 public discovery/catalog/ticket checks, nine server-info checks,
 11 real relay checks (including selected-peer isolation), 25 HTTP route checks,
 13 server-asset checks, and launcher/network suites pass. Generated scripts parse
 and all seven final offline bundle hashes match. The mobile layout and PWA update
@@ -1945,3 +1968,28 @@ were tested in Chromium while preserving installed packs and offline settings.
 Evidence includes `public-server-catalog-final.json`, `public-pure-support.json`,
 `public-relay-live.json`, `public-browser-supported.png`, `public-browser-mobile.png`
 and the public pack-recovery/pure-failure logs in build_wasm.
+
+### Controlled pure-server verification (8 October 2026)
+
+A Windows x64 dedicated server built from this source successfully accepted the
+browser on loopback with `sv_pure 1`. Radar rendered, the player joined Allies,
+moved, died and respawned. Native `ClientBegin` and the suicide event were recorded.
+Evidence: `build_wasm/pure-online-gameplay.png`, `pure-online-respawn.png`,
+`pure-online-gameplay-log.json`, and `build_native/fixture/info-proof.json`.
+This verifies one client on a controlled server; public deployment, multiple
+clients, map transitions and objective completion remain unverified. The latest
+public scan checked 410 servers and found no compatible entries.
+
+Build native `etlded`, `cgame`, `ui` and `qagame` and the browser targets from the
+same source. Native dependencies can be supplied with the CMake cache path
+`ETL_BUNDLED_LIBS_DIR`; its default remains the repository `libs` directory.
+Run `python misc/web/build_server_pack.py --compiler <emcc> --node <node>` to
+create a matching native/WebAssembly Legacy PK3. The builder checks actual WASM
+exports and validates the resulting archive and checksum. Install this PK3 in
+both the server's `legacy` directory and the launcher's approved asset directory.
+The server also needs its loose native qagame DLL and the original stock packs.
+Generated packages and stock game data are excluded from Git.
+
+Native Git builds can advertise `ET Legacy 2.86-dirty` instead of a dotted patch
+version with a leading `v`. Discovery accepts both forms while still requiring
+the explicit matching-module declaration for pure servers.

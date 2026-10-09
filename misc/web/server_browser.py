@@ -6,11 +6,9 @@ import threading
 import time
 import unicodedata
 
-# A native engine version alone does not establish browser compatibility. These
-# published mod archives have been inspected for both wasm32 module entries.
-# Keep this conservative until additional packages are verified; native pure
-# validation still checks the actual required package during connection.
-WEB_MODULE_BUILDS = ('2.86.0-34-g50cffc8',)
+# Engine and mod versions do not identify the actual package selected by a
+# server. Patched servers advertise wasmModules only after checking their PK3
+# entries. The client still validates installed, server-allowed packages.
 
 
 def clean_text(value, limit=160):
@@ -43,10 +41,10 @@ def parse_info(packet, challenge, latency):
         raise ValueError('Missing protocol')
     mod = clean_text(info.get('game', ''), 64).lower()
     legacy = protocol == 84 and info.get('gamename', '').lower() == 'et' and info.get('game', '').lower() == 'legacy'
-    version = re.match(r'^ET Legacy v(2)\.([0-9]{1,2})\.([0-9]{1,2})(?:[- ]|$)', info.get('version', ''))
-    modern = bool(version and tuple(map(int, version.groups())) >= (2, 86, 0))
-    web_modules = any(re.match(r'^ET Legacy v' + re.escape(build) + r'(?: |$)', info.get('version', '')) for build in WEB_MODULE_BUILDS)
-    compatible = legacy and (web_modules or (modern and info.get('pure') == '0'))
+    version = re.match(r'^ET Legacy v?(2)\.([0-9]{1,2})(?:\.([0-9]{1,2}))?(?:[- ]|$)', info.get('version', ''))
+    modern = bool(version and tuple(int(part or 0) for part in version.groups()) >= (2, 86, 0))
+    web_modules = info.get('wasmModules') == '1'
+    compatible = legacy and modern and (info.get('pure') == '0' or (info.get('pure') == '1' and web_modules))
     reason = '' if compatible else ('This server build has not been verified for this static browser client. Pure servers need published WebAssembly module packages.' if legacy else 'This browser build needs an ET: Legacy server with protocol 84 and the Legacy mod.')
     return {'status': 'online', 'hostname': clean_text(info.get('hostname', '')),
             'map': clean_text(info.get('mapname', ''), 64),

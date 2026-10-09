@@ -951,6 +951,7 @@ const char *FS_LoadedPakPureChecksums(void);
 const char *FS_ReferencedPakNames(void);
 const char *FS_ReferencedPakChecksums(void);
 const char *FS_ReferencedPakPureChecksums(void);
+qboolean FS_WebClientModulePaks(int *cgameChecksum, int *uiChecksum);
 // Returns a space separated string containing the checksums of all loaded
 // AND referenced pk3 files. Servers with sv_pure set will get this string
 // back from clients for pure validation
@@ -1316,6 +1317,9 @@ unsigned int Com_BeginWebDownload(const char *localName, const char *remoteName)
 void Com_NextDownload(void);
 void Com_InitDownloads(void);
 void Com_WebDownloadLoop(void);
+#ifdef __EMSCRIPTEN__
+void Com_WebPackSourceMessage(msg_t *msg);
+#endif
 qboolean Com_WWWBadChecksum(const char *pakname);
 void Com_Download_f(void);
 

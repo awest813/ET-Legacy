@@ -4809,8 +4809,7 @@ const char *FS_ReferencedPakNames(void)
  *
  * @note The string has a specific order, "cgame ui @ ref1 ref2 ref3 ..."
  */
-#ifdef __EMSCRIPTEN__
-static void FS_WebReferenceStaticModule(const char *fileName, int flag)
+static qboolean FS_WebReferenceStaticModule(const char *fileName, int flag, int *checksum)
 {
 	searchpath_t *search;
 	fileInPack_t *file;
@@ -4828,12 +4827,21 @@ static void FS_WebReferenceStaticModule(const char *fileName, int flag)
 			if (!FS_FilenameCompare(file->name, fileName))
 			{
 				search->pack->referenced |= flag;
-				return;
+				if (checksum) *checksum = search->pack->pure_checksum;
+				return qtrue;
 			}
 		}
 	}
+	return qfalse;
 }
-#endif
+
+qboolean FS_WebClientModulePaks(int *cgameChecksum, int *uiChecksum)
+{
+	// This also backs the dedicated server's browser-capability advertisement.
+	// A zero flag inspects exact package entries without changing references.
+	return FS_WebReferenceStaticModule("cgame.mp.wasm32.so", 0, cgameChecksum) &&
+	       FS_WebReferenceStaticModule("ui.mp.wasm32.so", 0, uiChecksum);
+}
 
 const char *FS_ReferencedPakPureChecksums(void)
 {
@@ -4845,8 +4853,8 @@ const char *FS_ReferencedPakPureChecksums(void)
 	info[0] = 0;
 
 #ifdef __EMSCRIPTEN__
-	FS_WebReferenceStaticModule("cgame.mp.wasm32.so", FS_CGAME_REF);
-	FS_WebReferenceStaticModule("ui.mp.wasm32.so", FS_UI_REF);
+	FS_WebReferenceStaticModule("cgame.mp.wasm32.so", FS_CGAME_REF, NULL);
+	FS_WebReferenceStaticModule("ui.mp.wasm32.so", FS_UI_REF, NULL);
 #endif
 
 	for (nFlags = FS_CGAME_REF; nFlags; nFlags = nFlags >> 1)

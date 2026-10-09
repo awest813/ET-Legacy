@@ -8,7 +8,7 @@ import server_browser as browser
 
 
 def packet(challenge='audit', **values):
-    info = dict(challenge=challenge, protocol='84', gamename='et', game='legacy', version='ET Legacy v2.86.0-34-g50cffc8 linux-x86_64 Oct 3 2026', pure='1',
+    info = dict(challenge=challenge, protocol='84', gamename='et', game='legacy', version='ET Legacy v2.86.0-34-g50cffc8 linux-x86_64 Oct 3 2026', pure='1', wasmModules='1',
                 hostname='^1Audit ^7server', mapname='oasis', clients='8', humans='3',
                 sv_maxclients='16', needpass='0')
     info.update(values)
@@ -27,13 +27,22 @@ class ServerInfo(unittest.TestCase):
 
     def test_older_or_unknown_versions_are_not_browser_compatible(self):
         for version in ('ET Legacy v2.84.0 linux-x86_64 May 18 2026', 'ET Legacy v2.86.0', 'ET Legacy v2.86.1', '', 'other v2.86.0', 'ET Legacy v2.8x.0', 'ET Le^1gacy v2.90.0', 'ET Legacy v2.86.0-34-g50cffc8bad'):
-            value = browser.parse_info(packet(version=version), 'audit', 0)
+            value = browser.parse_info(packet(version=version,wasmModules='0'), 'audit', 0)
             self.assertFalse(value['compatible'])
             self.assertIn('WebAssembly', value['reason'])
         for version in ('ET Legacy v2.86.0-34-g50cffc8', 'ET Legacy v2.86.0-34-g50cffc8 linux-x86_64 Oct 3 2026'):
             self.assertTrue(browser.parse_info(packet(version=version), 'audit', 0)['compatible'])
         self.assertTrue(browser.parse_info(packet(version='ET Legacy v2.86.0',pure='0'), 'audit', 0)['compatible'])
         self.assertFalse(browser.parse_info(packet(version='ET Legacy v2.86.0',pure='unknown'), 'audit', 0)['compatible'])
+
+    def test_engine_version_cannot_stand_in_for_current_pure_mod_pack(self):
+        for version in ('ET Legacy 2.86-dirty win-x64 Oct 8 2026', 'ET Legacy 2.86.0 win-x64', 'ET Legacy v2.86-dirty'):
+            self.assertTrue(browser.parse_info(packet(version=version), 'audit', 0)['compatible'])
+            self.assertFalse(browser.parse_info(packet(version=version,wasmModules='0'), 'audit', 0)['compatible'])
+        for declaration in ('', '0', 'yes', 'unknown'):
+            self.assertFalse(browser.parse_info(packet(wasmModules=declaration), 'audit', 0)['compatible'])
+        self.assertTrue(browser.parse_info(packet(version='ET Legacy v2.86.1',wasmModules='1'), 'audit', 0)['compatible'])
+        self.assertFalse(browser.parse_info(packet(version='ET Legacy v2.84.0',wasmModules='1'), 'audit', 0)['compatible'])
 
     def test_untrusted_fields_are_bounded(self):
         info = browser.parse_info(packet(hostname='^3<markup>\x01\u202e'+'a'*300, mapname='m'*200,
