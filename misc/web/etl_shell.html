@@ -258,8 +258,8 @@
 			</label>
 			<p id="mapbrief">Infiltrate the desert garrison and destroy its two anti-tank guns.</p>
 			<details id="custommaps"><summary>Custom maps &amp; assets</summary>
-				<p>Import an Enemy Territory map PK3 from your device. Imported maps are saved by the local launcher and cached in this browser when played.</p>
-				<label for="customfile">Map pack (.pk3, up to 256 MB)<input id="customfile" type="file" accept=".pk3"></label>
+				<p id="customimporthint">Checking whether this launcher supports map imports… Installed maps can still be played.</p>
+				<label for="customfile">Map pack (.pk3, up to 256 MB)<input id="customfile" type="file" accept=".pk3" aria-describedby="customimporthint" disabled></label>
 				<button id="refreshmaps" type="button">Refresh map list</button>
 				<p id="customstatus" role="status">Checking installed custom mapsâ€¦</p>
 			</details>
@@ -426,7 +426,7 @@
 	botcount.value = /^\d+$/.test(initialBots) && Number(initialBots) <= 12 ? Number(initialBots) : 4;
 	var initialDifficulty = String(optionValue('difficulty', 4));
 	difficulty.value = ['2', '4', '6'].indexOf(initialDifficulty) >= 0 ? initialDifficulty : '4';
-	var customCatalog = {version: 1, packs: [], errors: []}, catalogKnown = false, catalogBusy = false, catalogEpoch = 0, catalogRequest = null, previousBots = null;
+	var customCatalog = {version: 1, packs: [], errors: []}, catalogKnown = false, localImportAvailable = false, catalogBusy = false, catalogEpoch = 0, catalogRequest = null, previousBots = null;
 	function validCatalog(value)
 	{
 		return value && value.version === 1 && Array.isArray(value.packs) && value.packs.length <= 64 && value.packs.every(function(pack)
@@ -438,6 +438,13 @@
 				(pack.checksum == null || (Number.isInteger(pack.checksum) && pack.checksum >= -2147483648 && pack.checksum <= 2147483647)) &&
 				Array.isArray(pack.maps) && pack.maps.length <= 1024 && pack.maps.every(function(map) { return /^[a-z0-9_][a-z0-9_-]{0,63}$/.test(map); });
 		});
+	}
+	function customImportHint(fresh)
+	{
+		document.getElementById('customimporthint').textContent = localImportAvailable ?
+			'Import an Enemy Territory map PK3 from your device. Imported maps are saved by the local launcher and cached in this browser when played.' : fresh ?
+			'Map imports require direct access to the local launcher. Choose an installed map, or ask the launcher operator to add the PK3.' :
+			'Map imports need the local launcher online. Saved maps can still be played.';
 	}
 	function customStatus(text) { document.getElementById('customstatus').textContent = text; }
 	function customMapName(map) { return map.split(/[_-]+/).map(function(word) { return word === 'etl' ? 'ETL' : word.charAt(0).toUpperCase() + word.slice(1); }).join(' '); }
@@ -474,6 +481,8 @@
 			if (bootFailed || epoch !== catalogEpoch || !catalogBusy) return;
 			catalogBusy = false; catalogRequest = null;
 			var saved = false;
+			localImportAvailable = validCatalog(value) && value.localImport === true;
+			customImportHint(validCatalog(value));
 			if (!validCatalog(value)) { try { value = JSON.parse(localStorage.getItem('etl.customAssets')); saved = true; } catch (e) {} }
 			if (validCatalog(value))
 			{
@@ -481,7 +490,7 @@
 				if (!saved) try { localStorage.setItem('etl.customAssets', JSON.stringify(value)); } catch (e) {}
 			}
 			else customStatus('Custom map list unavailable. Bundled maps still work. Start the local launcher and refresh to import maps.');
-			document.getElementById('refreshmaps').disabled = loadState !== 'ready'; document.getElementById('customfile').disabled = loadState !== 'ready';
+			document.getElementById('refreshmaps').disabled = loadState !== 'ready'; document.getElementById('customfile').disabled = loadState !== 'ready' || !localImportAvailable;
 			playbtn.disabled = loadState !== 'ready'; updateOnlineJoin();
 			if (restoreRefreshFocus && document.activeElement === document.body && playMode === 'offline' && loadState === 'ready') refresh.focus();
 			if (callback) callback();
@@ -493,7 +502,7 @@
 	document.getElementById('refreshmaps').addEventListener('click', function() { if (loadState === 'ready') refreshCatalog(); });
 	document.getElementById('customfile').addEventListener('change', function()
 	{
-		if (loadState !== 'ready' || catalogBusy || !this.files || !this.files.length) return;
+		if (loadState !== 'ready' || catalogBusy || !localImportAvailable || !this.files || !this.files.length) return;
 		var file = this.files[0], input = this;
 		if (!/^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,119}\.pk3$/.test(file.name) || file.size < 22 || file.size > 268435456)
 		{ customStatus('Choose a .pk3 map pack with a simple filename, up to 256 MB.'); input.value = ''; return; }
@@ -511,9 +520,9 @@
 			if (bootFailed || epoch !== catalogEpoch || !catalogBusy) return;
 			catalogBusy = false; catalogRequest = null; input.value = '';
 			if (ok) { refreshCatalog(); return; }
-			input.disabled = loadState !== 'ready'; document.getElementById('refreshmaps').disabled = loadState !== 'ready'; playbtn.disabled = loadState !== 'ready'; updateOnlineJoin(); customStatus(message);
+			input.disabled = loadState !== 'ready' || !localImportAvailable; document.getElementById('refreshmaps').disabled = loadState !== 'ready'; playbtn.disabled = loadState !== 'ready'; updateOnlineJoin(); customStatus(message);
 		}
-		xhr.onload = function() { if (bootFailed || epoch !== catalogEpoch || !catalogBusy) return; if (xhr.status === 200) try { var result = JSON.parse(xhr.responseText); initialMap = result.installed.maps[0]; } catch (e) {} finish(xhr.status === 200, xhr.status === 409 ? 'That pack name is already installed. Rename the new pack, or choose the existing map.' : 'Import rejected. Use a valid ET map PK3 without executable mods, unsafe paths or startup settings.'); };
+		xhr.onload = function() { if (bootFailed || epoch !== catalogEpoch || !catalogBusy) return; if (xhr.status === 403) { localImportAvailable = false; customImportHint(true); } if (xhr.status === 200) try { var result = JSON.parse(xhr.responseText); initialMap = result.installed.maps[0]; } catch (e) {} finish(xhr.status === 200, xhr.status === 403 ? 'Map imports require direct access to the local launcher. Refresh the map list after opening it locally.' : xhr.status === 409 ? 'That pack name is already installed. Rename the new pack, or choose the existing map.' : 'Import rejected. Use a valid ET map PK3 without executable mods, unsafe paths or startup settings.'); };
 		xhr.onerror = xhr.ontimeout = function() { finish(false, 'Import did not finish. Start the local launcher, check the connection, then refresh the map list before retrying.'); };
 		xhr.send(file);
 	});
@@ -549,7 +558,7 @@
 		loadState = state;
 		graphicsPreset.disabled = !['ready','engine-loading'].includes(state) || joiningOnline;
 		document.getElementById('cancelload').hidden = !['cache-loading','manifest-loading','downloading','verifying'].includes(state);
-		document.getElementById('customfile').disabled = state !== 'ready' || catalogBusy;
+		document.getElementById('customfile').disabled = state !== 'ready' || catalogBusy || !localImportAvailable;
 		document.getElementById('refreshmaps').disabled = state !== 'ready' || catalogBusy;
 		document.getElementById('overlay').setAttribute('data-state', state);
 		var stage = state === 'engine-loading' ? 0 : state === 'starting' || state === 'running' ? 2 : 1;

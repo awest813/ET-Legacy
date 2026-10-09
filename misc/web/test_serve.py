@@ -64,9 +64,9 @@ class PreviewRoutes(unittest.TestCase):
         self.server_probe.stop()
         self.temp.cleanup()
 
-    def request(self, path, method="GET"):
+    def request(self, path, method="GET", headers=None):
         connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port)
-        connection.request(method, path)
+        connection.request(method, path, headers=headers or {})
         response = connection.getresponse()
         result = response.status, dict(response.getheaders()), response.read()
         connection.close()
@@ -272,11 +272,12 @@ class PreviewRoutes(unittest.TestCase):
                 archive.writestr(entry, data)
         return path
 
-    def upload(self, data, name='imported.pk3', origin=True):
+    def upload(self, data, name='imported.pk3', origin=True, extra_headers=None):
         connection = http.client.HTTPConnection('127.0.0.1', self.server.server_port)
         headers = {'X-ETL-Import':'1', 'Content-Type':'application/octet-stream'}
         if origin:
             headers['Origin'] = f'http://localhost:{self.server.server_port}'
+        headers.update(extra_headers or {})
         connection.request('POST', '/assets/import/' + name, data, headers)
         response = connection.getresponse()
         result = response.status, response.read()
@@ -361,6 +362,26 @@ class PreviewRoutes(unittest.TestCase):
         self.assertEqual(self.upload(b'invalid archive bytes' * 4,name='bad.pk3')[0],400)
         self.assertFalse(os.path.exists(os.path.join(self.custom,'etmain','bad.pk3')))
         self.assertEqual(set(os.listdir(os.path.join(self.custom,'etmain'))),{'sample.pk3','imported.pk3'})
+
+    def test_map_import_capability_and_forwarded_request_rejection(self):
+        path = self.custom_pack()
+        with open(path, 'rb') as stream:
+            data = stream.read()
+        for headers in ({'Host':'play.example.org'}, {'X-Forwarded-For':'203.0.113.8'},
+                        {'Forwarded':'for=203.0.113.8'}, {'X-Forwarded-Host':'play.example.org'},
+                        {'X-Forwarded-Proto':'https'}, {'Via':'1.1 proxy'}):
+            with self.subTest(headers=headers):
+                self.assertEqual(self.upload(data, extra_headers=headers)[0], 403,
+                                 'A proxy cannot grant a remote upload by forwarding a forged local Origin')
+                self.assertIs(json.loads(self.request('/assets/custom.json', headers=headers)[2]).get('localImport'), False)
+        for origin in (f'http://user@localhost:{self.server.server_port}',
+                       f'http://@localhost:{self.server.server_port}',
+                       'http://localhost:0',
+                       f'http://localhost:{self.server.server_port}?query',
+                       f'http://localhost:{self.server.server_port}#fragment'):
+            self.assertEqual(self.upload(data, extra_headers={'Origin':origin})[0], 403)
+        self.assertFalse(os.path.exists(os.path.join(self.custom, 'etmain', 'imported.pk3')))
+        self.assertIs(json.loads(self.request('/assets/custom.json')[2]).get('localImport'), True)
 
     def test_import_has_a_pack_count_limit(self):
         path = self.custom_pack()

@@ -3,6 +3,11 @@
 {$ETWASM_SITE} {
 	encode zstd gzip
 
+	# Device imports write to the operator's filesystem and remain local-only.
+	handle /assets/import/* {
+		respond "Map imports are available only from the local launcher." 403
+	}
+
 	# Keep complete paths: signed public server tickets use /relay/<ticket>.
 	@relay path /relay /relay/*
 	handle @relay {

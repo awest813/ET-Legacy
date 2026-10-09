@@ -3250,3 +3250,25 @@ normal launcher on 8081 was left running. Evidence:
 `latest-saved-offline-bots.png` and `latest-saved-offline-log.json`.
 This verifies local service-independent startup; public HTTPS/WSS deployment,
 Internet gameplay and physical Chromebook performance remain unverified.
+
+
+### Hosted map-import capability and proxy guard, October 9
+
+The custom-map catalog now advertises `localImport` for direct loopback access.
+The file picker stays disabled until a fresh, valid catalog explicitly permits
+imports; saved catalogs can restore installed maps but cannot authorize uploads.
+Hosted players receive guidance to choose an installed map or ask the operator to
+add a PK3. A rejected upload disables the picker until a fresh capability check.
+
+The backend rejects public Host values, forwarded requests, and malformed local
+Origins before accepting a device import. The example Caddy configuration also
+blocks `/assets/import/*`, so a forged localhost Origin cannot authorize writes
+through the public proxy. Direct local imports retain their existing validation.
+
+Validation: 91 Python tests, six JavaScript suites, the WebAssembly launcher build,
+and generated bundle verification. Live loopback Caddy checks returned
+`localImport: false` and HTTP 403 for uploads; direct backend access returned
+`localImport: true`. Browser checks confirmed the disabled hosted picker and
+operator guidance, with the local picker enabled. Public HTTPS deployment remains
+unverified. Evidence: `build_wasm/import-proxy-proof.json` and
+`build_wasm/import-hosted-ui.png`.

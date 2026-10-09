@@ -83,7 +83,7 @@ function launcher(fault = {}) {
             send() {
                 requests.push(this.url);
                 if (this.url.startsWith('assets/import/')) {
-                    this.status=200; this.responseText=JSON.stringify({installed:{maps:['sample']}});
+                    this.status=fault.importForbidden ? 403 : 200; this.responseText=JSON.stringify({installed:{maps:['sample']}});
                     if (fault.importLate) { pending.push(()=>this.onload()); return; }
                     return this.onload();
                 }
@@ -101,7 +101,7 @@ function launcher(fault = {}) {
                 }
                 if (this.url === 'assets/custom.json') {
                     this.status = fault.catalogMissing ? 503 : 200;
-                    this.responseText = JSON.stringify(fault.catalog || {version:1,packs:[],errors:[]});
+                    this.responseText = JSON.stringify({...fault.catalog || {version:1,packs:[],errors:[]},localImport:Object.hasOwn(fault,'localImport') ? fault.localImport : true});
                     if (fault.catalogLate) { pending.push(()=>this.onload()); return; }
                     return this.onload();
                 }
@@ -398,6 +398,23 @@ assert.equal(navCustom.elements.botcount.disabled,false);
 const offlineCatalog=launcher({catalogMissing:true,savedCatalog:customList,query:'?map=sample'});
 assert.equal(offlineCatalog.elements.mapselect.value,'sample');
 assert.match(offlineCatalog.elements.customstatus.textContent,/saved map list/);
+assert.equal(offlineCatalog.elements.customfile.disabled,true,'Saved catalogs cannot authorize uploads');
+for (const localImport of [false, undefined, 'true']) {
+    const hosted=launcher({catalog:customList,localImport,query:'?map=sample'});
+    assert.equal(hosted.elements.customfile.disabled,true,'Only explicit fresh server permission enables imports');
+    assert.equal(hosted.elements.mapselect.value,'sample','Installed maps remain selectable on hosted pages');
+    assert.equal(hosted.elements.playbtn.disabled,false);
+    hosted.elements.customfile.files=[{name:'sample.pk3',size:zip.length}];hosted.elements.customfile.change();
+    assert.equal(hosted.requests.some(url=>url.startsWith('assets/import/')),false);
+    assert.match(hosted.elements.customimporthint.textContent,/operator/);
+}
+const capabilityFault={localImport:false}, capabilityRefresh=launcher(capabilityFault);
+capabilityFault.localImport=true;capabilityRefresh.elements.refreshmaps.click();
+assert.equal(capabilityRefresh.elements.customfile.disabled,false,'A fresh local catalog can enable imports');
+const deniedImport=launcher({importForbidden:true});
+deniedImport.elements.customfile.files=[{name:'sample.pk3',size:zip.length}];deniedImport.elements.customfile.change();
+assert.equal(deniedImport.elements.customfile.disabled,true,'Rejected uploads require a fresh capability check');
+assert.match(deniedImport.elements.customstatus.textContent,/local launcher/);
 const badCustom=launcher({catalog:{version:1,packs:[{...extraPack,name:'../evil.pk3'}]}});
 assert.equal(badCustom.elements.mapselect.value,'oasis');
 const slowCatalog=launcher({catalog:customList,catalogLate:true});

@@ -129,19 +129,30 @@ def network_config(identity=None):
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
+    def local_import_origin(self, origin):
+        try:
+            parsed = urlsplit(origin)
+            return (parsed.scheme == 'http' and parsed.hostname in ('localhost', '127.0.0.1', '::1') and
+                    (80 if parsed.port is None else parsed.port) == self.server.server_port and
+                    parsed.username is None and parsed.password is None and
+                    not (parsed.path or parsed.query or parsed.fragment) and
+                    self.client_address[0] in ('127.0.0.1', '::1') and
+                    self.server.server_address[0] in ('127.0.0.1', '::1'))
+        except ValueError:
+            return False
+
+    def local_import_available(self):
+        # A reverse proxy is a loopback peer too. Neither a forged local Origin
+        # nor forwarded client metadata can authorize writes through that proxy.
+        forwarded = ('Forwarded', 'Via', 'X-Forwarded-For', 'X-Forwarded-Host', 'X-Forwarded-Proto')
+        return (not any(name in self.headers for name in forwarded) and
+                self.local_import_origin('http://' + self.headers.get('Host', '')))
+
     def do_POST(self):
         # Import is local only and requires the exact page origin plus a custom
         # header. Cross-origin forms and arbitrary remote clients cannot write.
-        origin = self.headers.get('Origin', '')
-        parsed = urlsplit(origin)
-        try:
-            allowed = (parsed.scheme == 'http' and parsed.hostname in ('localhost', '127.0.0.1', '::1') and
-                       parsed.port == self.server.server_port and not parsed.path and
-                       self.client_address[0] in ('127.0.0.1', '::1') and
-                       self.server.server_address[0] in ('127.0.0.1', '::1') and
-                       self.headers.get('X-ETL-Import') == '1')
-        except ValueError:
-            allowed = False
+        allowed = (self.local_import_available() and self.local_import_origin(self.headers.get('Origin', '')) and
+                   self.headers.get('X-ETL-Import') == '1')
         if not allowed:
             self.send_error(403, 'Import is available only from the local launcher')
             return
@@ -300,7 +311,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             try:
                 value = custom_catalog()
                 if path == '/assets/custom.json':
-                    return self.send_json(value)
+                    return self.send_json(dict(value, localImport=self.local_import_available()))
                 for entry in value['packs']:
                     expected = '/assets/custom/' + entry['game'] + '/' + entry['sha256'] + '/' + entry['name']
                     if path == expected:
