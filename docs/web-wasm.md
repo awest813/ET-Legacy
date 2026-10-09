@@ -2382,3 +2382,37 @@ custom 76 FPS cap. Evidence: `startup-graphics-customization.png` and
 `startup-graphics-customization-log.json`. The final bundle's seven local and
 served hashes match (`startup-graphics-bundle-hashes.json`). The temporary test
 tab and HTTP service were cleaned up; the existing bot-round tabs were retained.
+
+## Final graphics bundle offline validation (October 9, 2026)
+
+A fresh browser tab cold-started the final saved launcher on
+`http://127.0.0.1:8083/` with that origin's HTTP service stopped. Socket checks
+before and after play confirmed 8083 unavailable; the separate regular preview
+and relay on 8081/8082 remained running. This verifies an unavailable app origin,
+not an entire device disconnected from the internet.
+
+The cached custom catalog and ETL Supply loaded with four Hard bots. All four
+joined and rejoined after warmup. A human joined Allies as Medic through Limbo,
+moved and fired during the active round (Thompson ammunition 30 to 27). The
+render canvas retained the saved low-power 960x540 dimensions. App & offline
+reported offline readiness; fullscreen entered and exited with controls visible.
+End match and return loaded the cached launcher and preserved the custom-map
+inventory, four bots and Hard difficulty. Graphics defaulted to saved settings.
+
+Selecting Balanced and stock Radar while the origin remained unavailable
+started another cached match with four bots at actual 1280x720. The native
+System menu confirmed High textures, trilinear/4x filtering, single-pass lights,
+shadows and detailed sky enabled, low-quality sky disabled, and a 60 FPS cap.
+All four Radar bots joined. This is startup and settings integration evidence;
+it does not establish a complete Radar round with this final bundle.
+
+Evidence in `build_wasm`: `final-graphics-offline-origin.json`,
+`final-graphics-offline-after-play.json`, `final-graphics-offline-ready.png`,
+`final-graphics-offline-fullscreen.png`,
+`final-graphics-offline-custom-active.png`,
+`final-graphics-offline-custom-active-log.json`,
+`final-graphics-offline-return.png`,
+`final-graphics-offline-stock-settings.png` and
+`final-graphics-offline-stock-log.json`. Launcher, PWA UI and worker regression
+suites pass against the current source. Public compatible hosting and physical
+Chromebook/mobile/browser checks remain outstanding.
