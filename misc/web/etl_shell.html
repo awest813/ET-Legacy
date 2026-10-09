@@ -1279,7 +1279,8 @@
 	var closehelp = document.getElementById('closehelp');
 	var canvasDoc = Module.canvas.ownerDocument || document;
 	var inputMode = 3, resetInput = false, capturePending = false, captureError = '', captureTimer = null, captureEpoch = 0;
-	var dragFallback = false, draggingAim = false;
+	var dragFallback = false, draggingAim = false, nativeMouseButtons = 0;
+	function mouseButtonBit(event) { return Number.isInteger(event.button) && event.button >= 0 && event.button <= 4 ? 1 << event.button : 0; }
 	var audioContext = null, audioProcessor = null, audioGain = null, audioTarget = -1;
 	var audioGraphError = '', audioError = '', audioEpoch = 0, audioResume = null, audioStateListener = null, audioPageHidden = false;
 	var soundMuted = false, soundVolume = 0.8, soundLastVolume = 0.8;
@@ -1472,6 +1473,7 @@
 		updateAudio();
 		var flags = (focused ? 1 : 0) | (locked ? 2 : 0) | (resetInput ? 4 : 0) | (focused && draggingAim ? 8 : 0) |
 			(focused && mode === 0 && dragFallback ? 16 : 0);
+		if (resetInput) nativeMouseButtons = 0;
 		resetInput = false;
 		return flags;
 	};
@@ -1497,9 +1499,10 @@
 			if (event.button === 2) { draggingAim = true; event.preventDefault(); event.stopImmediatePropagation(); return; }
 			// Capture denial must not prevent stationary shots. The toolbar
 			// remains the explicit way to retry capture while fallback is active.
-			if (event.button === 0 || draggingAim) return;
+			if (event.button === 0 || draggingAim) { nativeMouseButtons |= mouseButtonBit(event); return; }
 		}
-		if (inputMode === 0 && !mouseLocked() && !(Module['browserTouch'] && Module['browserTouch'].enabled())) { event.preventDefault(); event.stopImmediatePropagation(); captureMouse(); }
+		if (inputMode === 0 && !mouseLocked() && !(Module['browserTouch'] && Module['browserTouch'].enabled())) { event.preventDefault(); event.stopImmediatePropagation(); captureMouse(); return; }
+		nativeMouseButtons |= mouseButtonBit(event);
 	}, true);
 	function audioGesture() { Module.canvas.focus(); resumeAudio(); }
 	Module['browserTouchGesture'] = function() { releaseMouse(); audioGesture(); };
@@ -1541,13 +1544,19 @@
 	{
 		if (event.target !== Module.canvas) event.stopImmediatePropagation();
 	}, true);
-	// SDL's document mouse listeners must not consume toolbar/dialog gestures.
+	// SDL's document mouseup must receive releases of canvas presses, even when
+	// the pointer leaves the game. Other toolbar/dialog gestures stay isolated.
 	['mousedown', 'mouseup', 'mousemove', 'wheel'].forEach(function(type)
 	{
 		window.addEventListener(type, function(event)
 		{
-			if (event.target === Module.canvas) return;
-			if (type === 'mouseup') stopDragAim();
+			var bit = mouseButtonBit(event);
+			if (event.target === Module.canvas) { if (type === 'mouseup') nativeMouseButtons &= ~bit; return; }
+			if (type === 'mouseup')
+			{
+				stopDragAim();
+				if (nativeMouseButtons & bit) { nativeMouseButtons &= ~bit; return; }
+			}
 			event.stopImmediatePropagation();
 		}, true);
 	});

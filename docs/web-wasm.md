@@ -3074,3 +3074,25 @@ disabled, without an uncaught error. This tests Chromium sandbox restrictions,
 not Firefox/Safari private-mode behavior. Evidence:
 `build_wasm/recovery-unregistered.png` and `recovery-restricted-browser.png`.
 Temporary test tabs and their local services were closed.
+
+## Mouse releases outside the game (October 9, 2026)
+
+The shell now tracks mouse presses delivered to the native canvas. A matching
+release outside the canvas reaches SDL's document-level mouseup listener;
+other toolbar/dialog mouse events remain isolated. A release on the canvas
+consumes the tracked press, and native input reset discards tracking. This
+prevents held firing after an outside release without clearing movement keys.
+
+The launcher regression failed before the change and passes afterward,
+including outside release, unrelated toolbar release, canvas release and
+focus reset. Launcher, touch, network, PWA worker and fullscreen checks passed;
+the rebuilt browser bundle and module/archive identities verified.
+
+Live Chromium loaded Radar with zero bots in a same-origin test frame whose
+sandbox denied pointer lock. Capture reported its fallback guidance. An Axis
+Soldier's firing drag began inside the canvas and ended in the surrounding
+margin, consuming two MP40 rounds (30/60 to 28/60). Ammunition remained 28/60
+as warmup counted from 20 to 6 seconds, confirming release stopped firing.
+This is a desktop browser mouse check during warmup, not a bot-combat or
+physical mobile test. Evidence: `build_wasm/outside-mouse-release.png`,
+`outside-mouse-release-stable.png` and `outside-mouse-live-log.json`.
