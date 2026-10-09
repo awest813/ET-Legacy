@@ -3160,3 +3160,36 @@ across reload. Evidence: `build_wasm/pack-checkpoint-later-failure.png`,
 `pack-checkpoint-recovered-radar.png`, `pack-checkpoint-request-counts.json`
 and `pack-checkpoint-live-log.json`. This verifies desktop-browser recovery
 and warmup startup, not a completed match or physical mobile storage behavior.
+
+## Current-build local online/offline integration (October 9, 2026)
+
+The local browser build at 41b5573 joined a fresh pure Radar server using a
+package made from its exact published modules. A second client used a separate
+localhost origin and player identity. Both joined; the peer followed the first
+player's movement and saw the same firing result, MP40 ammunition changing
+from 30/60 to 23/60. Background-browser capture was denied, so this exercised
+the supported mouse fallback. It does not prove remote Internet latency or
+physical two-device multiplayer.
+
+The first client used Chromebook / Low power graphics and an actual 960×540
+canvas. Disconnect followed by Retry reached Online again while the peer
+remained connected. Native events record the original two clients and the
+first client's reconnect, with ClientConnect at 169150 and ClientBegin at
+174300. Returning to the launcher then started cached Oasis with four Normal
+bots; the saved 960×540 graphics persisted.
+
+Evidence: `build_wasm/latest-online-chromebook-start.png`,
+`latest-online-player-firing.png`, `latest-online-peer-follow.png`,
+`latest-online-reconnected.png`, `latest-online-client-log.json`,
+`latest-online-peer-log.json`, `latest-online-native-events.json` and
+`latest-online-to-offline.png`.
+
+After closing the peer, the isolated native server, HTTP server and relay were
+stopped. Process and listener checks returned zero for the fixture. The saved
+PWA then reloaded, started Oasis from IndexedDB using its saved manifest, and
+initialized all four bots at 960×540 with no fixture services running. The
+normal launcher on 8081 was left running. Evidence:
+`build_wasm/latest-online-offline-service-evidence.json`,
+`latest-saved-offline-bots.png` and `latest-saved-offline-log.json`.
+This verifies local service-independent startup; public HTTPS/WSS deployment,
+Internet gameplay and physical Chromebook performance remain unverified.
