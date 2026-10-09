@@ -61,6 +61,13 @@ async function installBundle(repair = false, progress) {
  const cache = await caches.open(CACHE), total = CORE.reduce((sum, entry) => sum + entry.size, 0);
  let completed = 0, highest = 0;
  try {
+  const previous = [];
+  if (!repair) {
+   const keys = (await caches.keys()).filter(key => key.startsWith(PREFIX) && key !== CACHE).reverse().slice(0, 8);
+   for (const key of keys) {
+    try { previous.push(await caches.open(key)); } catch (error) { /* Evicted old caches cannot block an update. */ }
+   }
+  }
   for (const entry of CORE) {
    const advancing = loaded => {
     const value = completed + loaded;
@@ -70,6 +77,17 @@ async function installBundle(repair = false, progress) {
     const saved = await cache.match(absolute(entry.url));
     try { if (await verifiedResponse(saved, entry)) { advancing(entry.size); completed += entry.size; continue; } }
     catch (error) { /* Unreadable saved bytes must be downloaded and verified again. */ }
+   }
+   if (!repair) {
+    let reused = false;
+    for (const older of previous) {
+     let saved;
+     try { saved = await older.match(absolute(entry.url)); if (!await verifiedResponse(saved, entry)) continue; }
+     catch (error) { continue; }
+     // Copy verified bytes into the staged version; never edit the active cache.
+     await cache.put(absolute(entry.url), saved); reused = true; break;
+    }
+    if (reused) { completed += entry.size; continue; }
    }
    const response = await fetch(absolute(entry.url), {cache:'reload', credentials:'same-origin'});
    if (!await verifiedResponse(response, entry, progress ? advancing : null)) throw Error('App download failed or bundle changed');

@@ -3386,3 +3386,11 @@ screenshot window was missed; transfer duration and successful recovery provide
 the live evidence. Artifacts: `build_wasm/pwa-progress-transfer.json`,
 `build_wasm/pwa-progress-live.log`, `build_wasm/pwa-progress-repaired.png`, and
 `build_wasm/pwa-progress-service-tests.log`. Temporary server and tab were closed.
+
+### Verified cached-file reuse during app updates (2026-10-09)
+
+New worker installs reuse unchanged core files from up to eight previous caches in the same app scope. Each response must match the new bundle byte size and SHA-256 before it is copied into the separately staged cache. Changed, missing, corrupt or unreadable files are downloaded and checked normally. Failed installs remove the staged cache and leave the installed cache untouched.
+
+The worker regression previously downloaded all seven files for a launcher-only update; it now downloads only the changed launcher. Tests also cover a failed update preserving the old cache and another app scope being excluded. All six JavaScript suites, generated JavaScript parsing, the browser build and seven-file/two-module bundle verification passed.
+
+A fresh loopback browser fixture installed the previous worker, published the new worker with all seven core hashes unchanged, displayed Update ready, and applied Reload to update. It then showed App saved. The server log recorded zero core-file GETs after publication, including the reload (only worker checks and live custom catalog requests). Evidence: build_wasm/pwa-update-reuse-request-proof.json, pwa-update-reuse-live.log and pwa-update-reuse-saved.png. This verifies a worker-only update on Chromium; it does not establish public HTTPS deployment or other-browser behavior.
