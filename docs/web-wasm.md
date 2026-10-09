@@ -2469,3 +2469,39 @@ flow on one origin. It rejoined the pure ETL Supply server, retained Balanced's
 Filtered native handshake events are `build_native/fixture/restart-recovery-events.json`.
 Both temporary clients and the isolated HTTP/relay/server processes were stopped
 after verification; the regular preview services were left running.
+
+## Browser HUD editor pointer mapping (October 9, 2026)
+
+The HUD editor shrinks its rendered canvas to leave room for side and bottom
+controls. Browser absolute mouse coordinates now follow its expanded virtual
+grid, and panel hit testing receives the updated cursor immediately. Ordinary
+UI, Limbo and fullscreen editor coordinates retain their existing scale.
+Previously, clicking Clone could select a world HUD component instead.
+
+`misc/web/test_menu_mouse.py` compiles the production client/cgame coordinate
+functions and covers side/bottom panels, immediate clicks, fullscreen mode,
+three resolutions, UI priority and invalid-size/no-catcher gates. It passes,
+along with the input-focus regression and browser/native cgame builds. All seven
+local and served bundle hashes match the service-worker manifest
+(`build_wasm/hud-mouse-bundle-hashes.json`). The matching controlled-server
+module pack was rebuilt with checksum 168848376; it is a local test artifact.
+
+Live Chromium testing activated the rebuilt bundle through App & offline.
+At Balanced 1280x720, holding Clone created an editable HUD, selecting FPS in
+the bottom list selected the intended component, and its side-panel Visible
+checkbox enabled the counter. Fullscreen editor component selection and return
+worked, followed by exiting the editor and clicking Cancel in ordinary Limbo.
+Evidence: `build_wasm/hud-mouse-editor-fixed.png`. The displayed FPS is a brief
+spot check, not a sustained performance benchmark.
+
+The asset audit passed for 5,162 entries. A separate Gold Rush match with twelve
+Hard bots, six per team, is still in progress with a human spectator. Bots
+repaired/stole the tank and destroyed both tank barriers; complete gold theft,
+truck escape and round completion are not yet established. Progress is saved
+in `build_wasm/goldrush-round-progress.png` and its companion log JSON.
+A short 499-frame CPU timing sample had median 4 ms, p95 5 ms and maximum 9 ms;
+it excludes GPU/display time and overlapped asset auditing. It is not a full
+round or physical-device benchmark. Raw sample and summary are in
+`build_wasm/goldrush-balanced-frame-sample.json` and
+`goldrush-balanced-frame-summary.json`. Public compatible hosting and physical
+device/browser validation remain outstanding.

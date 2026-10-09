@@ -807,9 +807,18 @@ void CG_MouseEvent(int x, int y)
 #ifdef __EMSCRIPTEN__
 void CG_WebMousePosition(int x, int y)
 {
+	// The editor scales its canvas to leave room for side/bottom controls.
+	// Absolute browser positions must use the same expanded virtual grid.
+	if (cg.editingHud && !cg.fullScreenHudEditor)
+	{
+		x = (int)(x * HUD_EDITOR_SIZE_COEFF);
+		y = (int)(y * HUD_EDITOR_SIZE_COEFF);
+	}
+	CG_MouseEvent(x - cgs.cursorX, y - cgs.cursorY);
+	// Button events can immediately follow motion in the same SDL poll.
+	// Panel hit testing must see the new position, including any clamping.
 	cgDC.cursorx = cgs.cursorX;
 	cgDC.cursory = cgs.cursorY;
-	CG_MouseEvent(x - cgs.cursorX, y - cgs.cursorY);
 }
 #endif
 
