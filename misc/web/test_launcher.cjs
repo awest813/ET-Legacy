@@ -645,6 +645,7 @@ assert.ok(publicUI.requests.includes('network/config.json?server='+publicEntries
 assert.equal(publicUI.context.selectedServerId,publicEntries[1].id);
 publicUI.elements.serverfilter.value='no matches'; publicUI.elements.serverfilter.input();
 assert.equal(publicUI.context.renderPublicList(),0);
+assert.match(publicUI.elements.publicstatus.textContent,/No servers match this search.*Clear the search/);
 assert.equal(publicUI.elements.publicserver.value,publicEntries[1].id,'Filtering preserves the selected destination');
 publicUI.elements.publicserver.focus();
 const pickerOptions=publicUI.elements.publicserver.children.length;
@@ -653,6 +654,27 @@ assert.equal(publicUI.elements.publicserver.children.length,pickerOptions,'Backg
 publicUI.context.document.activeElement=publicUI.elements.serverfilter;publicUI.elements.publicserver.blur();
 assert.ok(publicUI.elements.publicserver.children.length>pickerOptions,'Leaving the picker applies the latest public options');
 assert.equal(publicUI.elements.publicserver.value,publicEntries[1].id);
+for (const status of ['checking','ready','unavailable']) {
+    const page=launcher({publicCatalog:{...publicCatalog,status,servers:[],checked:status==='checking'?2:5}});
+    page.elements.onlinebtn.click();
+    const before=page.elements.publicstatus.textContent;
+    page.elements.serverfilter.value='oasis';page.elements.serverfilter.input();
+    assert.equal(page.elements.publicstatus.textContent,before,'Search preserves empty-catalog scan/error status');
+    assert.match(before,status==='checking'?/2\/5 checked.*Checking/:status==='ready'?/No browser-compatible public servers found.*5\/5 checked.*Native-only/:/master is unavailable.*No recent compatible/);
+}
+const scanProgress=launcher({publicCatalog:{...publicCatalog,status:'checking',checked:3}});
+scanProgress.elements.onlinebtn.click();scanProgress.elements.serverfilter.value='no match';scanProgress.elements.serverfilter.input();
+assert.match(scanProgress.elements.publicstatus.textContent,/3\/5 checked.*Checking.*Clear the search/);
+const stalePublic=launcher({publicCatalog:{...publicCatalog,status:'unavailable'}});
+stalePublic.elements.onlinebtn.click();stalePublic.elements.serverfilter.value='no match';stalePublic.elements.serverfilter.input();
+assert.match(stalePublic.elements.publicstatus.textContent,/master is unavailable.*Recent verified.*Clear the search/);
+const refreshPublicFault={publicCatalog},refreshPublicUI=launcher(refreshPublicFault);
+refreshPublicUI.elements.onlinebtn.click();refreshPublicFault.publicFailure=true;refreshPublicUI.elements.refreshpublic.click();
+refreshPublicUI.elements.serverfilter.value='no match';refreshPublicUI.elements.serverfilter.input();
+assert.match(refreshPublicUI.elements.publicstatus.textContent,/Could not refresh.*last list.*Clear the search/);
+assert.equal(refreshPublicUI.context.publicEntries.length,2,'Refresh failure retains the last validated list');
+refreshPublicFault.publicFailure=false;refreshPublicUI.elements.refreshpublic.click();
+assert.doesNotMatch(refreshPublicUI.elements.publicstatus.textContent,/Could not refresh/,'A successful retry clears the error');
 const publicLate=launcher({publicCatalog,publicLate:true}); publicLate.elements.onlinebtn.click();
 publicLate.elements.refreshpublic.click();assert.equal(publicLate.requests.filter(url=>url==='network/servers.json').length,1,'Simultaneous refresh shares the pending request');
 publicLate.elements.offlinebtn.click();publicLate.pending.shift()();

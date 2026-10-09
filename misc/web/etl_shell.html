@@ -352,6 +352,7 @@
 	var playMode = 'offline', onlineConfigured = false, onlineRequest = null, onlineEpoch = 0, joiningOnline = false;
 	var checkingOnline = false, retryingOnline = false;
 	var publicEnabled = false, publicEntries = [], publicRequest = null, publicTimer = null, publicEpoch = 0, publicBusy = false, selectedServerId = '', selectedServerLabel = '';
+	var publicCatalogState = null, publicListFailed = false;
 	var serverCompatible = true, serverPasswordRequired = false, serverVerified = false;
 	var bootFailed = false;
 	var cacheEnabled = false;
@@ -854,6 +855,20 @@
 		controlAttribute(select, 'aria-describedby', 'publicstatus');
 		return shown;
 	}
+	function publicListStatus(shown)
+	{
+		var filtered = !!document.getElementById('serverfilter').value.trim();
+		var count = shown + ' matching compatible server' + (shown === 1 ? '' : 's');
+		var searchHelp = filtered && !shown && publicEntries.length ? ' No servers match this search. Clear the search to see all compatible servers.' : '';
+		if (publicListFailed) return 'Could not refresh the public list. Try again or play offline. ' + count + ' from the last list.' + searchHelp;
+		var value = publicCatalogState;
+		if (!value) return 'Discovering public servers…';
+		if (value.status === 'unavailable') return 'The public master is unavailable. ' + (publicEntries.length ? 'Recent verified servers are shown; retry later. ' + count + '.' + searchHelp : 'No recent compatible servers are available. Retry later or play offline.');
+		var progress = value.checked + '/' + value.total + ' checked';
+		if (value.status === 'checking') return count + ' · ' + progress + ' · Checking…' + searchHelp;
+		if (!publicEntries.length) return 'No browser-compatible public servers found · ' + progress + '. Refresh later or play offline. Native-only servers cannot run this browser client.';
+		return count + ' · ' + progress + '. Refreshes at most once a minute.' + searchHelp;
+	}
 	function loadPublicServers()
 	{
 		if (!publicEnabled || publicBusy || joiningOnline || bootFailed || playMode !== 'online' || !['ready','engine-loading'].includes(loadState)) return;
@@ -864,7 +879,8 @@
 		{
 			if (epoch !== publicEpoch || bootFailed) return;
 			publicRequest = null; publicBusy = false; updateOnlineJoin();
-			controlText(document.getElementById('publicstatus'), 'Could not refresh the public list. Try again, use the launcher default, or play offline.');
+			publicListFailed = true;
+			controlText(document.getElementById('publicstatus'), publicListStatus(renderPublicList()));
 		}
 		xhr.onload = function()
 		{
@@ -883,17 +899,16 @@
 						!Number.isInteger(info.latencyMs) || info.latencyMs < 0 || info.latencyMs > 10000) throw new Error('Invalid server entry');
 					ids[entry.id] = true;
 				});
-				publicEntries = value.servers; var shown = renderPublicList();
+				publicEntries = value.servers; publicCatalogState = value; publicListFailed = false; var shown = renderPublicList();
 				publicRequest = null; publicBusy = false; updateOnlineJoin();
-				controlText(document.getElementById('publicstatus'), value.status === 'unavailable' ? 'The public master is unavailable. Recent verified servers are shown; retry later.' :
-					shown + ' matching compatible server' + (shown === 1 ? '' : 's') + ' · ' + value.checked + '/' + value.total + ' checked' + (value.status === 'checking' ? ' · Checking…' : '. Refreshes at most once a minute.'));
+				controlText(document.getElementById('publicstatus'), publicListStatus(shown));
 				if (value.status === 'checking') publicTimer = setTimeout(loadPublicServers, 2000);
 			} catch (error) { failed(); }
 		};
 		xhr.onerror = failed; xhr.ontimeout = failed; xhr.send();
 	}
 	document.getElementById('serverfilter').addEventListener('input', function() {
-		var shown = renderPublicList(); controlText(document.getElementById('publicstatus'), shown + ' matching compatible server' + (shown === 1 ? '' : 's') + '.');
+		var shown = renderPublicList(); controlText(document.getElementById('publicstatus'), publicListStatus(shown));
 	});
 	document.getElementById('publicserver').addEventListener('change', function() {
 		if (joiningOnline || checkingOnline) return;

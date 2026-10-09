@@ -2314,3 +2314,33 @@ zero kills, deaths, damage given and score. Evidence:
 reached its normal result without human combat assistance, not that the Allies
 completed Oasis's attacking objective chain. This preserved match predates the
 graphics preset build, so it is not a full-round preset performance test.
+The same match then left intermission automatically, rejoined all twelve bots
+and reached active combat in the next round. Native log entries show the
+Oasis restart at 1982150 and twelve bot entries at 1983000. Evidence:
+`oasis-balanced-next-round.png` and `oasis-balanced-next-round-log.json`.
+
+## Public discovery status and search (October 9, 2026)
+
+Searching the public list previously replaced scan progress and discovery
+errors with a bare matching-server count. The launcher now retains the latest
+validated scan state across search edits. It distinguishes an ongoing scan,
+no browser-compatible servers, a search with no matches, an unavailable master
+with or without recent entries, and an HTTP refresh failure. Failed refreshes
+retain the last verified list; a successful retry clears the error. Empty-list
+guidance offers refresh/offline play rather than suggesting a launcher default
+that may itself be incompatible. Selection and compatibility gates are intact.
+
+The launcher regression suite covers each state, search during a scan or error,
+stale-list retention and successful retry. The browser build and emitted-script
+parsing pass. Live public scans checked 412/412 and then 414/414 servers, finding zero eligible
+browser-compatible entries; searching for Oasis preserved the scan progress
+and final empty-list explanation. The configured default also reported an
+unverified native build and Join remained disabled. This is discovery and
+compatibility-gate verification, not public online gameplay proof.
+The final bundle's seven local/served hashes match
+(`build_wasm/public-status-bundle-hashes.json`). After stopping only the
+temporary test HTTP service, Refresh public list displayed a real network
+failure; editing the search to Radar retained that error. The regular launcher,
+relay and bot matches were left running. Evidence:
+`build_wasm/public-status-live-empty.png`, `public-status-live-empty-ax.txt`,
+`public-status-live-failure.png` and `public-status-live-failure-ax.txt`.
