@@ -166,7 +166,7 @@
 	 * the controls their own space below the aspect-correct game view. */
 	@media (max-width: 600px) and (orientation: portrait) {
 		body[data-touch="true"] #wrap { align-items: flex-start; }
-		body[data-touch="true"] #canvas { max-height: calc(100% - 196px); }
+		body[data-touch-playing="true"] #canvas { max-height: calc(100% - 196px); }
 		body[data-touch="true"] #touchmove { bottom: max(24px, env(safe-area-inset-bottom)); }
 		body[data-touch="true"] #touchbuttons { bottom: max(16px, env(safe-area-inset-bottom)); }
 	}

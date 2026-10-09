@@ -27,6 +27,7 @@
    toggle.setAttribute('aria-pressed', String(enabled));
    doc.body.setAttribute('data-touch', String(enabled));
    layer.hidden = !enabled || !running || mode !== 0;
+   doc.body.setAttribute('data-touch-playing', String(!layer.hidden));
    tools.hidden = !enabled || !running || mode === 3;
    [tools, layer].forEach(function(parent) { parent.querySelectorAll('[data-touch-action]').forEach(function(button) {
     var action = Number(button.getAttribute('data-touch-action'));
