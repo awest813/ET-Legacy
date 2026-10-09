@@ -2696,7 +2696,12 @@ int64_t Com_EventLoop(void)
 			if (consoleButtonWasPressed)
 			{
 				consoleButtonWasPressed = qfalse;
+#ifndef __EMSCRIPTEN__
 				break;
+#endif
+				// Browser SDL already filters console-key text. Composition or
+				// inserted text can arrive without another SE_KEY, so preserving
+				// its first character is necessary (including command prefixes).
 			}
 #endif
 			CL_CharEvent(ev.evValue);

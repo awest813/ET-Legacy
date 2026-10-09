@@ -2621,3 +2621,54 @@ Evidence: `build_wasm/module-identity-online-play.png`,
 `build_native/fixture/module-identity-info.json` /
 `module-identity-native-events.json`. This verifies controlled local pure-server
 play; it does not establish public hosting or physical Chromebook behavior.
+
+## Console text insertion (October 9, 2026)
+
+Opening the browser console and inserting `/bot rollcall` without a key event
+lost its first slash, turning the diagnostic into chat. SDL had already removed
+the console-key text, but the engine also discarded the next character event.
+Browser character dispatch now clears that redundant suppression without
+discarding inserted text. Existing console-key character filtering remains
+active, and desktop dispatch retains its previous behavior.
+
+Compiled production event-dispatch and character-handler fixtures pass for
+browser and desktop configurations: slash prefixes, Unicode character events,
+ordinary text, and filtered grave/tilde/UK console characters. The input-focus
+fixture also passes. The browser build and all seven served bundle hashes pass.
+Live Chromium reproduced the missing prefix in the previous Gold Rush build;
+a separate fresh Radar session with the fixed build preserved the first slash
+and executed `/echo console-text-probe` immediately after opening the console.
+This checks browser text insertion; physical IME/device coverage remains open.
+
+Evidence: `build_wasm/console-text-prefix-before.png`,
+`console-text-prefix-fixed.png`, `console-text-browser-log.json`,
+`console-text-build.log`, and `console-text-hashes.json`. The isolated Radar tab
+and port 8085 preview were closed after verification.
+
+## Continuous Gold Rush bot round (October 9, 2026)
+
+A new continuous Gold Rush round completed with twelve Hard bots (six per team)
+and the human spectating throughout the 30-minute map clock. Axis won. The
+results list all twelve bots; detailed stats show 263 Axis kills and 178 Allied
+kills. The human spectator has zero kills, deaths, shots, and XP, with no team
+play. Spectator follow commands and read-only bot diagnostics did not change
+the match's objectives or teams.
+
+Captured objective events include tank repair at 130450, theft at 133550,
+destruction of Tank Barrier #1 at 253400, and another tank repair at 567400.
+Later diagnostics found Allied engineers selecting `BUILD_Tank` and Axis bots
+defending the second barrier. Follow views showed movement and combat near the
+damaged tank. This verifies sustained gameplay and a defensive full-round
+outcome, not the complete Allied attack chain: the second barrier/bank/gold/
+truck chain remains unproven in this run. The round used build `b8261da`; its
+bot scripts, navigation, gameplay modules, and renderer are unchanged by the
+subsequent pure-module and console-text fixes.
+
+Evidence: `build_wasm/goldrush-oct9-full-round-result.png`,
+`goldrush-oct9-full-round-stats.png`, and
+`goldrush-oct9-objective-round-log.json` (merged bounded console snapshots from
+initial startup through the result).
+The automatic next-round load rendered Gold Rush again; all twelve bots emitted
+new game-entry events at 1922000 and the next warmup appeared normally. Evidence:
+`build_wasm/goldrush-oct9-next-round.png` and
+`goldrush-oct9-next-round-log.json`.
