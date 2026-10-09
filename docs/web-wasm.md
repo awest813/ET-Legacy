@@ -2867,6 +2867,33 @@ The victory screen was not captured. Evidence:
 `fueldump-undefended-objective-log.json`, and
 `fueldump-undefended-next-round-playing.png`.
 
+## SDL console text and player/bot interaction (October 9, 2026)
+
+A hands-on Radar session with twelve Hard bots exposed another first-character
+loss before the existing console event-dispatch fix: SDL discarded text while
+its last recorded key was the console toggle. Browser inserted/composition text
+can arrive without a replacement keydown. The browser SDL path now accepts that
+text and filters only the held toggle's own characters. Desktop suppression
+and the browser focus gate remain unchanged.
+
+The expanded compiled fixture extracts the production SDL text handler as well
+as console dispatch. It failed before the change and passes afterward for the
+first slash, Unicode insertion, toggle filtering, focus denial and desktop
+behavior. A rebuilt engine on a fresh localhost origin executed `/bind SPACE`
+as its first console command, then `/echo café中` after closing and reopening
+the console. Both command prefixes and Unicode bytes were preserved in the log;
+the stock console font does not render every Unicode glyph. Browser build,
+generated-code/bundle integrity and input-focus checks passed.
+
+The preceding player-controlled Hard-bot session verified Axis Soldier spawning,
+touch camera turning, stair movement, one-shot touch firing (30 to 29 rounds),
+enemy Thompson/flamethrower damage, wounded-player presentation and bot medic
+interaction. A screenshot captured the explicit `[BOT]Cledus` revival message
+and 95 HP during warmup. The live round also returned to first-person play after
+being wounded. This short session does not prove sustained touch firing, player
+hit accuracy, physical multitouch support or a complete human-played round.
+No cheats were used. Temporary test tabs were closed and touch mode restored.
+
 ## PWA update guard scope (October 9, 2026)
 
 The service worker's uncontrolled-client inventory includes unrelated pages

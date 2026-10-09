@@ -1546,7 +1546,9 @@ static void IN_ProcessEvents(void)
 #ifdef __EMSCRIPTEN__
 			if (!(webInputFlags & 1)) { break; }
 #endif
+#ifndef __EMSCRIPTEN__
 			if (lastKeyDown != CONSOLE_KEY)
+#endif
 			{
 				char *c = e.text.text;
 
@@ -1587,6 +1589,12 @@ static void IN_ProcessEvents(void)
 					{
 						if (IN_IsConsoleKey(0, utf32))
 						{
+#ifdef __EMSCRIPTEN__
+							// Browser composition/inserted text can arrive without a
+							// new keydown. Filter only the held console key's own text,
+							// rather than dropping the first command character too.
+							if (lastKeyDown == CONSOLE_KEY) { continue; }
+#endif
 							Com_QueueEvent(lasttime, SE_KEY, CONSOLE_KEY, qtrue, 0, NULL);
 							Com_QueueEvent(lasttime, SE_KEY, CONSOLE_KEY, qfalse, 0, NULL);
 						}
