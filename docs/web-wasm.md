@@ -21,7 +21,7 @@ physical Chromebook frame rates have not been established.
 Public HTTPS/WSS deployment and Internet gameplay remain unverified. GitHub
 reported no deployments or Pages site for this repository during the October 9
 check. A deployment host and DNS name are still needed for that test. The latest
-public scan checked 412 entries and found none with verified compatibility for
+public scan checked 409 entries and found none with verified compatibility for
 this static browser build. Local multiplayer success does not establish that
 an arbitrary public ET server can accept the browser's module identities.
 
@@ -3468,3 +3468,10 @@ Toolbar layouts now preserve the top safe area at normal, narrow and compact tou
 A controlled Chromium fixture substituted top=47, right=44, bottom=34 and left=0 pixels into the served safe-area expressions. At 390x500, the previous compact toolbar began at y=4 and its rightmost button reached x=363.390625, outside the simulated safe right edge x=346. The rebuilt toolbar began at y=47 with all visible buttons within the safe edges. The launcher padding changed from fixed narrow-screen values to top=47/right=44/bottom=34/left=16. At 844x390, compact touch and regular mouse-mode toolbar buttons also remained within the simulated safe edges. These deliberately combined insets test the layout calculations; they do not establish physical phone behavior or PWA installation (the fixture modifies HTML).
 
 Browser build, generated JavaScript parsing, all six JavaScript suites and seven-file/two-module bundle verification passed. Evidence: build_wasm/mobile-insets-proof.json, mobile-insets-launcher-before.png, mobile-insets-launcher-after.png, mobile-insets-toolbar-before.png, mobile-insets-toolbar-after.png, mobile-insets-live.log and mobile-insets-build.log. Temporary fixture/tab were closed, viewport reset and main services left running.
+
+
+### Integrated service and public-server recheck (2026-10-09)
+
+The integrated source at 78c86c3 passed all 99 local Python service tests, covering discovery, relay, asset handling, runner and module publication. Its GitHub launcher-and-services job also completed successfully, including all six JavaScript suites; the clean WebAssembly job was still running at this checkpoint. Local service evidence: build_wasm/integrated-service-tests.log. CI: https://github.com/awest813/ET-Legacy/actions/runs/37993846562.
+
+A fresh production PublicCatalog scan completed at 2026-10-09T21:31:22Z in 12.537 seconds. It checked all 409 current master entries and found zero verified compatible servers. Evidence: build_wasm/integrated-public-scan.json. This updates the earlier 412-entry snapshot; compatibility checks remain enforced. Public Internet gameplay is still unproven and needs a reachable compatible server and a deployed HTTPS/WSS launcher. Existing local multiplayer, saved offline play and browser layout evidence do not remove that release gap.
