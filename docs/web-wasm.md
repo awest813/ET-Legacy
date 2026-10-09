@@ -2866,3 +2866,26 @@ The victory screen was not captured. Evidence:
 `build_wasm/fueldump-undefended-first-round-log.json`,
 `fueldump-undefended-objective-log.json`, and
 `fueldump-undefended-next-round-playing.png`.
+
+## Fuel Dump contested attacking completion (October 9, 2026)
+
+A separate match on build `f51442b` used twelve Hard bots selected in the
+launcher. The console roster confirmed six Axis and six Allies; the human
+remained a spectator. No objective, movement, timer, or victory commands were
+used. After the normal warmup restart, the Allies breached the Tunnel Grate
+at 124750, built the bridge at 138200, built the footbridge at 178500,
+reinforced the bridge at 190250, and breached the Tunnel Doors at 239900.
+
+The Depot Gates fell at 377500. Axis constructed the West Base Fortification
+at 390700; Allies damaged it at 460500 and destroyed it at 492800. A Fuel Dump
+dynamite plant at 469800 completed at 499750 with the fuel-dump destruction
+event, which triggers the stock script's Allied victory and round end.
+Final recorded stats list six players per team, Axis 29 kills, Allies 47,
+and the spectator with zero kills, deaths, damage, and score. This verifies
+the attacking chain with defenders and an Axis-built base fortification.
+
+Omni-bot initialized again at 563800; all twelve bots re-entered at 564700.
+The later screenshot shows that next round playing. The victory screen
+itself was not captured. Evidence: `build_wasm/fueldump-oct9-first-round-log.json`,
+`fueldump-oct9-objective-round-log.json`, and
+`fueldump-oct9-next-round-playing.png`.
