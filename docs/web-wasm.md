@@ -1,6 +1,6 @@
 # WebAssembly port status
 
-Updated October 8, 2026 (local time).
+Updated October 9, 2026 (local time).
 
 The working source is nested inside the downloaded directory. It originated as
 an extracted archive; the integrated source is now prepared on the repository's
@@ -2811,3 +2811,39 @@ Evidence: `build_wasm/goldrush-undefended-objective-log.json`,
 `goldrush-undefended-next-round.png`, and
 `goldrush-undefended-next-round-log.json`. The next round was ended through
 Match setup before using that isolated tab for Fuel Dump.
+
+## Battery contested and Fuel Dump undefended rounds (October 9, 2026)
+
+On build `f51442b`, Battery ran with twelve Hard bots, six per team, and a
+human spectator. The captured first-round events show ramp construction at
+142450, Axis destruction at 187250, reconstruction at 204300, door-controls
+generator destruction at 321800, and dynamite planted at the Gun Controls at
+424550. Gun tracking destruction at 454500 triggered the stock script's
+Allied victory and round end. Final recorded totals were Axis 51 kills and
+Allies 45; the spectator had zero kills, deaths, damage, and score. This
+completed a contested attacking chain, rather than a timed defensive result.
+
+The automatic next load initialized Omni-bot again at 514450, and all twelve
+bots re-entered at 515350. The saved later screenshot shows combat continuing
+in that next round. The victory screen itself was not captured. Evidence:
+`build_wasm/battery-oct9-first-round-log.json`,
+`battery-oct9-objective-round-log.json`, and
+`battery-oct9-next-round-playing.png`.
+
+Fuel Dump ran separately with six manually added Allied Hard bots, no Axis
+players or bots, balancing disabled, and the human spectating. Initial classes
+were two engineers, field ops, medic, soldier, and covert ops. No objective,
+movement, timer, or victory commands were used. Events show footbridge
+construction at 83300, bridge construction at 101850, reinforcement at 124400,
+Depot Gates breach at 285650, Fuel Dump dynamite plants at 303700/315200, and
+Fuel Dump destruction at 333650. The stock objective script ends the round
+with an Allied victory. Final recorded stats list all six Allies and the
+spectator; no opposing team participated.
+
+Omni-bot reinitialized at 397700 and all six bots re-entered at 398600. A later
+screenshot shows another automatically loaded round rendering. This verifies
+the attack chain without defenders, not contested Fuel Dump performance.
+The victory screen was not captured. Evidence:
+`build_wasm/fueldump-undefended-first-round-log.json`,
+`fueldump-undefended-objective-log.json`, and
+`fueldump-undefended-next-round-playing.png`.
