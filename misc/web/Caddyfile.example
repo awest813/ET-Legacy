@@ -1,0 +1,16 @@
+# Set ETWASM_SITE to the exact HTTPS origin used by run_online.py --public-origin.
+# Example: https://play.example.org
+{$ETWASM_SITE} {
+	encode zstd gzip
+
+	# Keep complete paths: signed public server tickets use /relay/<ticket>.
+	@relay path /relay /relay/*
+	handle @relay {
+		reverse_proxy {$ETWASM_RELAY_UPSTREAM:127.0.0.1:8082}
+	}
+
+	# Preserve the launcher's MIME, COOP/COEP, cache and integrity headers.
+	handle {
+		reverse_proxy {$ETWASM_WEB_UPSTREAM:127.0.0.1:8081}
+	}
+}

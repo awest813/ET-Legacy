@@ -3,11 +3,31 @@
 Updated October 9, 2026 (local time).
 
 The working source is nested inside the downloaded directory. It originated as
-an extracted archive; the integrated source is now prepared on the repository's
-initial `main` branch. Vendored dependencies include their browser fixes as
+an extracted archive; the integrated source is now tracked and pushed on the
+repository's `main` branch. Vendored dependencies include their browser fixes as
 regular source files, rather than unresolved Git links. The browser build runs the ET: Legacy engine,
 game modules, and Omni-bot AI inside one WebAssembly module. The local HTTP
 process serves files; it does not run the game simulation or bots.
+
+## Current verification and release gaps
+
+The dated sections below retain the audit history, including earlier limitations
+that later checks resolved. Current evidence includes clean Linux CI builds,
+live local pure-server multiplayer and reconnects, saved-app startup with its
+HTTP/relay/native services stopped, bot rounds and transitions, and persistent
+browser/native graphics presets. The Chromebook preset renders at 960×540;
+physical Chromebook frame rates have not been established.
+
+Public HTTPS/WSS deployment and Internet gameplay remain unverified. GitHub
+reported no deployments or Pages site for this repository during the October 9
+check. A deployment host and DNS name are still needed for that test. The latest
+public scan checked 391 entries and found none with verified compatibility for
+this static browser build. Local multiplayer success does not establish that
+an arbitrary public ET server can accept the browser's module identities.
+
+Physical multitouch, audible output and Firefox/Safari device checks also remain
+outside the current Chromium evidence. The hosting instructions and validated
+proxy example are in [Hosted launcher and retry follow-up](#hosted-launcher-and-retry-follow-up-october-9-2026).
 
 ## Build and runtime
 
@@ -213,7 +233,7 @@ It passed 24,573 texture allocations, 100 shader/program lifecycles, all eight
 alpha comparisons, invalid alpha enums, reference clamping, and clip enable state.
 Final build log: `build_wasm/asset-state-audit-verified-build.log`.
 
-## Local preview and remaining verification
+## Local preview and initial verification notes
 
 Run `python misc/web/serve.py 8081` from this source directory, then open
 <http://localhost:8081/>. Set `ETWASM_ASSETS` to override the pack directory.
@@ -224,9 +244,10 @@ are rejected.
 
 - The embedded browser denies pointer lock. Drag aim is available; normal
   captured mouse-look should be checked in a desktop browser.
-- Audible output and profile persistence require further checks. Browser online
-  transport and retry are verified; a full match against a compatible ET server
-  still needs verification (see the online networking section below).
+- These initial checks left audible output, profile persistence and full online
+  gameplay open. Later dated sections record persistence, local multiplayer,
+  map transitions and reconnect evidence; public gameplay and audible output
+  still need verification.
 - Optional GeoIP and platform-manifest files are absent. Some optional alternate
   crosshair textures are absent from the supplied packs.
 - C90 declaration warnings, vendor template warnings, and the deprecated
@@ -1857,7 +1878,9 @@ Progress logs are saved in `gameplay-12bots-log.json`; the final scoreboard is
 `gameplay-12bots-result.png`. Builds and network checks ran alongside the round,
 so these HUD samples do not isolate renderer cost from other CPU work.
 
-The expanded port goal remains open. Its next checks and deliverables are:
+The expanded port goal remains open. The following was the plan at this stage;
+later dated sections record completed work, and the current gaps are summarized
+at the top of this document:
 
 | Area | Evidence still needed / remaining work |
 | --- | --- |
@@ -2087,6 +2110,40 @@ headers and content types. Public signed server selections use the `/relay/*`
 paths as well as the configured default `/relay`. Serve a complete browser
 bundle from the application root and provide the verified stock/custom pack
 directories used by `serve.py`.
+
+`misc/web/Caddyfile.example` provides this routing for the default backend
+ports, without stripping ticket paths. With Caddy installed on the deployment
+host, set the exact site origin in both processes:
+
+```sh
+export ETWASM_SITE=https://play.example.org
+python misc/web/run_online.py --config web-server.json --public-origin "$ETWASM_SITE"
+# In a second terminal with ETWASM_SITE set to the same value:
+caddy validate --config misc/web/Caddyfile.example --adapter caddyfile
+caddy run --config misc/web/Caddyfile.example --adapter caddyfile
+```
+
+Replace the example hostname with the deployment's DNS name. Caddy needs its
+normal certificate-management access and inbound HTTPS access; the Python
+backends stay on loopback. Keep its certificate storage persistent. If backend
+ports differ, set `ETWASM_WEB_UPSTREAM` and `ETWASM_RELAY_UPSTREAM` to their
+loopback host:port values from `web-server.json`. Caddy handles
+WebSocket upgrades and preserves Origin automatically; do not add path-prefix
+stripping or replace Origin with the backend address. Its encoding directive
+compresses eligible engine responses, including WebAssembly. See the official
+[reverse proxy](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy)
+and [encoding](https://caddyserver.com/docs/caddyfile/directives/encode) references.
+
+The example passed HTTPS configuration validation with official Caddy 2.11.7.
+A loopback HTTP run of the same imported routing passed a binary UDP/WebSocket
+round trip through `/relay`, a valid signed `/relay/<ticket>` handshake, wrong
+and missing Origin rejection, and invalid-ticket rejection by the relay. Engine
+responses retained COOP/COEP, cache policy and Wasm MIME type. Gzip-decoded
+JavaScript and Wasm matched the built files' SHA-256; the Wasm response was
+2,343,713 encoded bytes versus 6,316,154 decoded bytes. This is transfer-size
+evidence, not a frame-rate benchmark or public TLS validation. Evidence:
+`build_wasm/caddy-audit/proxy-proof.json`. The temporary listener was bound to
+loopback; no public listener or certificate request was used for this test.
 
 For a browser-compatible native server, use the matching native/WASM module
 package described above and the compiled native server. Its public UDP port
