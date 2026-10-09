@@ -1212,7 +1212,14 @@ console.log('Match summary, solo setup, keyboard help, canvas focus and error ac
     e.canvas.mousedown({...gesture(),button:0});
     assert.equal(requests,2, 'Left click while dragging reaches gameplay');
     events.mouseup({button:2,target:e.helpbtn,stopImmediatePropagation(){}});
-    assert.equal(frame(0) & 12,4, 'Right release stops aiming and clears held actions');
+    assert.equal(frame(0) & 12,0, 'Normal right release stops aiming without clearing held movement or fire');
+    let simultaneousFireBlocked=false;
+    events.mouseup({button:0,target:e.helpbtn,stopImmediatePropagation(){simultaneousFireBlocked=true;}});
+    assert.equal(simultaneousFireBlocked,false,'Left fire held during aiming still receives its outside release');
+    e.canvas.mousedown({...gesture(),button:2});frame(0);e.canvas.mouseleave();
+    assert.equal(frame(0)&12,0,'Leaving the canvas ends drag aim without releasing keyboard movement');
+    e.canvas.mousedown({...gesture(),button:2});frame(0);e.canvas.keydown({key:'Escape'});
+    assert.equal(frame(0)&12,4,'Escape still clears held gameplay input while leaving aim');
     e.canvas.mousedown({...gesture(),button:2}); e.volume.focus();
     events.focusout({target:e.canvas}); e.canvas.focus();
     assert.equal(frame(0) & 12,4, 'Toolbar focus cancels held drag aim before returning to the game');

@@ -1520,7 +1520,8 @@
 	Module['browserAppResume'] = resumeBrowserGame;
 	Module.canvas.addEventListener('pointerdown', audioGesture, { passive: true });
 	Module.canvas.addEventListener('touchstart', audioGesture, { passive: true });
-	function stopDragAim() { if (draggingAim) { draggingAim = false; resetInput = true; } }
+	// Ending an aim gesture must preserve independently held movement/fire.
+	function stopDragAim() { draggingAim = false; }
 	canvasDoc.addEventListener('mouseup', function(event) { if (event.button === 2) stopDragAim(); }, true);
 	Module.canvas.addEventListener('mouseleave', stopDragAim);
 	Module.canvas.addEventListener('pointercancel', function() { stopDragAim(); releaseMouse(); resetInput = true; });
@@ -1532,7 +1533,7 @@
 			event.preventDefault(); event.stopImmediatePropagation();
 			stopDragAim(); releaseMouse(); resetInput = true; helpbtn.focus(); return;
 		}
-		if (event.key === 'Escape') { stopDragAim(); releaseMouse(); }
+		if (event.key === 'Escape') { stopDragAim(); releaseMouse(); resetInput = true; }
 	}, true);
 	// SDL listens at window level. Leave native form/dialog keyboard behavior
 	// available while keeping gameplay bindings on the focused canvas.

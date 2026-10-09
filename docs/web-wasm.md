@@ -3334,3 +3334,27 @@ query returned 412 unique public-master entries in approximately 0.47 seconds;
 this is discovery evidence, not proof that those servers accept this browser
 client. Evidence: `build_wasm/master-fallback-tests.log` and
 `build_wasm/master-fallback-live.json`.
+
+
+### Independent input during fallback aim release, October 9
+
+Ending right-button drag aim no longer requests a global native key reset.
+Normal right release and mouse leave stop aiming while preserving independently
+held movement/fire. Escape, focus loss, pointer cancellation, and dialogs retain
+explicit input resets. Mouse motion still resets through the native inactive-
+mouse path, and tracked left-button releases still reach SDL outside the canvas.
+
+The regression failed before the change because normal right release returned
+the global reset flag. Updated checks cover preserving held actions, receiving
+a simultaneous fire button's eventual outside release, mouse leave, Escape,
+blur, toolbar focus, and pointer cancellation. All six JavaScript suites, the
+WebAssembly build, and bundle integrity/parser checks passed.
+
+A live Radar solo smoke test used the existing sandboxed iframe that denies
+pointer capture. The player deployed as an Axis Soldier, moved, released a right
+button aim gesture, and fired MP40 ammunition from 30/60 to 23/60. Browser input
+commands were serialized (key release at 2569 ms, right release at 2892 ms), so
+that live run does not prove simultaneous held-key/right-release behavior; the
+controlled event regression covers that sequence. Evidence:
+`build_wasm/aim-release-input-times.json`, `build_wasm/aim-release-after-movement.png`,
+and `build_wasm/aim-release-fallback-fire.png`. Test tab and server were closed.
