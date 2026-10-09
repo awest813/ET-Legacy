@@ -2301,3 +2301,16 @@ preserved Balanced's 1280x720 size, High textures, trilinear/4x filtering,
 single-pass lights, shadows, detailed sky and 60 FPS cap. The game rendered
 normally. Evidence: `graphics-presets-persisted.png` and
 `graphics-presets-live-log.json`.
+
+## Balanced Oasis full bot round (October 9, 2026)
+
+The preserved optimized-renderer Oasis match completed its full 30-minute
+time limit with twelve Hard bots, six per team. Axis won and the native
+intermission scoreboard rendered with all twelve bots. End-of-round statistics
+record 236 Axis kills and 151 Allied kills; the human remained a spectator with
+zero kills, deaths, damage given and score. Evidence:
+`build_wasm/oasis-balanced-full-round-win.png` and
+`oasis-balanced-full-round-log.json`. This proves a complete balanced round
+reached its normal result without human combat assistance, not that the Allies
+completed Oasis's attacking objective chain. This preserved match predates the
+graphics preset build, so it is not a full-round preset performance test.
