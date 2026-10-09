@@ -435,8 +435,54 @@ static void repackVerts(GLint first, GLsizei count)
 {
 	size_t need = (size_t) count * 11;
 
+	// renderer1 normally submits float positions/UVs and byte colors. Resolve
+	// their types and strides once per draw rather than for every component.
+	const int hasColor = arrColor.enabled && arrColor.ptr;
+	const int hasTC0 = arrTexCoord[0].enabled && arrTexCoord[0].ptr;
+	const int hasTC1 = arrTexCoord[1].enabled && arrTexCoord[1].ptr;
+
 	ensureScratch(need);
 	scratchUsed = need;
+
+	if (arrVertex.enabled && arrVertex.ptr && arrVertex.type == GL_FLOAT && arrVertex.size >= 3 &&
+	    (!hasColor || (arrColor.type == GL_UNSIGNED_BYTE && arrColor.size == 4)) &&
+	    (!hasTC0 || (arrTexCoord[0].type == GL_FLOAT && arrTexCoord[0].size >= 2)) &&
+	    (!hasTC1 || (arrTexCoord[1].type == GL_FLOAT && arrTexCoord[1].size >= 2)))
+	{
+		const size_t vertexStride = arrVertex.stride ? arrVertex.stride : arrVertex.size * sizeof(GLfloat);
+		const size_t colorStride = arrColor.stride ? arrColor.stride : arrColor.size;
+		const size_t tc0Stride = arrTexCoord[0].stride ? arrTexCoord[0].stride : arrTexCoord[0].size * sizeof(GLfloat);
+		const size_t tc1Stride = arrTexCoord[1].stride ? arrTexCoord[1].stride : arrTexCoord[1].size * sizeof(GLfloat);
+		for (GLsizei i = 0; i < count; i++)
+		{
+			const size_t vi = (size_t)first + i;
+			const GLfloat *vertex = (const GLfloat *)((const GLubyte *)arrVertex.ptr + vi * vertexStride);
+			GLfloat *out = scratchVerts + (size_t)i * 11;
+			out[0] = vertex[0]; out[1] = vertex[1]; out[2] = vertex[2];
+			if (hasColor)
+			{
+				const GLubyte *color = (const GLubyte *)arrColor.ptr + vi * colorStride;
+				for (int j = 0; j < 4; j++) out[3 + j] = color[j] / 255.0f;
+			}
+			else
+			{
+				for (int j = 0; j < 4; j++) out[3 + j] = curColor[j];
+			}
+			if (hasTC0)
+			{
+				const GLfloat *tc = (const GLfloat *)((const GLubyte *)arrTexCoord[0].ptr + vi * tc0Stride);
+				out[7] = tc[0]; out[8] = tc[1];
+			}
+			else { out[7] = curTC[0][0]; out[8] = curTC[0][1]; }
+			if (hasTC1)
+			{
+				const GLfloat *tc = (const GLfloat *)((const GLubyte *)arrTexCoord[1].ptr + vi * tc1Stride);
+				out[9] = tc[0]; out[10] = tc[1];
+			}
+			else { out[9] = 0.0f; out[10] = 0.0f; }
+		}
+		return;
+	}
 
 	for (GLsizei i = 0; i < count; i++)
 	{

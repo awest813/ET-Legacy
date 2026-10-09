@@ -2,6 +2,55 @@
 #include "../../src/webgl/webgl_shim.c"
 #include "../../src/qcommon/web_frame.h"
 #include <assert.h>
+#include <emscripten.h>
+
+static void checkRepacking(void)
+{
+	struct vertex { GLfloat xyz[4]; GLubyte rgba[4]; GLfloat uv[3], lm[2]; } vertices[8];
+	for (int i = 0; i < 8; i++)
+	{
+		for (int j = 0; j < 4; j++) { vertices[i].xyz[j] = i * 4 + j; vertices[i].rgba[j] = i * 31 + j; }
+		for (int j = 0; j < 3; j++) vertices[i].uv[j] = i * 0.125f + j;
+		for (int j = 0; j < 2; j++) vertices[i].lm[j] = i * 0.25f + j;
+	}
+	glVertexPointer(4, GL_FLOAT, sizeof(vertices[0]), vertices[0].xyz);
+	glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(vertices[0]), vertices[0].rgba);
+	glClientActiveTextureARB(GL_TEXTURE0); glTexCoordPointer(3, GL_FLOAT, sizeof(vertices[0]), vertices[0].uv);
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY); glEnableClientState(GL_COLOR_ARRAY);
+	glClientActiveTextureARB(GL_TEXTURE1); glTexCoordPointer(2, GL_FLOAT, sizeof(vertices[0]), vertices[0].lm);
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	for (int enabled = 0; enabled < 8; enabled++)
+	{
+		arrColor.enabled = enabled & 1; arrTexCoord[1].enabled = enabled & 2; arrTexCoord[0].enabled = enabled & 4;
+		repackVerts(2, 4); assert(scratchUsed == 44);
+		for (int i = 0; i < 4; i++)
+		{
+			GLfloat *out = scratchVerts + i * 11;
+			for (int j = 0; j < 3; j++) assert(out[j] == vertices[i + 2].xyz[j]);
+			for (int j = 0; j < 4; j++) assert(out[j + 3] == (enabled & 1 ? vertices[i + 2].rgba[j] / 255.0f : curColor[j]));
+			for (int j = 0; j < 2; j++) { assert(out[j + 7] == (enabled & 4 ? vertices[i + 2].uv[j] : curTC[0][j])); assert(out[j + 9] == (enabled & 2 ? vertices[i + 2].lm[j] : 0)); }
+		}
+	}
+	GLshort shortVerts[2][2] = {{32767, 0}, {-32767, 16383}};
+	glVertexPointer(2, GL_SHORT, 0, shortVerts); arrColor.enabled = 0; arrTexCoord[0].enabled = arrTexCoord[1].enabled = 0;
+	repackVerts(0, 2); assert(scratchVerts[0] == 1 && scratchVerts[2] == 0 && scratchVerts[11] == -1);
+	glClientActiveTextureARB(GL_TEXTURE0);
+}
+
+static void benchmarkRepacking(void)
+{
+	static GLfloat xyz[4096][4], uv[4096][2], lm[4096][2]; static GLubyte rgba[4096][4];
+	for (int i = 0; i < 4096; i++) { xyz[i][0] = i; rgba[i][0] = i & 255; }
+	glVertexPointer(3, GL_FLOAT, sizeof(xyz[0]), xyz); glColorPointer(4, GL_UNSIGNED_BYTE, 0, rgba);
+	glEnableClientState(GL_COLOR_ARRAY);
+	glTexCoordPointer(2, GL_FLOAT, 0, uv); glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	glClientActiveTextureARB(GL_TEXTURE1); glTexCoordPointer(2, GL_FLOAT, 0, lm); glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	for (int i = 0; i < 100; i++) repackVerts(0, 4096);
+	double begin = emscripten_get_now();
+	for (int i = 0; i < 3000; i++) repackVerts(0, 4096);
+	printf("Vertex packing: %.2f ms for 12,288,000 vertices (CPU-only sample).\n", emscripten_get_now() - begin);
+	assert(scratchVerts[4095 * 11] == 4095);
+}
 
 static const void *uploadedIndices;
 static GLsizeiptr uploadedBytes;
@@ -72,6 +121,7 @@ int main(void)
 	assert(Web_FrameDue(&clock,16666,16666)); // changed cap applies immediately
 	assert(Web_FrameDue(&clock,5000000,16666));
 	assert(!Web_FrameDue(&clock,5000001,16666)); // no burst after tab suspension
+	checkRepacking(); benchmarkRepacking();
 	puts("Performance: direct index uploads (24/12/6 bytes, zero index scratch allocations), 60/144 Hz pacing, cap changes and suspension recovery passed.");
 	return 0;
 }

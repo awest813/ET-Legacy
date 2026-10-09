@@ -2129,3 +2129,29 @@ choices; evidence is `build_wasm/pwa-saved-update-preferences.png`. The separate
 Radar bot match advanced through both entrance breaches, securing the Forward
 Bunker, and stealing the West Radar Parts. Delivery and final victory remain
 pending while the ordinary balanced round continues.
+
+## Vertex packing performance (October 9, 2026)
+
+A short 495-frame `com_speeds` sample during the Radar round measured median
+CPU frame work of 10 ms, renderer backend work of 8 ms and game work of 0 ms
+(integer-resolution timer); their 95th percentiles were 15, 12 and 2 ms.
+This includes diagnostic logging and console transitions and excludes GPU and
+compositor time. Raw and summarized evidence are
+`build_wasm/radar-frame-cost-sample.json` and `radar-frame-cost-summary.json`.
+
+The renderer shim now resolves the common float-position/UV and byte-color
+array layout once per draw. Its existing component decoder handles other
+formats. Nonzero starting vertices, padded/interleaved strides, disabled color
+and texture arrays, normalized byte colors and short-position fallback are
+covered by the compiled performance checks. In alternating Node/WASM CPU-only
+runs, packing 12,288,000 vertices took about 367 ms with the original code and
+34–35 ms with the fast path. This isolates packing and is not an in-game FPS
+claim or a Chromebook measurement.
+
+The expanded real WebGL2 suite passes all 52 checks with zero failures,
+including new strided byte-color and diffuse/lightmap pixel checks. Existing
+fog, portal, cutout, depth, index-format and fresh-context checks still pass.
+Evidence: `build_wasm/vertex-pack-gpu-checks.png` and
+`vertex-pack-gpu-checks.json`. The final browser build succeeds and parses the
+generated scripts. The running Radar round still uses its original engine;
+live gameplay verification of the new engine is a subsequent check.

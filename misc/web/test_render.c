@@ -166,6 +166,23 @@ int main(void)
 	glClear(GL_COLOR_BUFFER_BIT);glColor4f(1,0,0,1);
 	glDrawElements(GL_TRIANGLES,6,GL_UNSIGNED_BYTE,indexedBytes);
 	pixel("Direct byte indices render",64,64,255,0,0,255);
+	struct packedVertex { GLfloat xyz[4]; GLubyte rgba[4]; GLfloat uv[3], lm[2]; } packed[5] = {0};
+	for (int i=1;i<5;i++) {
+		memcpy(packed[i].xyz,indexedVerts[i-1],sizeof(indexedVerts[0]));
+		const GLubyte rgba[4]={64,128,192,128};memcpy(packed[i].rgba,rgba,4);
+		packed[i].uv[0]=packed[i].uv[1]=packed[i].lm[0]=packed[i].lm[1]=.5f;
+	}
+	glVertexPointer(4,GL_FLOAT,sizeof(packed[0]),packed[0].xyz);
+	glColorPointer(4,GL_UNSIGNED_BYTE,sizeof(packed[0]),packed[0].rgba);glEnableClientState(GL_COLOR_ARRAY);
+	glClear(GL_COLOR_BUFFER_BIT);glColor4f(1,1,1,1);glDrawArrays(GL_TRIANGLE_FAN,1,4);
+	pixel("Strided byte colors and nonzero first vertex render",64,64,64,128,192,128);
+	texture(0,diffuse);texture(1,lightmap);
+	glClientActiveTextureARB(GL_TEXTURE0_ARB);glTexCoordPointer(3,GL_FLOAT,sizeof(packed[0]),packed[0].uv);glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	glClientActiveTextureARB(GL_TEXTURE1_ARB);glTexCoordPointer(2,GL_FLOAT,sizeof(packed[0]),packed[0].lm);glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	glClear(GL_COLOR_BUFFER_BIT);glDrawArrays(GL_TRIANGLE_FAN,1,4);
+	pixel("Strided colors diffuse and lightmap combine",64,64,8,16,18,64);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);glClientActiveTextureARB(GL_TEXTURE0_ARB);glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+	glDisableClientState(GL_COLOR_ARRAY);glActiveTextureARB(GL_TEXTURE1_ARB);glDisable(GL_TEXTURE_2D);glActiveTextureARB(GL_TEXTURE0_ARB);glDisable(GL_TEXTURE_2D);
 	glDisableClientState(GL_VERTEX_ARRAY);
 	GLuint framebuffer,color;glGenFramebuffersEXT(1,&framebuffer);glBindFramebufferEXT(GL_FRAMEBUFFER,framebuffer);
 	glGenTextures(1,&color);glBindTexture(GL_TEXTURE_2D,color);
