@@ -470,7 +470,7 @@ global Map =
 
 				if ( !Map.Switch_Raised )
 				{
-					if ( Map.norththofswitch != 0 )
+					if ( Map.northofswitch != 0 )
 					{
 						Map.Switches.TrackSwitch.LimitTeam = (1<<TEAM.AXIS);
 						Util.LimitToTeam( TEAM.AXIS, "SWITCH_trackswitch" );
@@ -568,7 +568,7 @@ global Map =
 			{
 				if ( !Map.Switch_Raised )
 				{
-					if ( Map.norththofswitch != 0 )
+					if ( Map.northofswitch != 0 )
 					{
 						Map.Switches.TrackSwitch.LimitTeam = (1<<TEAM.ALLIES);
 						Util.LimitToTeam( TEAM.ALLIES, "SWITCH_trackswitch" );

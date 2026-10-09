@@ -46,6 +46,43 @@ static void event(gmMachine &machine, const char *goalName, int eventId, bool qu
 
 int main(int, char **)
 {
+    // Execute the shipped tug decisions rather than merely parsing the scripts.
+    for (const char *map : {"railgun", "etx_railgun"}) {
+        gmMachine rail;
+        run(rail, R"GM(
+            global TEAM = { AXIS = 1, ALLIES = 2 };
+            global GetGoal = function(name) { return {GetEntity = function() { return 1; }}; };
+            global SetAvailableMapGoals = function(team, enabled, goals) {};
+            global SelectedSwitchTeam = 0;
+            global Util = {
+                MapDebugPrint = function(message, always) {},
+                LimitToTeam = function(team, goal) { global SelectedSwitchTeam = team; }
+            };
+        )GM");
+        run(rail, script(std::string("/nav/") + map + ".gm"));
+        for (int loaded = 0; loaded < 2; ++loaded) {
+            for (int raised = 0; raised < 2; ++raised) {
+                for (int north = 0; north < 2; ++north) {
+                    run(rail, "Map.AmmoLoaded = " + std::to_string(loaded) +
+                        "; Map.Switch_Raised = " + std::to_string(raised) +
+                        "; Map.northofswitch = " + std::to_string(north) +
+                        "; Map.tug_logics(3); global SwitchMask = Map.Switches.TrackSwitch.LimitTeam;");
+                    // Crossing toward the depot and returning with ammo need opposite switch states.
+                    const int team = (loaded ^ raised ^ north) ? 1 : 2;
+                    std::cout << map << " loaded=" << loaded << " raised=" << raised
+                              << " north=" << north << " switch team=" << value(rail, "SelectedSwitchTeam") << '\n';
+                    assert(value(rail, "SelectedSwitchTeam") == team);
+                    assert(value(rail, "SwitchMask") == (1 << team));
+                }
+                // Normal region entry clears the previous side before evaluating the switch.
+                run(rail, "Map.northofswitch = 1; Map.tug_southofswitch.OnEnter(1);"
+                    " global NorthAfterEntry = Map.northofswitch; global SouthAfterEntry = Map.southofswitch;");
+                assert(value(rail, "NorthAfterEntry") == 0);
+                assert(value(rail, "SouthAfterEntry") == 1);
+                assert(value(rail, "SelectedSwitchTeam") == ((loaded ^ raised) ? 1 : 2));
+            }
+        }
+    }
     gmMachine machine;
     for (const char *map : {"oasis", "goldrush", "battery", "fueldump", "radar", "railgun"}) {
         const std::string path = std::string("/nav/") + map + ".gm";
@@ -255,5 +292,5 @@ int main(int, char **)
     machine.Execute(1);
     run(machine, "global RatioCheck = 6;");
     assert(value(machine, "RatioKickCalls") == 2);
-    std::cout << "Bot checks passed (six map scripts, sparse/highest slots, humans, team isolation, departures, class selection, difficulty ordering, queued goal teardown, manual bot limits, human-team command and capped/unbounded bot ratios).\n";
+    std::cout << "Bot checks passed (16 Rail Gun switch states, eight region entries, six stock map scripts, sparse/highest slots, humans, team isolation, departures, class selection, difficulty ordering, queued goal teardown, manual bot limits, human-team command and capped/unbounded bot ratios).\n";
 }

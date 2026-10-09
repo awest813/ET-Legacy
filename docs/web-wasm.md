@@ -2694,3 +2694,32 @@ closed afterward; the separate Rail Gun round remained running.
 Evidence: `build_wasm/match-query-battery-start.png`,
 `match-query-offline-return.png`, `match-query-offline-restart.png`,
 `match-query-offline-log.json`, and `match-query-hashes.json`.
+
+## Rail Gun switch state audit (October 9, 2026)
+
+The stock and ETX Rail Gun bot scripts each read `norththofswitch` in two
+lowered-switch decisions, although the declared state is `northofswitch`.
+The actual GameMonkey interpreter reproduced the ignored north-side state:
+an unloaded tug with the switch lowered selected Allies even when the north
+flag was set. Both scripts now read the declared field.
+
+The compiled bot fixture executes both production scripts across all sixteen
+combinations of ammo load, switch height, and north-side state. Eight normal
+south-region entries also verify that the previous side is cleared and the
+resulting team assignment stays correct. Normal south-region callbacks already
+clear the north flag, so this correction is not evidence that the ongoing
+match's slow progress was caused by the typo. Existing class, difficulty,
+queued-event, population, and team-balancing regressions remain passing.
+
+The browser build passes; all seven served bundle hashes match, and `etl.data`
+contains both exact corrected scripts. A separate Chromium preview applied the
+app update, rendered Rail Gun, initialized Omni-bot, and recorded four bot-entry
+events. That preview and its port 8085 host were stopped afterward. The earlier
+continuous twelve-Normal-bot round remains on its original build, with depot
+captures, switch activity, and tug riding observed; its full outcome is still
+pending. Neither the short startup check nor the script fixture proves the
+complete ammo transport and firing chain.
+
+Evidence: `build_wasm/railgun-switch-before.log`, `railgun-switch-after.log`,
+`railgun-switch-build.log`, `railgun-switch-hashes.json`,
+`railgun-switch-startup.png`, and `railgun-switch-startup-log.json`.

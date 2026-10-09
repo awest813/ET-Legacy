@@ -14,7 +14,7 @@ try {
         $botCheckArgs += @('--embed-file', "vendor/omni-bot-browser/et/scripts/goals/goal_$botGoal.gm@/goal_$botGoal.gm")
     }
     $botCheckArgs += @('--embed-file', 'vendor/omni-bot-browser/global_scripts/server_manager.gm@/server_manager.gm')
-    foreach ($botMap in @('oasis', 'goldrush', 'battery', 'fueldump', 'radar', 'railgun')) {
+    foreach ($botMap in @('oasis', 'goldrush', 'battery', 'fueldump', 'radar', 'railgun', 'etx_railgun')) {
         $botCheckArgs += @('--embed-file', "vendor/omni-bot-browser/et/nav/$botMap.gm@/nav/$botMap.gm")
     }
     $botCheckArgs += @('-o', 'build_wasm/test_bot_classes.cjs')
