@@ -31,10 +31,10 @@ menuDef {
     MULTI(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 7), SUBWINDOW_OPTION_WIDTH_L, 10, _("Texture Filtering:"), .2, 8, "ui_r_texturemode", cvarStrList { "Bilinear"; "GL_LINEAR_MIPMAP_NEAREST"; "Trilinear"; "GL_LINEAR_MIPMAP_LINEAR" }, _("Set texture filtering"))
     MULTI(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 8), SUBWINDOW_OPTION_WIDTH_L, 10, _("Anisotropic Filtering:"), .2, 8, "ui_r_ext_texture_filter_anisotropic", cvarFloatList { "Disabled" 0 "4x" 4 "8x" 8 "16x" 16 }, _("Limited to what your graphics device supports"))
     MULTI(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 9), SUBWINDOW_OPTION_WIDTH_L, 10, _("Dynamic Lights:"), .2, 8, "ui_r_dynamiclight", cvarFloatList { "Disabled" 0 "Single-pass" 1 "Multi-pass" 2 }, _("Enable dynamic lighting effects"))
-    YESNO(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 10), SUBWINDOW_OPTION_WIDTH_L, 10, _("Dynamic Shadows:"), .2, 8, "cg_shadows", _("Draw shadows for dynamic objects"))
-    YESNO(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 11), SUBWINDOW_OPTION_WIDTH_L, 10, _("Detailed Sky:"), .2, 8, "cg_skybox", _("Draw the skybox portal scene"))
-    YESNO(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 12), SUBWINDOW_OPTION_WIDTH_L, 10, _("Low Quality Sky:"), .2, 8, "r_fastsky", _("Draw a simple sky to improve performance"))
-    MULTI(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 13), SUBWINDOW_OPTION_WIDTH_L, 10, _("Max FPS:"), .2, 8, "com_maxfps", cvarFloatList { "60" 60 "76" 76 "125" 125 "250" 250 }, _("The browser display rate also limits frame presentation"))
+    YESNO(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 10), SUBWINDOW_OPTION_WIDTH_L, 10, _("Dynamic Shadows:"), .2, 8, "ui_web_shadows", _("Draw shadows for dynamic objects"))
+    YESNO(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 11), SUBWINDOW_OPTION_WIDTH_L, 10, _("Detailed Sky:"), .2, 8, "ui_web_skybox", _("Draw the skybox portal scene"))
+    YESNO(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 12), SUBWINDOW_OPTION_WIDTH_L, 10, _("Low Quality Sky:"), .2, 8, "ui_web_fastsky", _("Draw a simple sky to improve performance"))
+    MULTI(SUBWINDOW_OPTION_X1_START, SUBWINDOW_OPTION_COMPUTE_Y(GRAPHICS_Y, 13), SUBWINDOW_OPTION_WIDTH_L, 10, _("Max FPS:"), .2, 8, "ui_web_maxfps", cvarFloatList { "60" 60 "76" 76 "125" 125 "250" 250 }, _("The browser display rate also limits frame presentation"))
 
 #define AUDIO_Y SUBWINDOW_OPTION_Y_START
 #define AUDIO_H SUBWINDOW_OPTION_COMPUTE_H(4)
@@ -53,8 +53,11 @@ menuDef {
     MULTI(SUBWINDOW_OPTION_X2_START, SUBWINDOW_OPTION_COMPUTE_Y(NETWORK_Y, 2), SUBWINDOW_OPTION_WIDTH_R, 10, _("Packet Duplication:"), .2, 8, "ui_cl_packetdup", cvarFloatList { "Off" 0 "x1" 1 "x2" 2 }, _("Repeat packet data to reduce effects of packet loss"))
 
 #define BROWSER_Y (NETWORK_Y + NETWORK_H + SUBWINDOW_OPTION_Y_PADDING)
-    SUBWINDOW(SUBWINDOW_OPTION_HEADER_X2_START, BROWSER_Y, SUBWINDOW_OPTION_HEADER_WIDTH_R, 108, _("BROWSER"))
-    LABELWHITE(SUBWINDOW_OPTION_X2_START + 6, BROWSER_Y + 28, SUBWINDOW_OPTION_WIDTH_R - 12, 10, _("Uses browser storage when available.\nApply display changes before leaving.\nToolbar volume controls all sound.\nSound pauses away from the game.\nChoose maps through Match setup."), .2, ITEM_ALIGN_LEFT, 0, 8)
+    SUBWINDOW(SUBWINDOW_OPTION_HEADER_X2_START, BROWSER_Y, SUBWINDOW_OPTION_HEADER_WIDTH_R, 108, _("BROWSER GRAPHICS PRESETS"))
+    BUTTON(SUBWINDOW_OPTION_X2_START + 6, BROWSER_Y + 18, SUBWINDOW_OPTION_WIDTH_R - 12, 16, _("Chromebook / Low power"), .2, 10, uiScript webGraphicsPreset 0)
+    BUTTON(SUBWINDOW_OPTION_X2_START + 6, BROWSER_Y + 36, SUBWINDOW_OPTION_WIDTH_R - 12, 16, _("Balanced"), .2, 10, uiScript webGraphicsPreset 1)
+    BUTTON(SUBWINDOW_OPTION_X2_START + 6, BROWSER_Y + 54, SUBWINDOW_OPTION_WIDTH_R - 12, 16, _("Quality"), .2, 10, uiScript webGraphicsPreset 2)
+    LABELWHITE(SUBWINDOW_OPTION_X2_START + 6, BROWSER_Y + 77, SUBWINDOW_OPTION_WIDTH_R - 12, 10, _("Choose a preset, then Apply.\nBack discards preset edits.\nLow power: 960x540, fewer effects."), .2, ITEM_ALIGN_LEFT, 0, 8)
 
     BUTTON(SUBWINDOW_OPTION_HEADER_X1_START, WINDOW_HEIGHT - 24, .5 * (WINDOW_WIDTH - 24) - 3, 18, _("MSGID_MENU_BACK"), .3, 14, uiScript systemCvarsReset ; uiScript vidReset ; close options_system ; open options)
     BUTTON(SUBWINDOW_OPTION_HEADER_X1_START + .5 * (WINDOW_WIDTH - 24) + 3, WINDOW_HEIGHT - 24, .5 * (WINDOW_WIDTH - 24) - 3, 18, _("MSGID_MENU_APPLY"), .3, 14, conditionalScript vidrestartIsRequired 2 ("open vid_restart") ("uiScript systemCvarsApply ; close options_system ; open options"))

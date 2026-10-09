@@ -6194,6 +6194,13 @@ void UI_RunMenuScript(char **args)
 			trap_Cvar_Set("r_oldMode", "");
 			trap_Cvar_Set("r_oldFullscreen", "");
 		}
+#ifdef __EMSCRIPTEN__
+		else if (Q_stricmp(name, "webGraphicsPreset") == 0)
+		{
+			int preset;
+			if (Int_Parse(args, &preset)) UI_WebGraphicsPreset(preset);
+		}
+#endif
 		else if (Q_stricmp(name, "systemCvarsGet") == 0)
 		{
 			char  ui_cl_lang[MAX_CVAR_VALUE_STRING];
@@ -6276,13 +6283,13 @@ void UI_RunMenuScript(char **args)
 			trap_Cvar_Set("ui_r_dynamiclight", va("%i", ui_r_dynamiclight));
 
 #ifdef __EMSCRIPTEN__
-			UI_WebCustomSizeGet();
+			UI_WebGraphicsGet();
 #endif
 		}
 		else if (Q_stricmp(name, "systemCvarsReset") == 0)
 		{
 #ifdef __EMSCRIPTEN__
-			UI_WebCustomSizeReset();
+			UI_WebGraphicsReset();
 #endif
 			trap_Cvar_Set("ui_cl_lang", "");
 			trap_Cvar_Set("ui_r_mode", "");
@@ -6412,7 +6419,7 @@ void UI_RunMenuScript(char **args)
 #endif
 
 #ifdef __EMSCRIPTEN__
-			UI_WebCustomSizeApply();
+			UI_WebGraphicsApply();
 #endif
 			trap_Cvar_Set("ui_cl_lang", "");
 			trap_Cvar_Set("ui_r_mode", "");

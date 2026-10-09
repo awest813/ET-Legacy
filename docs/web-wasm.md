@@ -2264,3 +2264,40 @@ rendered normally. Evidence: `build_wasm/custom-size-back-discard.png`,
 `custom-size-applied.png`, `custom-size-applied-log.json`,
 `custom-size-persisted.png` and `custom-size-persisted.json`. Browser graphics
 presets and physical Chromebook validation remain outstanding.
+
+## Browser graphics and Chromebook presets (October 9, 2026)
+
+In-game Options > System now offers three browser presets. These set editable
+graphics values and wait for Apply; Back discards preset edits. Shadows, sky
+detail, simple sky and the FPS cap also stage rather than changing immediately.
+Audio, controls, networking and map brightness remain independent of presets.
+
+| Preset | Render size | Texture detail | Filtering | Dynamic lights | Shadows / detailed sky | FPS cap |
+| --- | --- | --- | --- | --- | --- | --- |
+| Chromebook / Low power | 960x540 | Medium | Bilinear, no anisotropy | Disabled | Off / off, simple sky on | 60 |
+| Balanced | 1280x720 | High | Trilinear, 4x anisotropy | Single-pass | On / on | 60 |
+| Quality | 1920x1080 | Very High | Trilinear, 16x anisotropy | Multi-pass | On / on | 60 |
+
+Anisotropy is limited by device support. The browser scales the render canvas
+to fit the available display. The low-power preset reduces pixel count,
+texture memory and effects; physical Chromebook performance is not established
+by the desktop in-app-browser check.
+
+The actual-helper regression now checks all three presets, staged effects,
+Back/Apply/reopening and invalid preset rejection. Browser and native UI/cgame
+builds pass; the local native/WASM module fixture pack was refreshed. All seven
+local/served bundle hashes match (`build_wasm/graphics-presets-bundle-hashes.json`).
+The new build was activated through App & offline's saved-update flow on the
+isolated test origin, preserving its saved game files and settings.
+
+Live System-menu clicks staged Chromebook values without resizing the game;
+Back restored the previous size, effects and 125 FPS cap. Confirming Apply
+produced a rendered 960x540 canvas and the intended settings on reopening.
+Quality and Balanced each restarted successfully at actual 1920x1080 and
+1280x720 canvas sizes. Evidence: `build_wasm/graphics-presets-back.png`,
+`graphics-presets-chromebook.png` and `graphics-presets-quality.png`.
+Ending the match through Match setup and starting another solo Oasis match
+preserved Balanced's 1280x720 size, High textures, trilinear/4x filtering,
+single-pass lights, shadows, detailed sky and 60 FPS cap. The game rendered
+normally. Evidence: `graphics-presets-persisted.png` and
+`graphics-presets-live-log.json`.
