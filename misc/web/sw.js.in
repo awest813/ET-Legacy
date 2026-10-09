@@ -28,12 +28,12 @@ async function installBundle(repair = false) {
   }
  } catch (error) { if (!repair) await caches.delete(CACHE); throw error; }
 }
-async function status(client) {
+async function status(client, requestId) {
  try {
   const cache = await caches.open(CACHE);
   const entries = await Promise.all(CORE.map(entry => cache.match(absolute(entry.url))));
-  client.postMessage({type:entries.every(Boolean) ? 'APP_READY' : 'APP_MISSING', version:VERSION});
- } catch (error) { client.postMessage({type:'APP_SAVE_FAILED', version:VERSION}); }
+  client.postMessage({type:entries.every(Boolean) ? 'APP_READY' : 'APP_MISSING', version:VERSION, ...(requestId === undefined ? {} : {requestId})});
+ } catch (error) { client.postMessage({type:'APP_SAVE_FAILED', version:VERSION, ...(requestId === undefined ? {} : {requestId})}); }
 }
 function recoveryPage() {
  // This small page can repair an evicted bundle even when the launcher itself is missing.
@@ -55,8 +55,8 @@ self.addEventListener('message', event => {
  })());
  if (event.data && event.data.type === 'APP_STATUS' && event.source) event.waitUntil(status(event.source));
  if (event.data && event.data.type === 'REPAIR_CACHE' && event.source) event.waitUntil((async () => {
-  try { await installBundle(true); await status(event.source); }
-  catch (e) { event.source.postMessage({type:'APP_SAVE_FAILED'}); }
+  try { await installBundle(true); await status(event.source, event.data.requestId); }
+  catch (e) { event.source.postMessage({type:'APP_SAVE_FAILED', ...(event.data.requestId === undefined ? {} : {requestId:event.data.requestId})}); }
  })());
 });
 self.addEventListener('fetch', event => {

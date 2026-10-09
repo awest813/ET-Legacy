@@ -3272,3 +3272,24 @@ and generated bundle verification. Live loopback Caddy checks returned
 operator guidance, with the local picker enabled. Public HTTPS deployment remains
 unverified. Evidence: `build_wasm/import-proxy-proof.json` and
 `build_wasm/import-hosted-ui.png`.
+
+
+### Offline repair reply isolation, October 9
+
+Offline repair requests now carry an attempt identifier through the worker's
+success and failure replies. The launcher and standalone recovery page ignore
+replies from timed-out attempts, as well as unrelated status replies while a
+repair is active. A stale failure can no longer cancel a newer retry, and a
+stale success can no longer reopen the launcher during that retry. The current
+launcher repair reports missing files immediately rather than waiting for its
+deadline.
+
+Regression tests reproduced the stale-failure cancellation before the fix and
+cover stale success, failure, unrelated status, current success, current missing
+files, worker reply identifiers, and recovery-page reload isolation. All six
+JavaScript suites and the rebuilt bundle integrity/parser checks passed. A real
+browser at loopback port 8087 saved the app, ran standalone repair, downloaded
+all seven verified core files, returned to the launcher, and reported App saved.
+The timing race itself was exercised with controlled asynchronous regression
+tests. Browser evidence: `build_wasm/pwa-repair-generation.png`. The temporary
+server and test tab were closed afterward.

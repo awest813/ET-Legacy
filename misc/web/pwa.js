@@ -9,7 +9,7 @@
   var fullButtons = [doc.getElementById('fullscreenbtn'), doc.getElementById('launchfullscreen')];
   var registration = null, prompt = null, saved = false, packs = false, installing = false, updateRequested = false;
   var fullscreenPending = false, fullscreenTimer = null, fullEpoch = 0;
-  var updateTimer = null, repairTimer = null, repairing = false, updateFailed = false;
+  var updateTimer = null, repairTimer = null, repairing = false, repairSerial = 0, repairRequest = 0, updateFailed = false;
   var workers = new WeakSet(), registrations = new WeakSet();
   var installed = !!(win.matchMedia && win.matchMedia('(display-mode: standalone)').matches) || !!nav.standalone;
   var message = '', fullMessage = '';
@@ -86,7 +86,7 @@
    catch (e) { clearUpdate(); message = 'The update is no longer waiting. Reload from your browser when ready.'; render(); }
   });
   function clearUpdate() { options.clearTimeout.call(win, updateTimer); updateTimer = null; updateRequested = false; }
-  function clearRepair() { options.clearTimeout.call(win, repairTimer); repairTimer = null; repairing = false; }
+  function clearRepair() { options.clearTimeout.call(win, repairTimer); repairTimer = null; repairing = false; repairRequest = 0; }
   function requestStatus(worker) {
    try { worker.postMessage({type:'APP_STATUS'}); }
    catch (e) { if (!saved) { message = 'Offline saving is unavailable. Reconnect and retry when ready.'; retry.hidden = false; render(); } }
@@ -121,8 +121,11 @@
   if (serviceWorker) {
    serviceWorker.addEventListener('message', function(event) {
     if (!event.data) return;
+    // Repair replies belong to one attempt; status/activation replies do not.
+    if (event.data.requestId !== undefined && (!repairing || event.data.requestId !== repairRequest)) return;
+    if (repairing && event.data.requestId === undefined && ['APP_READY','APP_MISSING','APP_SAVE_FAILED'].indexOf(event.data.type) !== -1) return;
     if (event.data.type === 'APP_READY') { clearRepair(); saved = true; retry.hidden = !updateFailed; if (!updateFailed && (!registration || !registration.waiting)) message = ''; render(); }
-    if (event.data.type === 'APP_SAVE_FAILED' || (event.data.type === 'APP_MISSING' && !repairing)) { clearRepair(); saved = false; message = 'Some offline app files are unavailable. Reconnect and retry offline saving.'; retry.hidden = false; render(); }
+    if (event.data.type === 'APP_SAVE_FAILED' || (event.data.type === 'APP_MISSING' && (!repairing || event.data.requestId === repairRequest))) { clearRepair(); saved = false; message = 'Some offline app files are unavailable. Reconnect and retry offline saving.'; retry.hidden = false; render(); }
     if (event.data.type === 'APP_OTHER_TABS') { clearUpdate(); message = 'Close the other app tabs or windows, then reload to update. Your current match can continue.'; render(); }
    });
    serviceWorker.addEventListener('controllerchange', function() { if (updateRequested) { clearUpdate(); options.reload(); } });
@@ -133,9 +136,9 @@
    updateFailed = false;
    if (registration && registration.active && !saved) {
     // Also discover a newer bundle if this cache belongs to an older deployment.
-    register(true); repairing = true; retry.hidden = false; message = 'Saving app files for offline play…'; render();
+    register(true); repairing = true; repairRequest = ++repairSerial; retry.hidden = false; message = 'Saving app files for offline play…'; render();
     repairTimer = options.setTimeout.call(win, function() { clearRepair(); message = 'Saving did not finish. Check your connection and available storage, then retry.'; retry.hidden = false; render(); }, 30000);
-    try { registration.active.postMessage({type:'REPAIR_CACHE'}); }
+    try { registration.active.postMessage({type:'REPAIR_CACHE', requestId:repairRequest}); }
     catch (e) { clearRepair(); message = 'Offline saving is unavailable. Reconnect and retry when ready.'; retry.hidden = false; render(); }
     return;
    }

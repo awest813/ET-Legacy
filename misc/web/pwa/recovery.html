@@ -19,6 +19,8 @@
  serviceWorker.addEventListener('controllerchange',()=>{if(pending==='update')reopen();});
  serviceWorker.addEventListener('message',event=>{
   const type=event.data&&event.data.type;
+  if(event.data&&event.data.requestId!==undefined&&(pending!=='repair'||event.data.requestId!==attempt))return;
+  if(pending==='repair'&&['APP_READY','APP_SAVE_FAILED','APP_MISSING'].includes(type)&&event.data.requestId!==attempt)return;
   if(type==='APP_READY'&&pending==='repair')reopen();
   if(type==='APP_SAVE_FAILED'&&pending)finish('Saving did not finish. Check your connection and available storage, then retry.');
   if(type==='APP_OTHER_TABS'&&pending)finish('Close other app tabs or windows, then retry.');
@@ -35,7 +37,7 @@
    if(worker)await new Promise((resolve,reject)=>{function check(){if(worker.state==='installed'||worker.state==='activated')resolve();else if(worker.state==='redundant')reject(Error());}worker.addEventListener('statechange',check);check();});
    if(epoch!==attempt||pending!=='checking')return;
    if(registration.waiting){pending='update';registration.waiting.postMessage({type:'ACTIVATE_UPDATE'});}
-   else if(registration.active){pending='repair';registration.active.postMessage({type:'REPAIR_CACHE'});}
+   else if(registration.active){pending='repair';registration.active.postMessage({type:'REPAIR_CACHE',requestId:epoch});}
    else throw Error();
   }catch(error){if(epoch===attempt)finish('Saving did not finish. Check your connection and available storage, then retry.');}
  });
