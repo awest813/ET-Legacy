@@ -1764,6 +1764,10 @@ static void SV_VerifyPaks_f(client_t *cl)
 		{
 			bGood = (FS_FileIsInPAK(Sys_GetDLLName("ui"), &nChkSum2) == 1);
 		}
+		if (!bGood)
+		{
+			Com_DPrintf("Pure validation: native module packages unavailable\n");
+		}
 
 		nClientPaks = Cmd_Argc();
 
@@ -1906,6 +1910,8 @@ static void SV_VerifyPaks_f(client_t *cl)
 			nChkSum1 ^= nClientPaks;
 			if (nChkSum1 != nClientChkSum[nClientPaks])
 			{
+				Com_DPrintf("Pure validation: encoded checksum %d differs from %d (feed %d, %d packages)\n",
+				            nClientChkSum[nClientPaks], nChkSum1, sv.checksumFeed, nClientPaks);
 				bGood = qfalse;
 				break;
 			}
@@ -2399,16 +2405,18 @@ static void SV_UserMove(client_t *cl, msg_t *msg, qboolean delta)
 		// the moves can be processed normaly
 	}
 
-	// a bad cp command was sent, drop the client
-	if (sv_pure->integer != 0 && cl->pureAuthentic == 0)
+	if (cl->state != CS_ACTIVE)
 	{
-		SV_DropClient(cl, "Cannot validate pure client!");
+		// A newer map can arrive while the client is still loading the previous
+		// gamestate. Its old usercmds do not establish failed pure validation.
+		cl->deltaMessage = -1;
 		return;
 	}
 
-	if (cl->state != CS_ACTIVE)
+	// Only active clients can move. A bad cp command must still drop them.
+	if (sv_pure->integer != 0 && cl->pureAuthentic == 0)
 	{
-		cl->deltaMessage = -1;
+		SV_DropClient(cl, "Cannot validate pure client!");
 		return;
 	}
 

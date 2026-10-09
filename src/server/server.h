@@ -505,6 +505,7 @@ void SV_ExecuteClientMessage(client_t *cl, msg_t *msg);
 void SV_UserinfoChanged(client_t *cl);
 void SV_UpdateUserinfo_f(client_t *cl);
 void SV_ClientEnterWorld(client_t *client, usercmd_t *cmd);
+void SV_SendClientGameState(client_t *client);
 qboolean SV_CheckForMsgOverflow(client_t *client, msg_t *msg);
 void SV_DropClient(client_t *drop, const char *reason);
 void SV_ExecuteClientCommand(client_t *cl, const char *s, qboolean clientOK, qboolean premaprestart);

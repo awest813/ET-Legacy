@@ -1042,7 +1042,9 @@ void CL_SendPureChecksums(void)
 	// if we are pure we need to send back a command with our referenced pk3 checksums
 	pChecksums = FS_ReferencedPakPureChecksums();
 
-	Com_sprintf(cMsg, sizeof(cMsg), "cp %d %s", cl.serverId, pChecksums);
+	// Configstring updates can advance serverId before the next gamestate
+	// supplies its checksum feed. Keep old reports identifiable to the server.
+	Com_sprintf(cMsg, sizeof(cMsg), "cp %d %s", clc.checksumFeedServerId, pChecksums);
 
 	CL_AddReliableCommand(cMsg);
 }

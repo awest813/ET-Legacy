@@ -492,6 +492,13 @@ checkingOnline.pending[1]();assert.equal(checkingOnline.context.document.activeE
 checkingOnline.elements.refreshonline.click();checkingOnline.elements.onlinebtn.focus();checkingOnline.pending[2]();
 assert.equal(checkingOnline.context.document.activeElement,checkingOnline.elements.onlinebtn,'Check completion cannot steal focus from another action');
 const rejectedRelay=launcher({relayError:true});rejectedRelay.elements.onlinebtn.click();rejectedRelay.elements.joinbtn.click();
+const duplicatePlayer=launcher();duplicatePlayer.elements.onlinebtn.click();duplicatePlayer.elements.joinbtn.click();
+const playerIdentity=duplicatePlayer.files.get('/browser/etmain/etkey');
+duplicatePlayer.context.Module.browserNetworkStatus('Disconnected','Bad GUID: Duplicate etkey.',{failed:true,sent:1,received:1});
+assert.match(duplicatePlayer.elements.connectionhint.textContent,/Close or disconnect.*then retry/);
+assert.equal(duplicatePlayer.files.get('/browser/etmain/etkey'),playerIdentity,'Duplicate-player recovery must preserve the saved identity');
+duplicatePlayer.context.Module.browserNetworkStatus('Online','Packets flowing',{failed:false,ready:true,sent:2,received:2});
+assert.doesNotMatch(duplicatePlayer.elements.connectionhint.textContent,/Separate players/,'Successful reconnection clears duplicate-player guidance');
 assert.equal(rejectedRelay.calls.length,0);
 assert.equal(rejectedRelay.elements.joinbtn.disabled,false);
 assert.equal(rejectedRelay.elements.offlinebtn.disabled,false);

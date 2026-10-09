@@ -254,6 +254,7 @@ typedef struct
 
 	int challenge;                              ///< from the server to use for connecting
 	int checksumFeed;                           ///< from the server for checksum calculations
+	int checksumFeedServerId;                   ///< gamestate that supplied this checksum feed
 
 	int onlyVisibleClients;
 

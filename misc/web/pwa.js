@@ -9,7 +9,7 @@
   var fullButtons = [doc.getElementById('fullscreenbtn'), doc.getElementById('launchfullscreen')];
   var registration = null, prompt = null, saved = false, packs = false, installing = false, updateRequested = false;
   var fullscreenPending = false, fullscreenTimer = null, fullEpoch = 0;
-  var updateTimer = null, repairTimer = null, repairing = false;
+  var updateTimer = null, repairTimer = null, repairing = false, updateFailed = false;
   var workers = new WeakSet(), registrations = new WeakSet();
   var installed = !!(win.matchMedia && win.matchMedia('(display-mode: standalone)').matches) || !!nav.standalone;
   var message = '', fullMessage = '';
@@ -97,11 +97,11 @@
    var activated = worker.state === 'activated';
    worker.addEventListener('statechange', function() {
     if (worker.state === 'activated') activated = true;
-    if (worker.state === 'installed') { render(); if (registration.waiting) message = 'An app update is saved. Reload when you are ready to end the current match.'; render(); }
-    if (worker.state === 'redundant' && !activated) { clearUpdate(); message = saved ? 'The app update could not be saved. Your existing offline app is still available. Check storage and retry.' : 'Offline saving did not finish. Check available storage and retry; connected play is still available.'; retry.hidden = false; render(); }
+    if (worker.state === 'installed') { updateFailed = false; render(); if (registration.waiting) message = 'An app update is saved. Reload when you are ready to end the current match.'; render(); }
+    if (worker.state === 'redundant' && !activated) { clearUpdate(); updateFailed = true; message = saved ? 'The app update could not be saved. Your existing offline app is still available. Check storage and retry.' : 'Offline saving did not finish. Check available storage and retry; connected play is still available.'; retry.hidden = false; render(); }
    });
   }
-  function register() {
+  function register(forceUpdate) {
    retry.hidden = true;
    if (!win.isSecureContext || !serviceWorker) { message = 'Offline app installation needs HTTPS or localhost and browser permission. Connected play is still available.'; render(); return; }
    message = ''; render();
@@ -112,12 +112,16 @@
     if (value.active && !repairing) requestStatus(value.active);
     if (value.waiting) message = 'An app update is saved. Reload when you are ready to end the current match.';
     render();
+    if (forceUpdate && typeof value.update === 'function') {
+     function updateUnavailable() { updateFailed = true; message = saved ? 'Could not check the app update. Your saved offline app is still available. Reconnect and retry.' : 'Could not check the app update. Connected play is still available. Reconnect and retry.'; retry.hidden = false; render(); }
+     try { Promise.resolve(value.update()).catch(updateUnavailable); } catch (e) { updateUnavailable(); }
+    }
    }, failed); } catch (e) { failed(); }
   }
   if (serviceWorker) {
    serviceWorker.addEventListener('message', function(event) {
     if (!event.data) return;
-    if (event.data.type === 'APP_READY') { clearRepair(); saved = true; retry.hidden = true; if (!registration || !registration.waiting) message = ''; render(); }
+    if (event.data.type === 'APP_READY') { clearRepair(); saved = true; retry.hidden = !updateFailed; if (!updateFailed && (!registration || !registration.waiting)) message = ''; render(); }
     if (event.data.type === 'APP_SAVE_FAILED' || (event.data.type === 'APP_MISSING' && !repairing)) { clearRepair(); saved = false; message = 'Some offline app files are unavailable. Reconnect and retry offline saving.'; retry.hidden = false; render(); }
     if (event.data.type === 'APP_OTHER_TABS') { clearUpdate(); message = 'Close the other app tabs or windows, then reload to update. Your current match can continue.'; render(); }
    });
@@ -126,15 +130,16 @@
   }
   retry.addEventListener('click', function() {
    if (repairing) return;
+   updateFailed = false;
    if (registration && registration.active && !saved) {
     // Also discover a newer bundle if this cache belongs to an older deployment.
-    register(); repairing = true; retry.hidden = false; message = 'Saving app files for offline play…'; render();
+    register(true); repairing = true; retry.hidden = false; message = 'Saving app files for offline play…'; render();
     repairTimer = options.setTimeout.call(win, function() { clearRepair(); message = 'Saving did not finish. Check your connection and available storage, then retry.'; retry.hidden = false; render(); }, 30000);
     try { registration.active.postMessage({type:'REPAIR_CACHE'}); }
     catch (e) { clearRepair(); message = 'Offline saving is unavailable. Reconnect and retry when ready.'; retry.hidden = false; render(); }
     return;
    }
-   register();
+   register(true);
   }); render(); register();
   return {gameFilesReady: function(value) { packs = !!value; render(); }, show:show, handleEscape:handleEscape};
  }

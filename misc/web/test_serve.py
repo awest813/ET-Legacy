@@ -19,6 +19,18 @@ from public_servers import resolve_ticket
 
 
 class PreviewRoutes(unittest.TestCase):
+    def test_explicit_config_is_shared_without_replacing_default(self):
+        with tempfile.TemporaryDirectory() as root:
+            config = os.path.join(root, 'fixture.json')
+            settings = {'server':'127.0.0.1', 'udpPort':27961, 'serverLabel':'Private fixture'}
+            with open(config, 'w', encoding='utf-8') as stream:
+                json.dump(settings, stream)
+            with patch.dict(os.environ, {'ETWASM_SERVER_CONFIG':config}):
+                self.assertEqual(serve.online_settings(), settings)
+                with open(config, 'w', encoding='utf-8') as stream:
+                    stream.write('[]')
+                self.assertEqual(serve.online_settings(), {})
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.build = os.path.join(self.temp.name, "build")

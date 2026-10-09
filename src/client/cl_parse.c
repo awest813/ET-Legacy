@@ -825,6 +825,7 @@ void CL_ParseGamestate(msg_t *msg)
 
 	// parse serverId and other cvars
 	CL_SystemInfoChanged();
+	clc.checksumFeedServerId = cl.serverId;
 
 	// Verify if we have all official pakfiles. As we won't
 	// be downloading them, we should be kicked for not having them.

@@ -41,7 +41,7 @@ _public_catalog = PublicCatalog()
 
 def online_settings():
     try:
-        with open(os.path.join(REPO, 'web-server.json'), encoding='utf-8') as stream:
+        with open(os.environ.get('ETWASM_SERVER_CONFIG', os.path.join(REPO, 'web-server.json')), encoding='utf-8') as stream:
             value = json.load(stream)
         if not isinstance(value, dict):
             return {}

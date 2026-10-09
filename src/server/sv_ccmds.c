@@ -232,6 +232,19 @@ static qboolean SV_TransitionGameState(gamestate_t new_gs, gamestate_t old_gs, i
 void MSG_PrioritiseEntitystateFields(void);
 void MSG_PrioritisePlayerStateFields(void);
 
+static qboolean SV_RestartLoadingClient(client_t *client, qboolean isBot)
+{
+	if (!isBot && client->state < CS_ACTIVE)
+	{
+		// A fast restart must not make a loading client active before it has
+		// received and validated the current gamestate's pure packages.
+		Com_Memset(&client->lastUsercmd, 0, sizeof(client->lastUsercmd));
+		SV_SendClientGameState(client);
+		return qtrue;
+	}
+	return qfalse;
+}
+
 /**
  * @brief SV_FieldInfo_f
  */
@@ -255,7 +268,7 @@ static void SV_MapRestart_f(void)
 	gamestate_t new_gs, old_gs;
 
 	// make sure we aren't restarting twice in the same frame
-	if (com_frameTime == sv.serverId)
+	if (com_frameTime <= sv.serverId)
 	{
 		return;
 	}
@@ -389,6 +402,10 @@ static void SV_MapRestart_f(void)
 		// Player won't enter the world until the download is done
 		if (client->download == 0 && client->bWWWing == qfalse)
 		{
+			if (SV_RestartLoadingClient(client, isBot))
+			{
+				continue;
+			}
 			if (client->state == CS_ACTIVE)
 			{
 				SV_ClientEnterWorld(client, &client->lastUsercmd);

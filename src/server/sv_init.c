@@ -687,6 +687,13 @@ void SV_TouchCGameDLL(void)
 	}
 }
 
+static int SV_NextServerId(int previousId, int frameTime)
+{
+	// Multiple map commands can execute in one engine frame. Their checksum
+	// feeds must still have distinct IDs so stale pure reports are rejected.
+	return frameTime > previousId ? frameTime : previousId + 1;
+}
+
 /**
  * @brief Change the server to a new map, taking all connected
  * clients along with it.
@@ -699,6 +706,7 @@ void SV_SpawnServer(const char *server)
 	unsigned int checksum;
 	qboolean     isBot;
 	const char   *p;
+	int          previousServerId = sv.serverId;
 
 	// broadcast a level change to all connected clients
 	if (svs.clients && !com_errorEntered)
@@ -796,7 +804,7 @@ void SV_SpawnServer(const char *server)
 	Cvar_Set("sv_mapChecksum", va("%i", checksum));
 
 	// serverid should be different each time
-	sv.serverId             = com_frameTime;
+	sv.serverId             = SV_NextServerId(previousServerId, com_frameTime);
 	sv.restartedServerId    = sv.serverId;
 	sv.checksumFeedServerId = sv.serverId;
 	Cvar_Set("sv_serverid", va("%i", sv.serverId));

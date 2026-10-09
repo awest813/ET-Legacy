@@ -1993,3 +1993,53 @@ Generated packages and stock game data are excluded from Git.
 Native Git builds can advertise `ET Legacy 2.86-dirty` instead of a dotted patch
 version with a leading `v`. Discovery accepts both forms while still requiring
 the explicit matching-module declaration for pure servers.
+
+### Two-client map transition and combat verification (9 October 2026)
+
+Two Chromium clients with independent origin storage joined the native loopback
+pure server. Both rendered the Radar-to-Oasis transition. Real firing reduced
+the shooter's magazine from 30 to 27 and the other player's health from 100 to
+46; further shots produced synchronized Thompson death messages. These damage
+checks used the fixture's enabled friendly fire at a common spawn.
+
+Rapid transitions exposed a loading-state bug during a fast map restart. The
+client now identifies checksum reports by the gamestate that supplied their
+feed. Full server map loads receive distinct IDs even within one engine frame.
+Fast restarts resend the gamestate to pending clients and preserve loading until
+their handshake finishes. Active clients still need valid pure authentication
+before processing movement. Production-function tests cover pending, primed,
+active, invalid and bot states in browser and desktop configurations.
+
+The corrected native server and both clients survived the rapid Oasis-to-ETL
+Supply transition, including a fast restart during loading. Its log records map
+IDs 64142 and 64143 and subsequent accepted checksum reports and `ClientBegin`
+for both players. Screenshots: `pure-multiplayer-damage-a.png`,
+`pure-multiplayer-damage-b.png`, `pure-rapid-transition-a.png`, and
+`pure-rapid-transition-b.png` under `build_wasm`. Native fixture diagnostics are
+in `build_native/fixture/restart-loading-server.log`.
+
+Run an isolated launcher using `python misc/web/run_online.py --config <file>`.
+The configuration supplies separate web/relay ports and a server target; child
+services share that exact file through `ETWASM_SERVER_CONFIG`. Service logs
+include port numbers. The normal `web-server.json` stays available for the
+regular launcher. Same-origin tabs share a saved player identity: duplicate-key
+errors now explain that the other game should be disconnected before retrying.
+Distinct players use distinct browser profiles.
+
+The final seven bundle hashes matched both local files and HTTP responses. After
+activating that saved update, the fixture's HTTP and relay processes were stopped
+and ports 8083/8084 were independently confirmed unavailable. A new Chromium tab
+then cold-started the saved app, verified cached packs, started Oasis with four
+Normal bots, and spawned a movable Allied Medic. Evidence:
+`build_wasm/cold-offline-bots.png`, `cold-offline-bots-log.json`, and
+`build_native/fixture/offline-host-stopped.json`. This tests an unavailable local
+host with existing browser storage; it does not prove storage survival after
+device cleanup or physical ChromeOS behavior.
+
+An update-saving failure during development exposed a retry issue. Retry now
+calls the registration's explicit update check; a status reply from the previous
+saved bundle cannot hide a failed update. PWA unit checks cover that recovery and
+the existing repair/update/fullscreen flows. The launcher suite, 26 HTTP checks,
+native dedicated-server build, browser build and compiled pure-state tests pass.
+Public server deployment, full attacker objective completion and physical mobile
+and ChromeOS testing remain outstanding before the whole port can be complete.

@@ -11,6 +11,7 @@ function fixture(fault={}){
  const active={postMessage:m=>{if(fault.post)throw Error('Worker stopped');posts.push(m);}},registration=new Element();registration.active=active;
  if(fault.update){registration.waiting=new Element();registration.waiting.state='installed';registration.waiting.postMessage=m=>{if(fault.updatePost)throw Error('Worker stopped');posts.push(m);};}
  sw.register=async()=>{if(fault.register)throw Error();return registration;};sw.controller=active;
+ registration.update=async()=>{registration.updateCalls=(registration.updateCalls||0)+1;if(fault.updateCheck)throw Error('Network unavailable');};
  if(fault.registerSync)sw.register=()=>{throw Error('Registration denied');};
  win.isSecureContext=!fault.insecure;win.matchMedia=()=>({matches:!!fault.installed});
  const nav={serviceWorker:fault.noWorker?null:sw};const timers=new Map();let serial=0;
@@ -78,6 +79,11 @@ function fixture(fault={}){
  for(let i=0;i<3;i++){f.e.retryapp.send('click');await tick();f.registration.send('updatefound');}
  assert.equal(f.registration.events.updatefound.length,1,'Registration retries do not accumulate update listeners');
  assert.equal(f.registration.installing.events.statechange.length,1,'The same installing worker is watched once');
+ assert.equal(f.registration.updateCalls,3,'Retry must explicitly check for a newer worker rather than only registering an existing one');
+ f=fixture({updateCheck:true});await tick();f.sw.send('message',{data:{type:'APP_READY'}});
+ f.e.retryapp.send('click');await tick();assert.match(f.e.appstatus.textContent,/Could not check the app update/);
+ f.sw.send('message',{data:{type:'APP_READY'}});assert.match(f.e.appstatus.textContent,/Could not check/,'A status reply from the previous saved bundle cannot hide an update failure');
+ assert.equal(f.e.retryapp.hidden,false);
  const modal={modal:true};f=fixture(modal);await tick();f.e.fullscreenbtn.send('click');await tick();
  f.app.handleEscape({key:'Escape'});assert.equal(f.doc.fullscreenElement,f.doc.body,'Dialog Escape does not also exit fullscreen');
  modal.modal=false;f.app.handleEscape({key:'Escape'});await tick();assert.equal(f.doc.fullscreenElement,null);
