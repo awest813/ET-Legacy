@@ -37,6 +37,7 @@
 #include "ui_cvars.h"
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include "ui_web_settings.h"
 EM_JS(void, UI_WebMatchSetup, (), {
 	if (Module['browserShowMatchSetup']) Module['browserShowMatchSetup']();
 });
@@ -6273,9 +6274,16 @@ void UI_RunMenuScript(char **args)
 			trap_Cvar_Set("ui_r_texturemode", ui_r_texturemode);
 			trap_Cvar_Set("ui_r_ignorehwgamma", va("%i", ui_r_ignorehwgamma));
 			trap_Cvar_Set("ui_r_dynamiclight", va("%i", ui_r_dynamiclight));
+
+#ifdef __EMSCRIPTEN__
+			UI_WebCustomSizeGet();
+#endif
 		}
 		else if (Q_stricmp(name, "systemCvarsReset") == 0)
 		{
+#ifdef __EMSCRIPTEN__
+			UI_WebCustomSizeReset();
+#endif
 			trap_Cvar_Set("ui_cl_lang", "");
 			trap_Cvar_Set("ui_r_mode", "");
 			trap_Cvar_Set("ui_r_intensity", "");
@@ -6403,6 +6411,9 @@ void UI_RunMenuScript(char **args)
 			trap_Cvar_Set("cl_wwwDownload", "0");
 #endif
 
+#ifdef __EMSCRIPTEN__
+			UI_WebCustomSizeApply();
+#endif
 			trap_Cvar_Set("ui_cl_lang", "");
 			trap_Cvar_Set("ui_r_mode", "");
 			trap_Cvar_Set("ui_rate", "");

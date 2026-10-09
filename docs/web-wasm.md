@@ -2232,3 +2232,35 @@ cached stock packs; the HTTP log showed a manifest request and no pack
 redownload. Evidence: `build_wasm/pack-crc-live-fueldump.png` and
 `pack-crc-live-fueldump-log.json`. This startup check does not establish total
 load-time improvement or a complete Fuel Dump attacking round.
+
+## Browser custom render-size Apply and Back (October 9, 2026)
+
+Changing only Custom Width or Custom Height previously failed to request a
+renderer restart when Custom resolution was already selected. The fields also
+changed engine cvars before Apply, so Back did not discard the edits. Browser
+System settings now stage both dimensions, read pending latched dimensions when
+opened, discard staged edits on Back, and apply them with restart detection.
+Desktop menu behavior is unchanged.
+
+`misc/web/test_system_settings.c` tests the actual staging helper, including
+width-only and height-only changes, Back, Apply, reopening, non-custom mode and
+an already-latched width. Compile it with Emscripten and run the output in Node:
+
+```sh
+emcc misc/web/test_system_settings.c -O2 -sENVIRONMENT=node -sWASM_ASYNC_COMPILATION=0 -o build_wasm/test_system_settings.cjs
+node build_wasm/test_system_settings.cjs
+```
+
+The regression passes. Browser and native UI/cgame builds pass, the local
+native/WASM fixture module pack was regenerated, and all seven local/served
+bundle hashes match (`build_wasm/custom-size-bundle-hashes.json`). The fixture
+pack refresh is not a deployment or a new online-session verification.
+
+In the in-app browser, a solo Oasis match started at 960x540. Editing to
+1024x576 then pressing Back restored 960x540. Repeating the edits and confirming
+Apply restarted the renderer and produced an actual 1024x576 canvas. Ending the
+match through Match setup and starting another match preserved 1024x576 and
+rendered normally. Evidence: `build_wasm/custom-size-back-discard.png`,
+`custom-size-applied.png`, `custom-size-applied-log.json`,
+`custom-size-persisted.png` and `custom-size-persisted.json`. Browser graphics
+presets and physical Chromebook validation remain outstanding.

@@ -35,6 +35,9 @@
 
 #include "ui_shared.h"
 #include "ui_local.h"
+#ifdef __EMSCRIPTEN__
+#include "ui_web_settings.h"
+#endif
 
 /**
  * @brief Script_Show
@@ -670,7 +673,11 @@ void Script_ConditionalScript(itemDef_t *item, qboolean *bAbort, char **args)
 				trap_Cvar_VariableStringBuffer("ui_r_texturemode", ui_r_texturemode, sizeof(ui_r_texturemode));
 				trap_Cvar_VariableStringBuffer("r_texturemode", r_texturemode, sizeof(r_texturemode));
 
-				if (Q_stricmp(cl_lang, ui_cl_lang) ||
+				if (
+#ifdef __EMSCRIPTEN__
+				    UI_WebCustomSizeChanged() ||
+#endif
+				    Q_stricmp(cl_lang, ui_cl_lang) ||
 				    ui_r_mode != r_mode ||
 				    ui_r_colorbits != r_colorbits ||
 				    ui_r_fullscreen != r_fullscreen ||
