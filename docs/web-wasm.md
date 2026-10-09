@@ -2867,6 +2867,38 @@ The victory screen was not captured. Evidence:
 `fueldump-undefended-objective-log.json`, and
 `fueldump-undefended-next-round-playing.png`.
 
+## Selected releases and live relay recovery (October 9, 2026)
+
+Use `python misc/web/run_online.py --config <file> --build-dir <release>` to
+serve an extracted browser release. `ETWASM_BUILD` also selects the release
+for standalone services; the command-line option takes precedence. Static
+files and the server browser's module identity manifest come from that same
+directory. A missing or invalid selected manifest does not fall back to the
+local build's identities. Original game packs remain separately supplied.
+
+Two browser clients loaded the downloaded clean Linux CI artifact `d776dd2`
+against a local native Radar server with `sv_pure 1` and its matching module
+pack. Allied and Axis movement and firing worked; a following spectator
+replicated the Allied player's position and ammunition changes. Explicit
+Disconnect followed by Retry returned to the match as a spectator.
+
+Restarting the relay exposed a native GUID check that compared a reused client
+slot against its own previous identity. The check now excludes that slot while
+continuing to reject duplicate identities in every other slot. The compiled
+production-code regression failed before the fix and passes afterward,
+including sparse slots, invalid GUIDs and another simultaneous duplicate.
+With the patched native game DLL, both clients recovered after a second
+backend-only restart without restarting the game server. Native events confirm
+active-slot cleanup at 546400/551600 and `ClientBegin` at 551350/557050, before
+the previous sessions timed out. Both browser views returned to rendered Radar.
+The launcher also explains that an unpatched server may require waiting for
+the previous session to expire; it preserves the player's identity.
+
+Validation: 89 Python service tests, launcher JavaScript regressions, the
+compiled GUID fixture, and native/browser builds. This verifies local pure
+online play and relay recovery; public HTTPS/WSS deployment and physical
+ChromeOS, Safari and mobile checks remain outstanding.
+
 ## Fuel Dump contested attacking completion (October 9, 2026)
 
 A separate match on build `f51442b` used twelve Hard bots selected in the

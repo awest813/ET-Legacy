@@ -2309,6 +2309,14 @@ char *ClientConnect(int clientNum, qboolean firstTime, qboolean isBot)
 			{
 				gclient_t *cl = level.clients + level.sortedClients[i];
 
+				// The engine can reuse this slot after a transport reconnect.
+				// Its previous game entity is disconnected below; other slots
+				// must still be checked for duplicate identities.
+				if (level.sortedClients[i] == clientNum)
+				{
+					continue;
+				}
+
 				if (!Q_strncmp(cl->pers.cl_guid, cs_guid, MAX_GUID_LENGTH + 1))
 				{
 					return "Bad GUID: Duplicate etkey.";

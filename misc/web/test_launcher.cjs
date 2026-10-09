@@ -573,6 +573,7 @@ assert.equal(passwordWriteFailure.networkCalls.length,1);assert.match(passwordWr
 const playerIdentity=duplicatePlayer.files.get('/browser/etmain/etkey');
 duplicatePlayer.context.Module.browserNetworkStatus('Disconnected','Bad GUID: Duplicate etkey.',{failed:true,sent:1,received:1});
 assert.match(duplicatePlayer.elements.connectionhint.textContent,/Close or disconnect.*then retry/);
+assert.match(duplicatePlayer.elements.connectionhint.textContent,/previous connection.*old server session to time out/);
 assert.equal(duplicatePlayer.files.get('/browser/etmain/etkey'),playerIdentity,'Duplicate-player recovery must preserve the saved identity');
 duplicatePlayer.context.Module.browserNetworkStatus('Online','Packets flowing',{failed:false,ready:true,sent:2,received:2});
 assert.doesNotMatch(duplicatePlayer.elements.connectionhint.textContent,/Separate players/,'Successful reconnection clears duplicate-player guidance');

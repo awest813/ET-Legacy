@@ -23,9 +23,10 @@ from custom_assets import catalog, inspect_pack, MAX_PACK, PACK_NAME, inventory_
 from server_assets import install as install_server_pack, pack_checksum, DownloadCancelled, public_error
 from server_browser import ServerBrowser
 from public_servers import PublicCatalog, issue_ticket
+from build_paths import browser_build
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-BUILD = os.path.join(REPO, "build_wasm")
+BUILD = str(browser_build())
 ASSETS = os.environ.get("ETWASM_ASSETS", r"C:\Users\allen\Downloads\etlegacy-wasm\assets")
 BUILD_FILES = {"etl.html", "etl.js", "etl.wasm", "etl.data", "etl.js.map", "etl.wasm.map"}
 BUILD_FILES.update({"sw.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"})

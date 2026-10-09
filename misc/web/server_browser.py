@@ -6,9 +6,9 @@ import threading
 import time
 import unicodedata
 import json
-from pathlib import Path
+from build_paths import browser_build
 
-MODULE_MANIFEST = Path(__file__).resolve().parents[2] / 'build_wasm/web-modules/identity.json'
+MODULE_MANIFEST = browser_build() / 'web-modules/identity.json'
 
 
 def browser_module_identities():

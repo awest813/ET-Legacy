@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 from urllib.parse import urlsplit
+from build_paths import browser_build
 
 def https_origin(value):
     """An exact TLS proxy origin, with no credentials, path or query."""
@@ -34,6 +35,8 @@ def main():
                         help='Server configuration file (default: web-server.json)')
     parser.add_argument('--public-origin', type=https_origin,
                         help='Exact HTTPS origin of a TLS reverse proxy; services stay on loopback')
+    parser.add_argument('--build-dir', type=Path,
+                        help='Browser release directory (default: ETWASM_BUILD or build_wasm)')
     args = parser.parse_args()
     config = args.config.resolve()
     try:
@@ -46,11 +49,14 @@ def main():
     except (OSError,ValueError,KeyError,TypeError) as error:
         raise SystemExit('Check '+str(config)+' using misc/web/online-server.example.json: '+str(error))
     udp,web,relay=ports
+    build = args.build_dir.resolve() if args.build_dir is not None else browser_build()
+    if args.build_dir is not None and not build.is_dir():
+        parser.error('--build-dir must name an existing browser release directory')
     env=os.environ.copy()
     origins = [args.public_origin] if args.public_origin else [f'http://localhost:{web}', f'http://127.0.0.1:{web}']
     relay_url = 'wss://' + args.public_origin[len('https://'):] + '/relay' if args.public_origin else f'ws://127.0.0.1:{relay}/relay'
     env.update(ETWASM_RELAY_URL=relay_url,ETWASM_BIND='127.0.0.1',
-               ETWASM_SERVER_CONFIG=str(config))
+               ETWASM_SERVER_CONFIG=str(config), ETWASM_BUILD=str(build))
     # Shared only by these child services, never written to disk or browser JSON.
     env['ETWASM_PUBLIC_SECRET'] = secrets.token_hex(32)
     flags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0
@@ -63,6 +69,7 @@ def main():
         children.append(subprocess.Popen([sys.executable,'-u',str(root/'misc/web/relay.py'),'--server',server,'--udp-port',str(udp),'--port',str(relay),*origin_args],cwd=root,env=env,creationflags=flags,stdout=logs[0],stderr=subprocess.STDOUT))
         children.append(subprocess.Popen([sys.executable,'-u',str(root/'misc/web/serve.py'),str(web)],cwd=root,env=env,creationflags=flags,stdout=logs[1],stderr=subprocess.STDOUT))
         print(f'Online launcher: {args.public_origin or f"http://localhost:{web}"}/ (Ctrl+C stops both services)',flush=True)
+        print(f'Browser release: {build}', flush=True)
         if args.public_origin:
             print(f'TLS proxy required: /relay and /relay/* -> 127.0.0.1:{relay}; other paths -> 127.0.0.1:{web}',flush=True)
         print('Service logs: '+', '.join('build_wasm/'+name for name in log_names),flush=True)
