@@ -3450,3 +3450,12 @@ The browser rebuild, seven-file/two-module bundle verification, all six JavaScri
 The portrait canvas reserves space for touch controls only while those controls are visible. Native menus, console and loading screens can use the full available canvas area; returning to gameplay restores the controls and their reserved area. This follows the existing native mode and running state rather than relying on browser-specific CSS relational selectors.
 
 A live Chromium check at 320x480 reproduced the Team menu retaining the smaller 232.875x130.984375 gameplay canvas even after controls disappeared. After the fix and a normal verified PWA update/reload, opening Team expanded the canvas to 320x180. Closing it restored the smaller aspect-correct gameplay view and visible controls. This is viewport emulation, not physical touchscreen validation. Evidence: build_wasm/touch-short-menu-before.png, touch-short-menu-after.png and touch-short-menu-proof.json. Browser build, generated JavaScript parsing, all six JavaScript suites and seven-file/two-module bundle verification passed. The temporary test tab/server were closed and viewport override reset; main services remained running.
+
+
+### Portrait control space includes the bottom safe area (2026-10-09)
+
+Portrait gameplay now reserves the 172-pixel action grid, an 8-pixel gap and the same bottom spacing used by the controls, including the device safe-area inset. The default zero-inset reservation remains 196 pixels. Larger insets no longer lift the action buttons into the game view.
+
+A controlled Chromium fixture replaced the bottom safe-area environment value with 34 pixels in served HTML. At 390x500, the previous canvas ended at y=303.984375 while the buttons began at y=294, reproducing roughly 10 pixels of overlap. After rebuilding, the canvas ended at y=285.984375 with the buttons still at y=294, leaving the intended 8-pixel gap; all eight actions remained within the viewport. This is simulated inset evidence, not a physical phone test. The modified fixture HTML also means this check does not validate PWA installation.
+
+Browser build, generated JavaScript parsing, all six JavaScript suites and seven-file/two-module bundle verification passed. Evidence: build_wasm/touch-safearea-before.png, touch-safearea-after.png, touch-safearea-proof.json, touch-safearea-live.log and touch-safearea-build.log. The temporary fixture/tab were closed, viewport reset and main services left running.
