@@ -2723,3 +2723,75 @@ complete ammo transport and firing chain.
 Evidence: `build_wasm/railgun-switch-before.log`, `railgun-switch-after.log`,
 `railgun-switch-build.log`, `railgun-switch-hashes.json`,
 `railgun-switch-startup.png`, and `railgun-switch-startup-log.json`.
+
+## Undefended Rail Gun transport check (October 9, 2026)
+
+A separate Chromium match on build `f51442b` started from zero-bot Rail Gun.
+Console commands disabled team balancing and the population cap, then added
+six named Axis bots (initially two engineers, a field ops, medic, soldier, and
+covert ops). The human stayed a spectator; there were no Allied players or
+bots. No objective, movement, timer, or victory commands were used.
+
+The bots completed every transport stage after the normal warmup restart:
+first-tug ammunition loading at 141300, north-crane delivery at 187950,
+second-tug transfer at 218750, gun loading at 229950, and gun firing at 236350.
+The result rendered Axis WIN with all six bots and the human spectator listed.
+This establishes that browser bot navigation, mover boarding, transport
+triggers, and final switch activation can complete the attack chain without
+defenders. It does not establish a contested attacking victory or attribute
+the successful run to the switch spelling correction.
+
+Evidence: `build_wasm/railgun-undefended-objective-log.json`,
+`railgun-undefended-north-crane.png`, and `railgun-undefended-axis-win.png`.
+The isolated match tab was closed after the result.
+
+## Continuous Rail Gun bot round (October 9, 2026)
+
+A continuous thirty-minute Rail Gun round finished with an Allied defensive
+win. Twelve Normal bots played six per team on build `d911c80`; the URL still
+contained the previous Gold Rush / Hard parameters because this match started
+before the deep-link return fix. Read-only rollcall output confirms difficulty
+4. All twelve bots appear in the result, with 199 Allied kills and 187 Axis
+kills. The human spectated throughout with zero kills, deaths, shots, and XP.
+Spectator follow and read-only goal diagnostics did not change objectives or
+team assignments.
+
+The saved log records depot captures, repeated switch operation, MG
+construction/destruction, and sustained combat. Following an Axis rider showed
+movement to and boarding of the tug. The contested run did not complete the
+ammo/firing sequence; the separate undefended run above provides that coverage
+under different conditions. The spelling correction was not loaded into this
+already-running round.
+
+Evidence: `build_wasm/railgun-oct9-full-round-result.png`,
+`railgun-oct9-full-round-stats.png`, and `railgun-oct9-objective-round-log.json`.
+The automatic next-round load rendered Rail Gun with its warmup, and all twelve
+bots emitted game-entry events at 1922000. Evidence:
+`railgun-oct9-next-round.png` and `railgun-oct9-next-round-log.json`. That next
+round was then ended through Match setup after saving its startup evidence.
+
+## Undefended Gold Rush attack check (October 9, 2026)
+
+A separate Chromium match on build `f51442b` started with zero bots, disabled
+balancing and the population cap through the console, and added six named
+Allied bots. Initial classes were two engineers, a field ops, medic, soldier,
+and covert ops. No Axis players or bots were present; the human spectated.
+No objective, movement, timer, or victory commands were used.
+
+After the normal warmup restart, captured events show tank repair at 97050,
+tank theft at 100400, bank-door destruction at 289200, both crate thefts at
+298400/299600, deliveries at 311850/312550, and truck escape at 359700. The
+result UI showed Allies WIN with all six bots and the spectator. The automatic
+next round then rendered its warmup. The saved screenshot was taken after
+that reload and shows the next round, rather than the victory screen.
+
+This verifies tank escort, the bank breach, both gold deliveries, and the
+truck escape without defenders. Axis-built tank/truck barriers and contested
+attacking success remain separate coverage; the undefended run did not test
+barrier demolition under those conditions. Bot deaths from vehicle crushing
+occurred during the escape and did not prevent completion.
+
+Evidence: `build_wasm/goldrush-undefended-objective-log.json`,
+`goldrush-undefended-next-round.png`, and
+`goldrush-undefended-next-round-log.json`. The next round was ended through
+Match setup before using that isolated tab for Fuel Dump.
