@@ -27,7 +27,7 @@ int main(void)
     NET_WebClientFrame(1, 0, "Game server error");
     assert(!strcmp(command, "disconnect\n"));
     NET_WebClientFrame(8, 0, "^1Game ^7server error");
-    assert(!strcmp(command, "connect 192.0.2.1:27960\n"));
+    assert(!strcmp(command, "exec browser-connect.cfg\nconnect 192.0.2.1:27960\n"));
     NET_WebUserDisconnect();
     assert(EM_ASM_INT({ return Module.departureNotified === true; }));
     puts("Native network bridge: complete plain/color messages and disconnect/reconnect commands passed.");

@@ -536,6 +536,34 @@ checkingOnline.elements.refreshonline.click();checkingOnline.elements.onlinebtn.
 assert.equal(checkingOnline.context.document.activeElement,checkingOnline.elements.onlinebtn,'Check completion cannot steal focus from another action');
 const rejectedRelay=launcher({relayError:true});rejectedRelay.elements.onlinebtn.click();rejectedRelay.elements.joinbtn.click();
 const duplicatePlayer=launcher();duplicatePlayer.elements.onlinebtn.click();duplicatePlayer.elements.joinbtn.click();
+const passwordRetry=launcher();passwordRetry.elements.onlinebtn.click();passwordRetry.elements.joinbtn.click();
+const badPasswordStats={failed:true,ready:false,opening:false,sent:1,received:1};
+passwordRetry.context.Module.browserNetworkStatus('Connection failed','Invalid password',badPasswordStats);
+passwordRetry.context.Module.browserNetworkFailure('Invalid password',true);
+assert.equal(passwordRetry.elements.retrypasswordfield.hidden,false);
+assert.equal(passwordRetry.context.document.activeElement,passwordRetry.elements.retrypassword);
+const passwordAttempts=passwordRetry.networkCalls.length;
+for (const invalid of ['', 'bad"quote', 'bad\\slash', 'bad;command', 'bad\nline', 'x'.repeat(65)]) {
+ passwordRetry.elements.retrypassword.value=invalid;passwordRetry.elements.retryconnection.click();
+ assert.equal(passwordRetry.networkCalls.length,passwordAttempts,'Invalid replacement passwords cannot open a relay');
+ assert.equal(passwordRetry.elements.retrypassword['aria-invalid'],'true');
+}
+passwordRetry.elements.retrypassword.value='new +safe password';passwordRetry.elements.retryconnection.click();
+assert.equal(passwordRetry.files.get('/browser/legacy/browser-connect.cfg'),'set password "new +safe password"\n');
+assert.equal(passwordRetry.elements.retrypassword.value,'');
+assert.equal(passwordRetry.elements.retrypasswordfield.hidden,true);
+assert.equal(passwordRetry.networkCalls.length,passwordAttempts+1);
+passwordRetry.context.Module.browserNetworkStatus('Connection failed','Invalid password',badPasswordStats);
+passwordRetry.elements.retrypassword.value='discard-me';passwordRetry.elements.networkdialog.close();
+assert.equal(passwordRetry.elements.retrypassword.value,'','Closing the connection dialog clears entered credentials');
+passwordRetry.context.Module.browserNetworkStatus('Online','Connected',{failed:false,ready:true,sent:2,received:2});
+assert.equal(passwordRetry.elements.retrypasswordfield.hidden,true);
+const passwordWriteFailure=launcher();passwordWriteFailure.elements.onlinebtn.click();passwordWriteFailure.elements.joinbtn.click();
+passwordWriteFailure.context.Module.browserNetworkStatus('Connection failed','Invalid password',badPasswordStats);
+passwordWriteFailure.elements.retrypassword.value='safe';
+passwordWriteFailure.context.Module.FS.writeFile=()=>{throw Error('Read only');};
+passwordWriteFailure.elements.retryconnection.click();
+assert.equal(passwordWriteFailure.networkCalls.length,1);assert.match(passwordWriteFailure.elements.connectionstatus.textContent,/Could not update the password/);
 const playerIdentity=duplicatePlayer.files.get('/browser/etmain/etkey');
 duplicatePlayer.context.Module.browserNetworkStatus('Disconnected','Bad GUID: Duplicate etkey.',{failed:true,sent:1,received:1});
 assert.match(duplicatePlayer.elements.connectionhint.textContent,/Close or disconnect.*then retry/);

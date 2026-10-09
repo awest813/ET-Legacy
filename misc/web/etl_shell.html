@@ -112,7 +112,7 @@
 	#serverdetails p { margin: 6px 0; }
 	#serverpassword { margin: 14px 0; }
 	#serverpassword summary { cursor: pointer; min-height: 44px; padding: 12px 0; }
-	#onlinepassword { width: 100%; min-height: 44px; padding: 10px; color: #eee; background: #222429; border: 1px solid #58544a; border-radius: 6px; }
+	#onlinepassword, #retrypassword { width: 100%; min-height: 44px; padding: 10px; color: #eee; background: #222429; border: 1px solid #58544a; border-radius: 6px; }
 	#joinbtn, #refreshonline, #canceljoin, #refreshpublic { width: 100%; min-height: 44px; border-radius: 6px; padding: 10px; }
 	#joinbtn { color: #17140d; background: #e1bd6e; border: 1px solid #f1d28e; font-weight: 700; }
 	#refreshonline, #canceljoin, #refreshpublic { margin-top: 10px; background: #222429; color: #ddd; border: 1px solid #58544a; }
@@ -350,6 +350,7 @@
 		<p>Verified packs stay installed. When all required packs are ready, the game reloads and rejoins automatically.</p>
 	</div>
 	<p id="connectionhint">Retry to join this server, or return to the launcher to choose offline play.</p>
+	<div id="retrypasswordfield" hidden><label for="retrypassword">Server password <input id="retrypassword" type="password" maxlength="64" autocomplete="off" aria-describedby="retrypasswordhint"></label><p id="retrypasswordhint">Enter the correct password, then retry. It is not saved.</p></div>
 	<div class="connectionactions"><button id="reloadassets" type="button" hidden>Reload to load packs</button><button id="retryconnection" type="button">Retry connection</button><button id="disconnectonline" type="button">Disconnect</button><button id="backoffline" type="button">Return to launcher</button></div>
 	<details id="connectiondetails"><summary>Connection details</summary><p id="networkstats"></p></details>
 </dialog>
@@ -366,7 +367,7 @@
 	var difficulty = document.getElementById('difficulty');
 	var matchOptions;
 	var playMode = 'offline', onlineConfigured = false, onlineRequest = null, onlineEpoch = 0, joiningOnline = false;
-	var checkingOnline = false, retryingOnline = false;
+	var checkingOnline = false, retryingOnline = false, retryPasswordRequired = false;
 	var publicEnabled = false, publicEntries = [], publicRequest = null, publicTimer = null, publicEpoch = 0, publicBusy = false, selectedServerId = '', selectedServerLabel = '';
 	var publicCatalogState = null, publicListFailed = false;
 	var serverCompatible = true, serverPasswordRequired = false, serverVerified = false;
@@ -847,13 +848,17 @@
 		}
 		next();
 	}
+	function validServerPassword(value)
+	{
+		return value.length <= 64 && value.split('').every(function(char) {
+			return char.charCodeAt(0) >= 32 && char.charCodeAt(0) !== 127 && ['\\','"',';'].indexOf(char) === -1;
+		});
+	}
 	function updateOnlineJoin()
 	{
 		graphicsPreset.disabled = !['ready','engine-loading'].includes(loadState) || joiningOnline;
 		var password = document.getElementById('onlinepassword');
-		var passwordValid = password.value.length <= 64 && password.value.split('').every(function(char) {
-			return char.charCodeAt(0) >= 32 && char.charCodeAt(0) !== 127 && ['\\','"',';'].indexOf(char) === -1;
-		});
+		var passwordValid = validServerPassword(password.value);
 		controlAttribute(password, 'aria-invalid', String(!passwordValid));
 		controlText(document.getElementById('passwordhint'), passwordValid ? 'Only needed for password-protected servers. It is not saved.' : 'ET passwords cannot contain quotes, backslashes, semicolons or control characters, and must be at most 64 characters.');
 		password.disabled = joiningOnline;
@@ -989,6 +994,10 @@
 	}
 	Module['browserNetworkStatus'] = function(label, text, stats)
 	{
+		if (stats.failed && /^Invalid password$/i.test(text.trim())) retryPasswordRequired = true;
+		if (label === 'Online') { retryPasswordRequired = false; document.getElementById('retrypassword').value = ''; }
+		document.getElementById('retrypasswordfield').hidden = !retryPasswordRequired;
+		document.getElementById('retrypassword').disabled = !!retryConfigRequest || stats.ready || stats.opening;
 		controlText(networkbtn, recoveringAssets ? 'Downloading packs' : assetsNeedReload ? 'Packs ready' : assetError ? 'Download failed' : label);
 		if (label === 'Online') saveAssetResume(null);
 		controlAttribute(networkbtn, 'data-failed', String(stats.failed));
@@ -1000,6 +1009,7 @@
 		controlText(document.getElementById('connectionhint'), recoveringAssets ? 'Cancel to stop this download. Verified packs stay installed.' : assetsNeedReload ? 'Reload to load the verified packs, then join again from the launcher.' : stats.closing ? 'Leaving the server…' : stats.opening ? 'You can cancel this connection attempt.' : label === 'Online' ? 'You are connected. Disconnect to leave this server, or return to the launcher to change play mode.' : stats.ready ? 'Joining the server. Disconnect to cancel, or return to the launcher.' : 'Retry to reconnect, or return to the launcher to choose offline play.');
 		if (stats.failed && !recoveringAssets && !assetsNeedReload && !assetError && /Bad GUID: Duplicate etkey\./i.test(text))
 			controlText(document.getElementById('connectionhint'), 'Another game using this browser profile is connected with your player identity. Close or disconnect that game, then retry. Separate players need separate browser profiles.');
+		if (retryPasswordRequired) controlText(document.getElementById('connectionhint'), 'The server rejected the password. Enter its correct password below, then retry.');
 		document.getElementById('retryconnection').disabled = !!retryConfigRequest || recoveringAssets || assetsNeedReload || stats.ready || stats.opening;
 		document.getElementById('disconnectonline').disabled = stats.closing || (!recoveringAssets && !stats.ready && !stats.opening);
 		controlText(document.getElementById('disconnectonline'), recoveringAssets ? 'Cancel download' : stats.opening ? 'Cancel connection' : 'Disconnect');
@@ -1022,7 +1032,7 @@
 		if (started && !bootFailed)
 		{
 			updateConnectionActions();
-			var preferred = recoveringAssets ? 'disconnectonline' : assetsNeedReload ? 'reloadassets' : 'retryconnection';
+			var preferred = recoveringAssets ? 'disconnectonline' : assetsNeedReload ? 'reloadassets' : retryPasswordRequired ? 'retrypassword' : 'retryconnection';
 			if (!document.getElementById(preferred).disabled) document.getElementById(preferred).focus();
 		}
 	};
@@ -1142,7 +1152,7 @@
 	});
 	networkbtn.addEventListener('click', showNetworkDialog);
 	document.getElementById('closenetwork').addEventListener('click', function() { networkdialog.close(); });
-	networkdialog.addEventListener('close', function() { retryingOnline = false; resumeBrowserGame(); });
+	networkdialog.addEventListener('close', function() { retryingOnline = false; document.getElementById('retrypassword').value = ''; resumeBrowserGame(); });
 	var retryConfigRequest = null, retryConfigEpoch = 0;
 	function cancelRetryConfig()
 	{
@@ -1192,6 +1202,21 @@
 	document.getElementById('retryconnection').addEventListener('click', function()
 	{
 		if (this.disabled || bootFailed || loadState !== 'running') return;
+		if (retryPasswordRequired)
+		{
+			var password = document.getElementById('retrypassword');
+			if (!password.value || !validServerPassword(password.value))
+			{
+				controlAttribute(password, 'aria-invalid', 'true');
+				controlText(document.getElementById('retrypasswordhint'), 'Enter a password of at most 64 characters without quotes, backslashes, semicolons or control characters.');
+				password.focus(); return;
+			}
+			try { Module.FS.writeFile('/browser/legacy/browser-connect.cfg', 'set password "' + password.value + '"\n'); }
+			catch (e) { controlText(document.getElementById('connectionstatus'), 'Could not update the password. Retry, or return to the launcher.'); return; }
+			password.value = ''; controlAttribute(password, 'aria-invalid', 'false');
+			controlText(document.getElementById('retrypasswordhint'), 'Enter the correct password, then retry. It is not saved.');
+			retryPasswordRequired = false; document.getElementById('retrypasswordfield').hidden = true;
+		}
 		assetError = '';
 		this.disabled = true; retryingOnline = true;
 		document.getElementById('closenetwork').focus();

@@ -2531,3 +2531,44 @@ restored. Evidence: `build_wasm/touch-primary-portrait.png` and
 `touch-primary-landscape.png`. This checks layout and single-pointer menu
 integration, not physical multi-touch play or a completed Rail Gun round.
 The match remains available for objective-chain testing.
+
+## Protected server password recovery (October 9, 2026)
+
+A live protected native server exposed a recovery gap: Invalid password offered
+Retry, but the dialog could not correct the rejected credential. The connection
+dialog now reveals and focuses a replacement password field after that native
+failure. Retry validates it with the same rules as initial Join, writes the
+existing memory-only connection config, and clears the field. The native retry
+bridge executes that config before connecting. Closing the dialog discards
+typed credentials; successful connection clears the recovery state. Passwords
+remain excluded from saved native browser settings.
+
+Launcher regressions cover empty/invalid/overlong replacements, exact transient
+config delivery, focus, close/success cleanup and filesystem-write failure.
+The compiled production network bridge verifies the config-before-connect
+command order. Launcher, native bridge, network and PWA UI checks pass, as do
+the browser build and generated JavaScript parsing. All seven local/served
+bundle hashes match (`build_wasm/password-retry-hashes.json`).
+
+Live Chromium testing used a loopback-only, password-protected `sv_pure 1`
+Radar server and matching module pack checksum 168848376. The browser displayed
+the password requirement and rejected an intentionally wrong test password.
+After activating the rebuilt bundle through App & offline, repeating rejection
+focused the new field. Correcting the password and clicking Retry reached the
+rendered map without a page reload. The player joined Allies as Medic, moved
+and fired (30 to 27 rounds). A subsequent Disconnect and ordinary Retry again
+reached Online using the corrected memory-only password. Native logs record
+the successful connection/ClientBegin events. This is controlled loopback
+evidence, not public internet or TLS hosting validation.
+
+Evidence: `build_wasm/password-retry-before.png`,
+`password-retry-fixed-dialog.png`, `password-retry-online-play.png`,
+`password-retry-normal-reconnect.png`, `password-retry-browser-log.json`, and
+`build_native/fixture/password-retry-native-events.json`. The isolated native
+server, launcher and relay are no longer running.
+
+The browser environment subsequently restored the Gold Rush and Rail Gun tabs
+to launcher pages. Saved logs retain tank theft/both tank-barrier destruction
+for Gold Rush and depot/track-switch activity for Rail Gun. Neither interrupted
+round proves a complete attacking objective chain or final round result; both
+still require continuous full-round testing.

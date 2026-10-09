@@ -37,7 +37,7 @@ void NET_WebClientFrame(int state, int ping, const char *message)
 {
     int action = NET_WebFrame(state, ping, message);
     if (action == 1) Cbuf_AddText("disconnect\n");
-    else if (action == 2) Cbuf_AddText("connect 192.0.2.1:27960\n");
+    else if (action == 2) Cbuf_AddText("exec browser-connect.cfg\nconnect 192.0.2.1:27960\n");
 }
 
 static void NET_WebSleep(void)
