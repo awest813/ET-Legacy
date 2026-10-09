@@ -25,7 +25,7 @@
 	#wrap { position: relative; display: flex; flex: 1 1 0; min-height: 0; min-width: 0; align-items: center; justify-content: center; overflow: hidden; }
 	#canvas { display: block; background: #000; touch-action: none; image-rendering: auto; width: auto; height: auto; max-width: 100%; max-height: 100%; flex-shrink: 0; }
 	#canvas:focus:not(:focus-visible) { outline: none; }
-	#gamebar { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left)); background: #151619; border-bottom: 1px solid #37352e; font-size: 13px; }
+	#gamebar { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left)); background: #151619; border-bottom: 1px solid #37352e; font-size: 13px; }
 	#gamebar[hidden] { display: none; }
 	#focusgroup { display: flex; flex: 1 1 310px; align-items: center; gap: 12px; min-width: 0; }
 	#inputbadge { flex-shrink: 0; padding: 5px 8px; color: var(--gold); border: 1px solid #5d5036; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
@@ -41,7 +41,7 @@
 	#networkbtn { width: 160px; overflow: hidden; text-overflow: ellipsis; }
 	#volume { width: 88px; accent-color: var(--gold); vertical-align: middle; }
 	#volumevalue { display: inline-block; min-width: 34px; font-variant-numeric: tabular-nums; color: #ddd; }
-	#overlay { position: absolute; inset: 0; padding: max(28px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; overflow: auto; background: radial-gradient(ellipse at 50% 0, #30291c 0, #141619 40%, #0a0b0d 85%); z-index: 10; text-align: center; }
+	#overlay { position: absolute; inset: 0; padding: max(28px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); display: flex; flex-direction: column; align-items: center; overflow: auto; background: radial-gradient(ellipse at 50% 0, #30291c 0, #141619 40%, #0a0b0d 85%); z-index: 10; text-align: center; }
 	#overlay > * { flex-shrink: 0; max-width: 100%; }
 	.eyebrow { color: var(--gold); font-size: 11px; font-weight: 600; letter-spacing: 2.5px; margin: auto 0 12px; }
 	#overlay h1 { color: #f2eee5; letter-spacing: -1px; margin: 0 0 10px; font-size: clamp(30px, 5vw, 46px); line-height: 1.1; font-weight: 650; }
@@ -96,8 +96,8 @@
 	.bindings dt, .bindings dd { margin: 0; }
 	#helpdialog summary, #networkdialog summary { min-height: 44px; padding: 12px 0; cursor: pointer; color: #ddd; font-size: 14px; }
 	#networkdialog .connectionactions button[data-primary="true"], #matchdialog #resumematch { background: #e1bd6e; color: #17140d; border-color: #f1d28e; font-weight: 600; }
-	@media (max-width: 760px) { #gamebar { gap: 8px; padding: 8px 12px; } #focusgroup { flex-basis: 100%; } #gameactions { justify-content: center; width: 100%; } #soundstatus { flex-basis: 100%; text-align: center; } }
-	@media (max-width: 420px) { #overlay { padding: 24px 16px; } #matchform { padding: 20px; } #gamebar { font-size: 12px; } #soundgroup { border-left: 0; padding-left: 0; } #gamebar button { min-height: 40px; padding: 7px 10px; } #volume { width: 72px; } #volumevalue { min-width: 30px; } #gameactions { gap: 8px; } }
+	@media (max-width: 760px) { #gamebar { gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); } #focusgroup { flex-basis: 100%; } #gameactions { justify-content: center; width: 100%; } #soundstatus { flex-basis: 100%; text-align: center; } }
+	@media (max-width: 420px) { #overlay { padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); } #matchform { padding: 20px; } #gamebar { font-size: 12px; } #soundgroup { border-left: 0; padding-left: 0; } #gamebar button { min-height: 40px; padding: 7px 10px; } #volume { width: 72px; } #volumevalue { min-width: 30px; } #gameactions { gap: 8px; } }
 	@media (max-width: 340px) { #matchsettings { grid-template-columns: 1fr; } }
 	@media (prefers-reduced-motion: reduce) { #bar { transition: none; } }
 	#modebar { display: flex; gap: 6px; width: 440px; margin: 0 0 16px; padding: 4px; border: 1px solid #484234; border-radius: 8px; background: #151619; }
@@ -155,7 +155,7 @@
 	body[data-touch="true"] #capturebtn { display: none; }
 	body[data-touch="true"] #gamebar button { min-height: 44px; }
 	@media (max-width: 900px) and (max-height: 500px), (max-width: 600px) and (max-height: 700px) {
-		body[data-touch="true"] #gamebar { padding: 4px max(8px, env(safe-area-inset-left)); gap: 4px 8px; font-size: 11px; }
+		body[data-touch="true"] #gamebar { padding: max(4px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 4px max(8px, env(safe-area-inset-left)); gap: 4px 8px; font-size: 11px; }
 		body[data-touch="true"] #focusgroup, body[data-touch="true"] #soundstatus { display: none; }
 		body[data-touch="true"] #gameactions { flex-wrap: wrap; justify-content: center; width: 100%; gap: 6px; }
 		body[data-touch="true"] #gamebar button { min-height: 44px; padding: 5px 8px; }
