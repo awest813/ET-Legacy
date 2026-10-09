@@ -673,6 +673,28 @@ const initialFailureFault={publicCatalog},initialFailure=publicReady(initialFail
 initialFailure.elements.joinbtn.click();assert.equal(initialFailure.networkCalls.length,0);assert.equal(initialFailure.calls.length,0);
 assert.equal(initialFailure.elements.joinbtn.disabled,false);assert.equal(initialFailure.elements.offlinebtn.disabled,false);
 assert.match(initialFailure.elements.onlinestatus.textContent,/Could not refresh/);
+for (const [changed, guidance] of [
+    [{enabled:false}, /Refresh the public list and choose another server/],
+    [{serverInfo:{compatible:false}}, /Choose another server, or play offline/],
+    [{relay:'wss://other.example.org/relay/'+'B'.repeat(100)}, /Check again to review the new connection/]
+]) {
+    const fault={publicCatalog},page=publicReady(fault);fault.onlineOverride=changed;
+    page.elements.joinbtn.focus();page.elements.joinbtn.click();
+    assert.equal(page.networkCalls.length,0,'A stale public selection cannot open its previous relay');
+    assert.equal(page.calls.length,0,'A rejected public refresh cannot start the engine');
+    assert.match(page.elements.onlinestatus.textContent,guidance,'Join failure names recovery available on the current launcher');
+    assert.doesNotMatch(page.elements.onlinestatus.textContent,/Return to the launcher/i);
+    assert.equal(page.elements.refreshpublic.disabled,false);assert.equal(page.elements.refreshonline.disabled,false);
+    assert.equal(page.elements.offlinebtn.disabled,false);
+    assert.equal(page.context.document.activeElement,page.elements.joinbtn,'Failed Join restores keyboard focus');
+    fault.onlineOverride=null;page.elements.refreshonline.click();page.elements.joinbtn.click();
+    assert.equal(page.networkCalls.length,1,'Checking a recovered selection permits a fresh connection');
+}
+const initialTimeoutFault={publicCatalog},initialTimeout=publicReady(initialTimeoutFault);initialTimeoutFault.onlineTimeout=true;
+initialTimeout.elements.joinbtn.click();
+assert.equal(initialTimeout.networkCalls.length,0);
+assert.match(initialTimeout.elements.onlinestatus.textContent,/timed out\. Join again, or play offline/);
+assert.equal(initialTimeout.elements.joinbtn.disabled,false,'A transient refresh timeout keeps Join available');
 const initialCancelFault={publicCatalog},initialCancel=publicReady(initialCancelFault);initialCancelFault.onlineLate=true;
 initialCancel.elements.joinbtn.click();initialCancel.elements.canceljoin.click();initialCancel.pending.shift()();
 assert.equal(initialCancel.networkCalls.length,0,'Cancel stops a late initial ticket request before opening the relay');
@@ -698,6 +720,7 @@ for(const changed of [{onlineUnavailable:true},{onlineTimeout:true},{onlineNetwo
     assert.equal(page.networkCalls.length,1,'A failed or changed selection cannot reuse the old ticket');
     assert.equal(page.elements.retryconnection.disabled,false);assert.equal(page.elements.retryconnection.hidden,false);
     assert.notEqual(page.elements.connectionstatus.textContent,'Refreshing the selected server connection…');
+    if (changed.onlineOverride) assert.match(page.elements.connectionstatus.textContent,/Return to the launcher/,'In-game retry retains the route back to server selection');
 }
 const refreshFault={publicCatalog},refreshCancelled=retryPublic(refreshFault);refreshFault.onlineLate=true;
 refreshCancelled.elements.retryconnection.click();refreshCancelled.elements.retryconnection.click();

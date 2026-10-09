@@ -1163,7 +1163,7 @@
 	{
 		if (!selectedServerId) { done(); return; }
 		cancelRetryConfig();
-		var epoch = retryConfigEpoch, identity = selectedServerId;
+		var epoch = retryConfigEpoch, identity = selectedServerId, atLauncher = loadState === 'ready';
 		var xhr = retryConfigRequest = new XMLHttpRequest();
 		controlText(document.getElementById('connectionstatus'), 'Refreshing the selected server connection…');
 		xhr.open('GET', 'network/config.json?server=' + encodeURIComponent(identity), true); xhr.timeout = 5000;
@@ -1184,11 +1184,11 @@
 				if (xhr.status !== 200) throw new Error('Could not refresh the server connection. Check your connection and retry.');
 				var config = JSON.parse(xhr.responseText);
 				if (config.version !== 1 || config.enabled !== true || config.publicServers !== true || config.serverId !== identity || selectedServerId !== identity)
-					throw new Error('This public server is no longer verified. Return to the launcher and refresh the public server list.');
+					throw new Error(atLauncher ? 'This public server is no longer verified. Refresh the public list and choose another server, or play offline.' : 'This public server is no longer verified. Return to the launcher and refresh the public server list.');
 				if (config.serverInfo && config.serverInfo.compatible === false)
-					throw new Error('This server is no longer compatible. Return to the launcher and choose another server.');
+					throw new Error(atLauncher ? 'This server is no longer compatible. Choose another server, or play offline.' : 'This server is no longer compatible. Return to the launcher and choose another server.');
 				if (typeof config.relay !== 'string' || config.relay.split('/relay')[0] !== configuredRelay.split('/relay')[0])
-					throw new Error('The relay operator changed. Return to the launcher to review the new connection.');
+					throw new Error(atLauncher ? 'The relay operator changed. Check again to review the new connection.' : 'The relay operator changed. Return to the launcher to review the new connection.');
 				retryConfigRequest = null;
 				Module['browserNetwork'].configure(config, Module.canvas.ownerDocument.baseURI);
 				configuredRelay = config.relay; selectedServerLabel = config.serverLabel; autoServerAssets = config.autoAssets === true;
@@ -1196,7 +1196,7 @@
 			} catch (error) { failed(error.message); }
 		};
 		xhr.onerror = function() { failed('Could not refresh the server connection. Check your connection and retry.'); };
-		xhr.ontimeout = function() { failed('Refreshing the server connection timed out. Retry, or return to the launcher.'); };
+		xhr.ontimeout = function() { failed(atLauncher ? 'Refreshing the server connection timed out. Join again, or play offline.' : 'Refreshing the server connection timed out. Retry, or return to the launcher.'); };
 		xhr.send();
 	}
 	document.getElementById('retryconnection').addEventListener('click', function()

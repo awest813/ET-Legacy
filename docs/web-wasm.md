@@ -3096,3 +3096,19 @@ as warmup counted from 20 to 6 seconds, confirming release stopped firing.
 This is a desktop browser mouse check during warmup, not a bot-combat or
 physical mobile test. Evidence: `build_wasm/outside-mouse-release.png`,
 `outside-mouse-release-stable.png` and `outside-mouse-live-log.json`.
+
+## Public server Join recovery (October 9, 2026)
+
+When Join refreshes a selected public server, failure instructions now match
+the current screen. An unavailable selection names Refresh public list and
+choosing another server; a changed relay names Check again. Initial timeouts
+offer Join again or offline play. In-game Retry still directs players back to
+the launcher when their server selection needs review.
+
+Regression checks reproduced the previous misleading launcher instruction.
+They verify that rejected refreshes cannot connect using the old relay or
+start the engine, that recovery controls and keyboard focus remain available,
+and that checking a recovered selection permits a fresh connection. Launcher
+checks, all 90 Python service checks, the browser rebuild, generated JavaScript
+parsing and bundle/module identity verification passed. These are controlled
+failure tests; they do not establish public Internet gameplay or deployment.
