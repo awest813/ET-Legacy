@@ -2792,6 +2792,19 @@ Original game PK3s are supplied separately. The separate
 modules and archives needed by `build_server_pack.py`. Downloading an artifact
 does not deploy it or establish public HTTPS/WSS connectivity.
 
+The first successful clean Linux run is
+https://github.com/awest813/ET-Legacy/actions/runs/37967647017 for commit
+`d776dd2`. It passed 83 Python tests, all six JavaScript suites, the six
+compiled handler fixtures, and the compiled bot checks, including all sixteen
+Rail Gun switch states. Both artifacts uploaded successfully. Downloaded
+copies passed the seven bundle hash checks, publication archive/module hash
+checks, identical identity-manifest check, and emitted-JavaScript parsing.
+The downloaded browser artifact then rendered Radar in Chromium with its
+warmup and all four requested Normal bots joining. This is a clean-artifact
+startup smoke test, not a full round or public online test. Local evidence:
+`build_wasm/ci-success.log`, `ci-release-radar-start.png`, and
+`ci-release-radar-log.json`.
+
 ## Undefended Gold Rush attack check (October 9, 2026)
 
 A separate Chromium match on build `f51442b` started with zero bots, disabled
