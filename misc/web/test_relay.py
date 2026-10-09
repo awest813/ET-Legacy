@@ -138,6 +138,18 @@ class RelayChecks(unittest.IsolatedAsyncioTestCase):
         queue = relay.DatagramQueue()
         queue.connection_lost(None)
         self.assertTrue(queue.failed.is_set())
+        self.assertEqual(queue.failure_reason, 'UDP server unavailable')
+
+    async def test_udp_error_reports_upstream_failure_without_overwriting_queue_failure(self):
+        queue = relay.DatagramQueue()
+        queue.error_received(OSError('test upstream failure'))
+        self.assertTrue(queue.failed.is_set())
+        self.assertEqual(queue.failure_reason, 'UDP server unavailable')
+        congested = relay.DatagramQueue()
+        for _ in range(129):
+            congested.datagram_received(b'a', None)
+        congested.connection_lost(None)
+        self.assertEqual(congested.failure_reason, 'UDP unavailable or receive queue full')
 
     async def test_closed_udp_transport_closes_websocket_and_releases_slot(self):
         class TrackedQueue(relay.DatagramQueue):
@@ -153,7 +165,7 @@ class RelayChecks(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(ConnectionClosed) as error:
                     await asyncio.wait_for(websocket.recv(), 2)
                 self.assertEqual(error.exception.rcvd.code, 1013)
-                self.assertEqual(error.exception.rcvd.reason, 'UDP unavailable or receive queue full')
+                self.assertEqual(error.exception.rcvd.reason, 'UDP server unavailable')
         for _ in range(20):
             if self.relay.active == 0:
                 break

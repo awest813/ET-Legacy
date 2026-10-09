@@ -2993,3 +2993,28 @@ Evidence: `build_wasm/touch-sustained-fire.png`, `touch-sustained-strafe.png`,
 `touch-held-release-stopped.png`, `touch-offline-service-evidence.json`,
 `touch-offline-bots-log.json`, `touch-offline-bots-playing.png` and
 `touch-offline-bots-later.png`.
+
+## Unavailable upstream recovery (October 9, 2026)
+
+An isolated real Chromium session used the normal launcher and relay on
+ports 8090/8091, targeting an unavailable loopback UDP game port. The native
+client reached the relay, received an upstream failure, and displayed the
+connection dialog with Retry focused. Retry executed `browser-connect.cfg`
+and made another native connection attempt. Return to launcher restored
+offline setup; starting Oasis then initialized Omni-bot and all four Normal
+bots. The captured offline view shows warmup, not a completed round.
+
+This check exposed ambiguous relay wording for known socket failures. UDP
+errors and transport loss now send `UDP server unavailable`, which the browser
+already translates into actionable server-reachability guidance. Queue
+failures retain their original diagnosis even if transport teardown follows.
+The regression failed before the fix; 90 service tests and the browser network
+suite pass afterward, including a real WebSocket close and slot cleanup.
+Repeating the live failure with the patched relay displayed "The relay could
+not reach its ET server. Check the server, then retry."
+Evidence is saved in `build_wasm/unavailable-online-log.json`,
+`unavailable-online-recovery.png`, `unavailable-online-to-offline.png` and
+`unavailable-recovered-offline-log.json`; the patched dialog is captured in
+`unavailable-online-fixed.png` and `unavailable-online-fixed-log.json`.
+This is local failure/recovery
+validation, not proof of public online gameplay.

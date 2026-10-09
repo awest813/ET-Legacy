@@ -43,6 +43,7 @@ class DatagramQueue(asyncio.DatagramProtocol):
         self.queue = asyncio.Queue(maxsize=128)
         self.queued_bytes = 0
         self.failed = asyncio.Event()
+        self.failure_reason = 'UDP unavailable or receive queue full'
         self.budget = Budget()
 
     def datagram_received(self, data, _address):
@@ -60,10 +61,14 @@ class DatagramQueue(asyncio.DatagramProtocol):
             self.failed.set()
 
     def error_received(self, _error):
+        # Keep the first failure: transport teardown after congestion must not
+        # replace the queue diagnosis with an upstream-unavailable message.
+        if not self.failed.is_set():
+            self.failure_reason = 'UDP server unavailable'
         self.failed.set()
 
     def connection_lost(self, _error):
-        self.failed.set()
+        self.error_received(_error)
 
     async def receive(self):
         data = await self.queue.get()
@@ -132,7 +137,7 @@ class Relay:
 
             async def udp_failure():
                 await incoming.failed.wait()
-                await websocket.close(1013, "UDP unavailable or receive queue full")
+                await websocket.close(1013, incoming.failure_reason)
 
             tasks = [asyncio.create_task(job()) for job in (upload, download, udp_failure)]
             done, _pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
