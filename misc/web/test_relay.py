@@ -42,6 +42,46 @@ class RelayChecks(unittest.IsolatedAsyncioTestCase):
     def client(self, **kwargs):
         return connect(self.url, origin=ORIGIN, subprotocols=[relay.PROTOCOL], proxy=None, **kwargs)
 
+    async def test_dual_stack_selection_and_binary_roundtrip(self):
+        class InfoEcho(Echo):
+            def datagram_received(self, data, address):
+                if data.startswith(b'\xff\xff\xff\xffgetinfo '):
+                    challenge=data.split(b' ')[1].strip()
+                    self.transport.sendto(b'\xff\xff\xff\xffinfoResponse\n'+b'\\challenge\\'+challenge+b'\\protocol\\84\\gamename\\et\\game\\legacy\\version\\ET Legacy v2.86.0\\pure\\0',address)
+                else:super().datagram_received(data,address)
+        loop=asyncio.get_running_loop()
+        try:silent=socket.socket(socket.AF_INET6,socket.SOCK_DGRAM);silent.bind(('::1',0))
+        except OSError:
+            if 'silent' in locals():silent.close()
+            self.skipTest('IPv6 loopback unavailable')
+        udp,echo=await loop.create_datagram_endpoint(InfoEcho,local_addr=('127.0.0.1',0))
+        addresses=[(socket.AF_INET6,socket.SOCK_DGRAM,0,'',silent.getsockname()),
+                   (socket.AF_INET,socket.SOCK_DGRAM,0,'',udp.get_extra_info('sockname'))]
+        server=None
+        try:
+            with mock.patch.object(loop,'getaddrinfo',new=mock.AsyncMock(return_value=addresses)):
+                target,family=await relay.resolve_configured_target('dual.example',27960,timeout=.4)
+            self.assertEqual(target,udp.get_extra_info('sockname'));self.assertEqual(family,socket.AF_INET)
+            _,server=await relay.start_relay(target,[ORIGIN],port=0,family=family)
+            url=f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}/relay"
+            async with connect(url,origin=ORIGIN,subprotocols=[relay.PROTOCOL],proxy=None) as client:
+                payload=bytes(range(256))
+                await client.send(payload);self.assertEqual(await asyncio.wait_for(client.recv(),2),payload)
+            self.assertEqual(echo.received,[payload])
+        finally:
+            if server:server.close();await server.wait_closed()
+            udp.close();silent.close()
+
+    async def test_unverified_hostname_keeps_original_target_and_scope(self):
+        loop=asyncio.get_running_loop()
+        addresses=[(socket.AF_INET6,socket.SOCK_DGRAM,0,'',('fe80::1',27960,0,3)),
+                   (socket.AF_INET,socket.SOCK_DGRAM,0,'',('127.0.0.1',27960))]
+        with mock.patch.object(loop,'getaddrinfo',new=mock.AsyncMock(return_value=addresses)), mock.patch.object(relay,'probe_resolved_server',side_effect=TimeoutError()):
+            self.assertEqual(await relay.resolve_configured_target('dual.example',27960),(('fe80::1%3',27960),socket.AF_INET6))
+        with mock.patch.object(loop,'getaddrinfo',new=mock.AsyncMock(return_value=addresses[1:])), mock.patch.object(relay,'probe_resolved_server') as probe:
+            self.assertEqual(await relay.resolve_configured_target('single.example',27960),(('127.0.0.1',27960),socket.AF_INET))
+            probe.assert_not_called()
+
     async def test_binary_datagrams_and_client_isolation(self):
         async with self.client() as one, self.client() as two:
             for data in (b'\xff\xff\xff\xffgetchallenge 123',bytes(range(256)),b'one',b'two'):

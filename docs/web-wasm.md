@@ -21,7 +21,7 @@ physical Chromebook frame rates have not been established.
 Public HTTPS/WSS deployment and Internet gameplay remain unverified. GitHub
 reported no deployments or Pages site for this repository during the October 9
 check. A deployment host and DNS name are still needed for that test. The latest
-public scan checked 391 entries and found none with verified compatibility for
+public scan checked 412 entries and found none with verified compatibility for
 this static browser build. Local multiplayer success does not establish that
 an arbitrary public ET server can accept the browser's module identities.
 
@@ -3408,3 +3408,11 @@ An initial Join for a selected public server now applies refreshed server detail
 The regression previously opened the relay despite the newly required password. It now checks that no relay opens, changed map/player details render, password entry receives focus, and entering the password permits a new connection while clearing the field afterward. The launcher source also contained one Windows-encoded ellipsis byte in its initial custom-import hint; this is now valid UTF-8, and the launcher test decodes the source strictly to catch future invalid bytes.
 
 All six JavaScript suites, browser build, generated JavaScript parsing and seven-file/two-module bundle verification passed. A fresh Chromium loopback fixture returned a public selection without a password, then changed its map, population and password flag on the Join refresh. The browser showed the updated details and focused password prompt; its request log records two selected configuration checks and zero relay requests. This fixture verifies the UI transition, not public Internet gameplay. Evidence: build_wasm/public-password-refresh-request-proof.json, public-password-refresh-live.log and public-password-refresh-required.png. The temporary server and tab were closed afterward.
+
+### Configured-server DNS fallback for discovery and relay (2026-10-09)
+
+Configured-server discovery no longer uses only the first DNS address. It deduplicates up to four IPv4 and four IPv6 addresses, alternates address families, and divides a single UDP query deadline among remaining candidates. Each candidate still uses connected UDP and a fresh challenged getinfo response. Relay startup shares this selection for multi-address hostnames, so it can forward gameplay to the responding address instead of the silent first address. Single-address relay targets keep their existing startup behavior. If no address answers getinfo, the relay retains the original configured destination; getinfo being disabled must not prevent joining. IPv6 scope identifiers remain supported.
+
+A real UDP regression failed before the fix when the first address stayed silent and the second replied. It now passes. A separate real relay regression binds a silent IPv6 loopback peer and responding IPv4 ET-info fixture, resolves the latter, and completes a 256-byte binary WebSocket/UDP round trip through the selected address. Additional checks cover duplicate/address-family bounds, immediate socket failure fallback, empty resolution, single-address startup and the original scoped IPv6 destination when probing fails. All 99 Python service tests passed (build_wasm/dual-stack-service-tests.log). Compatibility and pure-module identity checks are unchanged; these loopback checks do not establish public Internet gameplay.
+
+The running main launcher/relay were left available: automatic approval review rejected the attempted restart to avoid service interruption. Newly started services use this fix; the existing processes require a restart to load it.

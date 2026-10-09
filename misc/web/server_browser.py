@@ -77,7 +77,39 @@ def parse_info(packet, challenge, latency):
 
 def probe_server(host, port, timeout=1.5):
     """Connected UDP accepts replies from the configured peer, with a random echo."""
-    family, _, _, _, target = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)[0]
+    return probe_resolved_server(socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM), timeout)[0]
+
+
+def resolved_targets(addresses):
+    """Bound and alternate DNS families without probing duplicate addresses."""
+    groups = {}
+    for family, _, _, _, target in addresses:
+        if family not in (socket.AF_INET, socket.AF_INET6):
+            continue
+        group = groups.setdefault(family, [])
+        if target not in group and len(group) < 4:
+            group.append(target)
+    return [(family, group[index]) for index in range(4)
+            for family, group in groups.items() if index < len(group)]
+
+
+def probe_resolved_server(addresses, timeout=1.5):
+    """Return info and its responding UDP target within one shared deadline."""
+    targets = resolved_targets(addresses)
+    deadline = time.monotonic() + timeout
+    for index, (family, target) in enumerate(targets):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        try:
+            info = _probe_target(family, target, remaining / (len(targets) - index))
+            return info, family, target
+        except OSError:
+            continue
+    raise TimeoutError('No configured server address returned valid info')
+
+
+def _probe_target(family, target, timeout):
     challenge = secrets.token_hex(12)
     with socket.socket(family, socket.SOCK_DGRAM) as udp:
         udp.settimeout(timeout)

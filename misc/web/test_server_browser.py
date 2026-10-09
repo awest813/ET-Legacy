@@ -115,6 +115,36 @@ class ServerInfo(unittest.TestCase):
             self.assertFalse(errors)
             self.assertEqual(info['status'],'online')
 
+    def test_resolution_bounds_duplicates_and_empty_addresses(self):
+        addresses=[(socket.AF_INET6,socket.SOCK_DGRAM,0,'',('::1',i,0,0)) for i in range(10)]
+        addresses += [(socket.AF_INET,socket.SOCK_DGRAM,0,'',('127.0.0.1',i)) for i in range(10)]
+        targets=browser.resolved_targets(addresses+addresses)
+        self.assertEqual(len(targets),8)
+        self.assertEqual([family for family,_ in targets],[socket.AF_INET6,socket.AF_INET]*4)
+        with self.assertRaises(TimeoutError):browser.probe_resolved_server([])
+        with patch.object(browser,'_probe_target',side_effect=[OSError('IPv6 unavailable'),{'status':'online'}]) as probe:
+            info,family,target=browser.probe_resolved_server(addresses)
+            self.assertEqual((info['status'],family,target),('online',socket.AF_INET,('127.0.0.1',0)))
+            self.assertEqual(probe.call_count,2)
+
+    def test_hostname_tries_another_address_after_silence(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as silent, socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as live:
+            silent.bind(('127.0.0.1', 0));live.bind(('127.0.0.1', 0));live.settimeout(2)
+            targets=[(socket.AF_INET, socket.SOCK_DGRAM, 0, '', udp.getsockname()) for udp in (silent,live)]
+            errors=[]
+            def reply():
+                try:
+                    data,peer=live.recvfrom(1000)
+                    live.sendto(packet(data.split(b' ')[1].strip().decode()),peer)
+                except Exception as error:errors.append(error)
+            worker=threading.Thread(target=reply);worker.start()
+            try:
+                with patch.object(browser.socket,'getaddrinfo',return_value=targets):
+                    info=browser.probe_server('dual.example',27960,timeout=.4)
+                self.assertEqual(info['status'],'online')
+            finally:worker.join(3)
+            self.assertFalse(errors)
+
     def test_cache_and_configured_target_changes(self):
         cache=browser.ServerBrowser()
         with patch.object(browser,'probe_server',return_value={'status':'online'}) as probe:

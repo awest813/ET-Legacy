@@ -14,6 +14,7 @@ from http import HTTPStatus
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
 from public_servers import resolve_ticket
+from server_browser import probe_resolved_server, resolved_targets
 
 MAX_PACKET = 32768
 MAX_QUEUED_BYTES = 1048576
@@ -166,14 +167,26 @@ async def start_relay(target, origins, host="127.0.0.1", port=8082, family=socke
     return relay, server
 
 
-async def main(args):
-    addresses = await asyncio.get_running_loop().getaddrinfo(
-        args.server, args.udp_port, type=socket.SOCK_DGRAM)
-    family, _, _, _, address = addresses[0]
+async def resolve_configured_target(host, port, timeout=1.5):
+    addresses = await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_DGRAM)
+    targets = resolved_targets(addresses)
+    if not targets:
+        raise OSError('No supported configured server address')
+    family, address = targets[0]
+    if len(targets) > 1:
+        try:
+            _, family, address = await asyncio.to_thread(probe_resolved_server, addresses, timeout)
+        except OSError:
+            # getinfo may be disabled; retain the operator's original destination.
+            pass
     host = address[0]
     if family == socket.AF_INET6 and address[3]:
         host += f"%{address[3]}"
-    target = (host, address[1])
+    return (host, address[1]), family
+
+
+async def main(args):
+    target, family = await resolve_configured_target(args.server, args.udp_port)
     relay, server = await start_relay(target, args.origin, args.bind, args.port, family, os.environ.get('ETWASM_PUBLIC_SECRET', ''))
     print(f"ET relay ws://{args.bind}:{args.port}/relay -> {args.server}:{args.udp_port}", flush=True)
     print(f"Allowed page origins: {', '.join(args.origin)}", flush=True)
