@@ -46,7 +46,17 @@ function fixture(fault={}){
   f.e.fullscreenbtn.send('click');await tick();assert.equal(f.doc.fullscreenElement,f.doc.body,'Optional storage failure leaves other controls working');
  }
  f=fixture({registerSync:true});await tick();f.sw.send('message',{data:{type:'APP_READY'}});f.app.gameFilesReady(true);
- f.e.retryapp.send('click');assert.match(f.e.appstatus.textContent,/Offline ready/,'Registration failure preserves an existing saved app');
+ f.e.retryapp.send('click');assert.match(f.e.appstatus.textContent,/saved offline app is still available/,'A failed explicit retry preserves the saved app and explains the update failure');
+ assert.equal(f.e.retryapp.hidden,false);
+ f.sw.send('message',{data:{type:'APP_READY'}});assert.match(f.e.appstatus.textContent,/Could not check/);
+ for(const asyncFailure of [false,true]){
+  f=fixture();await tick();f.sw.send('message',{data:{type:'APP_READY'}});
+  f.sw.register=()=>{if(asyncFailure)return Promise.reject(Error('Offline'));throw Error('Permission denied');};
+  f.e.retryapp.send('click');await tick();assert.match(f.e.appstatus.textContent,/Could not check/);
+  f.sw.send('message',{data:{type:'APP_READY'}});assert.equal(f.e.retryapp.hidden,false);
+  f.sw.register=()=>Promise.resolve(f.registration);f.e.retryapp.send('click');await tick();
+  f.sw.send('message',{data:{type:'APP_READY'}});assert.match(f.e.appstatus.textContent,/App saved/);assert.equal(f.e.retryapp.hidden,true);
+ }
  f=fixture({registerSync:true});await tick();f.sw.register=()=>Promise.resolve(f.registration);f.e.retryapp.send('click');await tick();
  assert.ok(f.posts.some(m=>m.type==='APP_STATUS'),'A denied registration can be retried after permission changes');
  f=fixture({update:true});await tick();assert.equal(f.e.updateapp.hidden,false);assert.equal(f.e.appbtn.textContent,'Update ready');

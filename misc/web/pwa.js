@@ -105,7 +105,8 @@
    retry.hidden = true;
    if (!win.isSecureContext || !serviceWorker) { message = 'Offline app installation needs HTTPS or localhost and browser permission. Connected play is still available.'; render(); return; }
    message = ''; render();
-   function failed() { if (repairing) return; message = saved ? '' : 'Offline saving is unavailable. Connected play is still available; retry when ready.'; retry.hidden = saved; render(); }
+   function updateUnavailable() { updateFailed = true; message = saved ? 'Could not check the app update. Your saved offline app is still available. Reconnect and retry.' : 'Could not check the app update. Connected play is still available. Reconnect and retry.'; retry.hidden = false; render(); }
+   function failed() { if (repairing) return; if (forceUpdate) { updateUnavailable(); return; } message = saved ? '' : 'Offline saving is unavailable. Connected play is still available; retry when ready.'; retry.hidden = saved; render(); }
    try { serviceWorker.register('sw.js', {scope:'./', updateViaCache:'none'}).then(function(value) {
     registration = value; watch(value.installing); watch(value.waiting);
     if (!registrations.has(value)) { registrations.add(value); value.addEventListener('updatefound', function() { watch(value.installing); }); }
@@ -113,7 +114,6 @@
     if (value.waiting) message = 'An app update is saved. Reload when you are ready to end the current match.';
     render();
     if (forceUpdate && typeof value.update === 'function') {
-     function updateUnavailable() { updateFailed = true; message = saved ? 'Could not check the app update. Your saved offline app is still available. Reconnect and retry.' : 'Could not check the app update. Connected play is still available. Reconnect and retry.'; retry.hidden = false; render(); }
      try { Promise.resolve(value.update()).catch(updateUnavailable); } catch (e) { updateUnavailable(); }
     }
    }, failed); } catch (e) { failed(); }

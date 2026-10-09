@@ -2051,3 +2051,55 @@ packages with correctly encoded checksums, duplicates, incorrect encoding,
 incorrect module packages, an empty allowlist and outdated reports. The unlisted
 package regression fails against the original condition and passes after the
 correction. Both browser and desktop test configurations and engine builds pass.
+
+## Hosted launcher and retry follow-up (October 9, 2026)
+
+An explicit PWA retry now reports a service-worker registration failure even
+when the old app is saved. The saved app remains usable, the retry button stays
+available, and an old `APP_READY` reply cannot hide the error. Synchronous and
+asynchronous registration failures and subsequent successful recovery pass the
+PWA suite. The worker suite and generated bundle parsing also pass.
+
+The combined runner now supports an exact HTTPS proxy origin:
+
+```sh
+python misc/web/run_online.py --config web-server.json --public-origin https://play.example.org
+```
+
+Use the deployment's real hostname in place of `play.example.org`. The runner
+keeps both HTTP and WebSocket services bound to `127.0.0.1`, advertises
+`wss://play.example.org/relay` to the browser, and allows only that HTTPS origin
+at the relay. It generates and shares the public-discovery signing key between
+its children in memory. Without this option the existing localhost launcher
+and its two allowed local origins continue to work.
+
+The HTTPS proxy must terminate TLS for that hostname and forward `/relay` and
+`/relay/*` to the configured loopback relay port (8082 by default), preserving
+the complete path/query, browser Origin and WebSocket upgrade. All other paths
+go to the configured loopback web port (8081 by default), preserving response
+headers and content types. Public signed server selections use the `/relay/*`
+paths as well as the configured default `/relay`. Serve a complete browser
+bundle from the application root and provide the verified stock/custom pack
+directories used by `serve.py`.
+
+For a browser-compatible native server, use the matching native/WASM module
+package described above and the compiled native server. Its public UDP port
+must be reachable and it must advertise to the ET master for public discovery.
+The configured default can target the same server. Configure approved pack
+download sources when players need packages beyond the bundled assets.
+
+Runner tests cover local defaults, normalized default/non-default TLS ports,
+IPv6 origins, configuration propagation, shared private signing keys and
+invalid origins. A real isolated loopback run returned the expected WSS URL,
+accepted the configured HTTPS Origin and rejected the local HTTP Origin with
+403. Evidence is `build_native/fixture/hosted-origin-proof.json`. This verifies
+the backends and runner wiring; actual TLS termination, public hosting and
+public browser gameplay still require a deployment target and live testing.
+
+A new ordinary Radar match with twelve Hard bots is running for objective-chain
+verification. Initial logs show all twelve bots joining, bunker capture during
+warmup, and a side-entrance dynamite plant and defensive defuse during the round.
+Native HUD samples at 1280 by 720 showed 56 FPS outdoors and 58 FPS indoors with
+no concurrent builds; these are individual samples, not a sustained benchmark.
+The round is still in progress. Initial evidence is
+`build_wasm/radar-objective-round-progress.png` and `radar-objective-round-log.json`.
