@@ -2548,13 +2548,15 @@ void SV_ExecuteClientMessage(client_t *cl, msg_t *msg)
 	// I don't like this hack though, it must have been working fine at some point, suspecting the fix is somewhere else
 	if (serverId != sv.serverId && !*cl->downloadName && !strstr(cl->lastClientCommandString, "nextdl"))
 	{
-		if (serverId >= sv.restartedServerId && serverId < sv.serverId)     // TTimo - use a comparison here to catch multiple map_restart
+		if (cl->state == CS_ACTIVE && serverId >= sv.restartedServerId && serverId < sv.serverId)
 		{   // they just haven't caught the map_restart yet
 			Com_DPrintf("%s: ignoring pre map_restart / outdated client message status: %d\n", rc(cl->name), cl->state);
 			return;
 		}
-		// if we can tell that the client has dropped the last
-		// gamestate we sent them, resend it
+		// Loading clients may finish an older gamestate after a fast restart.
+		// Let their acknowledgements recover the current gamestate rather than
+		// indefinitely ignoring packets from the restart window above.
+		// An acknowledgement beyond the last gamestate means it was dropped.
 		if (cl->state != CS_ACTIVE && cl->messageAcknowledge > cl->gamestateMessageNum)
 		{
 			Com_DPrintf("%s: dropped gamestate, resending\n", rc(cl->name));

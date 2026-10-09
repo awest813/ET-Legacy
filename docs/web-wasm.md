@@ -2416,3 +2416,56 @@ Evidence in `build_wasm`: `final-graphics-offline-origin.json`,
 `final-graphics-offline-stock-log.json`. Launcher, PWA UI and worker regression
 suites pass against the current source. Public compatible hosting and physical
 Chromebook/mobile/browser checks remain outstanding.
+
+## Online graphics and loading restart recovery (October 9, 2026)
+
+Two independent-origin Chromium clients joined the controlled native pure
+server with the current matching native/WebAssembly module pack (checksum
+504815435). Launcher-selected Chromebook and Balanced settings produced actual
+960x540 and 1280x720 canvases respectively. Both players joined teams, moved
+and fired (30 to 27 rounds). On the low-power client, the native System menu
+confirmed the preset values; selecting Balanced and confirming Apply restarted
+the renderer at 1280x720 while retaining the online connection. Movement and
+firing continued (27 to 24 rounds). These are loopback integration checks,
+not public internet or Chromebook hardware performance measurements.
+
+A Radar-to-ETL Supply transition exposed a remaining fast-restart race. Both
+clients finished loading but stayed at Waiting for match until the connection
+timeout. The server repeatedly ignored their previous map IDs while they were
+still `CS_PRIMED`. The restart-window shortcut now applies to active clients;
+loading clients can use their message acknowledgements to request a replacement
+gamestate. Stale movement still returns without entering the world, and current
+pure authentication remains required. Download/nextdl handling is unchanged.
+
+The regression compiles the production packet-state block in browser and
+desktop configurations. It covers primed/connected recovery across multiple
+restarts, acknowledgements before/after the last gamestate, current/active
+clients, downloading clients and the earlier full-map boundary, alongside the
+existing invalid-pure rejection checks. Both pass, as do native/browser builds,
+launcher and PWA UI/worker suites.
+
+On the corrected server, both stalled clients reconnected through Retry.
+Repeating the custom-map transition and forcing a fast restart while both
+clients visibly loaded recovered both without a timeout. Native logs record
+new checksum reports and `ClientBegin` for each, followed by the normal warmup
+restart. The server-side retest retained the existing client engines to isolate
+the recovery fix. Evidence: `build_native/fixture/restart-recovery-server.log`,
+`restart-recovery-transition.log`, `restart-recovery-fast-restart.log`, and
+`build_wasm/restart-recovery-custom-a.png` / `restart-recovery-custom-b.png`.
+The initial failure is preserved in
+`build_native/fixture/final-graphics-online-server.log`.
+
+Graphics evidence in `build_wasm`: `final-graphics-online-play-a.png`,
+`final-graphics-online-play-b.png`, `final-graphics-online-low-power.png` and
+`final-graphics-online-restart-play.png`. All seven rebuilt local/served bundle
+hashes match (`restart-recovery-bundle-hashes.json`). Public compatible hosting
+and physical-device validation remain open.
+
+The rebuilt browser bundle was then activated through the explicit saved-update
+flow on one origin. It rejoined the pure ETL Supply server, retained Balanced's
+1280x720 size using saved settings, spawned through Limbo, moved and fired
+(30 to 28 rounds). Evidence: `restart-recovery-updated-play.png`,
+`restart-recovery-updated-a-log.json` and `restart-recovery-peer-b-log.json`.
+Filtered native handshake events are `build_native/fixture/restart-recovery-events.json`.
+Both temporary clients and the isolated HTTP/relay/server processes were stopped
+after verification; the regular preview services were left running.

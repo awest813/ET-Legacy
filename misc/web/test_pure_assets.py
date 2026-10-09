@@ -30,6 +30,9 @@ verify=server_client[verify_start:verify_end]
 move_start=server_client.index('\tif (cl->state == CS_PRIMED)',server_client.index('static void SV_UserMove('))
 move_end=server_client.index('#ifdef LEGACY_AUTH',move_start)
 move_gate=server_client[move_start:move_end]
+message_start=server_client.index('\tif (serverId != sv.serverId',server_client.index('void SV_ExecuteClientMessage('))
+message_end=server_client.index('\n\t// read optional clientCommand strings',message_start)
+message_gate=server_client[message_start:message_end]
 client=(ROOT/'src/client/cl_main.c').read_text(encoding='utf-8')
 send_start=client.index('void CL_SendPureChecksums(void)')
 send_end=client.index('/**',send_start)
@@ -68,8 +71,13 @@ static void CL_AddReliableCommand(const char *text) { strcpy(reliable,text); }
 #define CS_PRIMED 3
 #define CS_ACTIVE 4
 #define Com_DPrintf(...) ((void)0)
-typedef struct { int state, pureAuthentic, gotCP, deltaMessage; char *name; struct { int serverTime; } lastUsercmd; int ettvClient,lastSnapshotTime; } client_t;
-static struct { int checksumFeedServerId,checksumFeed; } sv={100,7};
+typedef struct { int state, pureAuthentic, gotCP, deltaMessage; char *name; struct { int serverTime; } lastUsercmd; int ettvClient,lastSnapshotTime; char downloadName[8],lastClientCommandString[16]; int messageAcknowledge,gamestateMessageNum; } client_t;
+static struct { int checksumFeedServerId,checksumFeed,serverId,restartedServerId; } sv={100,7};
+#define clc_EOF 0
+#define clc_clientCommand 1
+#define CS_ZOMBIE 1
+static int MSG_ReadByte(void *msg) { return clc_EOF; }
+static int SV_ClientCommand(client_t *cl,void *msg,int stale) { return 1; }
 static struct { int integer; } pureCvar={1};
 #define Com_Memset memset
 #define sv_pure (&pureCvar)
@@ -108,6 +116,7 @@ static void Com_Error(int code,const char *text) { assert(0); }
 /* NEXT ID */
 static void movement_gate(client_t *cl) { int cmds[]={0}; /* MOVE GATE */ }
 /* RESTART LOADING */
+static void message_gate(client_t *cl,int serverId) { void *msg=NULL;int c; /* MESSAGE GATE */ }
 /* VERIFY */
 static void verify_report(const char *report,int valid) {
  client_t player={CS_PRIMED,0,0,0,"test"};int before=dropped;
@@ -170,13 +179,25 @@ int main(void) {
  loading.state=CS_PRIMED;assert(SV_RestartLoadingClient(&loading,0));assert(loading.state==CS_PRIMED && resent==3);
  loading.state=CS_ACTIVE;assert(!SV_RestartLoadingClient(&loading,0));assert(resent==3);
  loading.state=CS_CONNECTED;assert(!SV_RestartLoadingClient(&loading,1));assert(resent==3);
+ sv.serverId=300;sv.restartedServerId=200;
+ loading.state=CS_PRIMED;loading.gamestateMessageNum=10;loading.messageAcknowledge=11;
+ message_gate(&loading,200);assert(resent==4 && loading.state==CS_PRIMED);
+ message_gate(&loading,299);assert(resent==5); /* Multiple fast restarts while loading. */
+ loading.state=CS_CONNECTED;message_gate(&loading,250);assert(resent==6);
+ loading.state=CS_PRIMED;loading.messageAcknowledge=10;message_gate(&loading,250);assert(resent==6); /* Await an acknowledgement before retransmitting. */
+ loading.messageAcknowledge=11;message_gate(&loading,300);assert(resent==6); /* Current gamestate. */
+ loading.state=CS_ACTIVE;message_gate(&loading,250);assert(resent==6); /* Active clients await restart snapshots. */
+ loading.state=CS_PRIMED;strcpy(loading.downloadName,"map");message_gate(&loading,250);assert(resent==6);loading.downloadName[0]=0;
+ strcpy(loading.lastClientCommandString,"nextdl");message_gate(&loading,250);assert(resent==6);loading.lastClientCommandString[0]=0;
+ message_gate(&loading,199);assert(resent==7); /* Previous full-map load still recovers. */
+ puts("Pure restart recovery: loading acknowledgements retransmit gamestate; current, active and downloading clients preserved.");
  puts("Pure assets: exact allowed Legacy module entries referenced; missing/disallowed packs rejected; desktop unchanged.");
 }
 '''
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--compiler',default='emcc');parser.add_argument('--node',default='node');args=parser.parse_args()
     fixture=ROOT/'build_wasm/test_pure_assets.c';fixture.write_text(HARNESS.replace('/* FUNCTIONS */',functions)
-        .replace('/* LOOKUP */',lookup).replace('/* ADVERTISEMENT */',advertisement).replace('/* SEND */',send).replace('/* NEXT ID */',next_id).replace('/* MOVE GATE */',move_gate).replace('/* RESTART LOADING */',restart_loading).replace('/* VERIFY */',verify),encoding='utf-8')
+        .replace('/* LOOKUP */',lookup).replace('/* ADVERTISEMENT */',advertisement).replace('/* SEND */',send).replace('/* NEXT ID */',next_id).replace('/* MOVE GATE */',move_gate).replace('/* RESTART LOADING */',restart_loading).replace('/* MESSAGE GATE */',message_gate).replace('/* VERIFY */',verify),encoding='utf-8')
     for name,flags in [('web',[]),('desktop',['-U__EMSCRIPTEN__'])]:
         output=ROOT/('build_wasm/test_pure_assets_'+name+'.cjs')
         subprocess.run([args.compiler,str(fixture),'-O2','-sENVIRONMENT=node','-sWASM_ASYNC_COMPILATION=0',*flags,'-o',str(output)],check=True)
