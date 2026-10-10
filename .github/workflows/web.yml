@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/web.yml'
       - 'build_wasm.sh'
+      - 'docs/web-wasm.md'
+      - 'docs/web-hosting.md'
       - 'CMakeLists.txt'
       - 'VERSION.txt'
       - 'cmake/**'
@@ -83,6 +85,7 @@ jobs:
           python misc/web/verify_bundle.py build_wasm
           cp COPYING.txt build_wasm/COPYING.txt
           cp docs/web-wasm.md build_wasm/README.md
+          cp docs/web-hosting.md build_wasm/web-hosting.md
           printf 'Source: %s\nCommit: %s\nSDK: Emscripten 6.0.10\nOriginal game PK3s are supplied separately.\n' "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$GITHUB_SHA" > build_wasm/BUILD_INFO.txt
       - name: Save deployable browser bundle
         uses: actions/upload-artifact@v4
@@ -102,6 +105,7 @@ jobs:
             build_wasm/web-modules/identity.json
             build_wasm/COPYING.txt
             build_wasm/README.md
+            build_wasm/web-hosting.md
             build_wasm/BUILD_INFO.txt
       - name: Save exact modules and archives for matching server packs
         uses: actions/upload-artifact@v4

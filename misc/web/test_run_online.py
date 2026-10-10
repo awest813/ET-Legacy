@@ -13,7 +13,7 @@ import run_online
 
 
 class RunnerTests(unittest.TestCase):
-    def run_fixture(self, origin=None, release=None, inherited=None):
+    def run_fixture(self, origin=None, release=None, inherited=None, assets=False):
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / 'isolated.json'
             config.write_text(json.dumps({'server': '127.0.0.1', 'udpPort': 27961,
@@ -24,11 +24,14 @@ class RunnerTests(unittest.TestCase):
                 selected = Path(directory) / release
                 selected.mkdir()
                 argv += ['--build-dir', str(selected)]
+            if assets:
+                argv += ['--assets-dir', str(Path(directory) / 'original packs')]
             child = Mock()
             child.poll.return_value = 1
             output = io.StringIO()
             with patch('sys.argv', argv), patch.object(run_online.subprocess, 'Popen', return_value=child) as start, \
                     patch.object(run_online.secrets, 'token_hex', return_value='c' * 64), \
+                    patch.object(run_online, 'verify_browser', return_value=7), \
                     patch.dict(os.environ, {'ETWASM_BUILD': inherited} if inherited else {}, clear=True), \
                     contextlib.redirect_stdout(output):
                 with self.assertRaisesRegex(SystemExit, 'Launcher or relay stopped'):
@@ -43,6 +46,9 @@ class RunnerTests(unittest.TestCase):
                     Path(inherited).resolve() if inherited else
                     Path(run_online.__file__).resolve().parents[2] / 'build_wasm')
                 self.assertEqual(call.kwargs['env']['ETWASM_BUILD'], str(expected))
+                if assets:
+                    self.assertEqual(call.kwargs['env']['ETWASM_ASSETS'],
+                                     str((Path(directory) / 'original packs').resolve()))
             self.assertNotIn('c' * 64, output.getvalue())
             return calls, output.getvalue()
 
@@ -67,6 +73,9 @@ class RunnerTests(unittest.TestCase):
         self.run_fixture(inherited='existing-release')
         self.run_fixture(release='selected-release', inherited='different-release')
 
+    def test_asset_directory_reaches_both_services(self):
+        self.run_fixture(assets=True)
+
     def test_missing_explicit_release_starts_no_services(self):
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / 'test.json'
@@ -79,6 +88,41 @@ class RunnerTests(unittest.TestCase):
                     run_online.main()
             self.assertEqual(error.exception.code, 2)
             start.assert_not_called()
+
+    def test_invalid_release_starts_no_services(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / 'config.json'
+            config.write_text(json.dumps({'server': '127.0.0.1'}), encoding='utf-8')
+            with patch('sys.argv', ['run_online.py', '--config', str(config),
+                                   '--build-dir', directory]), \
+                    patch.object(run_online.subprocess, 'Popen') as start, \
+                    contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as error:
+                    run_online.main()
+            self.assertEqual(error.exception.code, 2)
+            start.assert_not_called()
+
+    def test_check_validates_packs_without_starting_services(self):
+        import zipfile
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / 'config.json'
+            config.write_text(json.dumps({'server': '127.0.0.1'}), encoding='utf-8')
+            argv = ['run_online.py', '--config', str(config), '--build-dir', directory,
+                    '--assets-dir', directory, '--check']
+            for name in ('pak0.pk3', 'pak1.pk3', 'pak2.pk3', 'etloose.pk3'):
+                with zipfile.ZipFile(root / name, 'w') as archive:
+                    archive.writestr('fixture.txt', 'test')
+            with patch('sys.argv', argv), \
+                    patch.object(run_online, 'verify_browser', return_value=7), \
+                    patch.object(run_online.subprocess, 'Popen') as start, \
+                    contextlib.redirect_stdout(io.StringIO()) as output:
+                run_online.main()
+                self.assertIn('Hosting preflight passed', output.getvalue())
+                (root / 'pak0.pk3').write_bytes(b'corrupt')
+                with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                    run_online.main()
+                start.assert_not_called()
 
     def test_reject_non_origins(self):
         for value in ['http://play.example.org', 'https://', 'https://user@play.example.org',

@@ -7,8 +7,10 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import zipfile
 from urllib.parse import urlsplit
 from build_paths import browser_build
+from verify_bundle import verify_browser
 
 def https_origin(value):
     """An exact TLS proxy origin, with no credentials, path or query."""
@@ -37,6 +39,10 @@ def main():
                         help='Exact HTTPS origin of a TLS reverse proxy; services stay on loopback')
     parser.add_argument('--build-dir', type=Path,
                         help='Browser release directory (default: ETWASM_BUILD or build_wasm)')
+    parser.add_argument('--check', action='store_true',
+                        help='Validate configuration, browser bundle and original packs, then exit without starting services')
+    parser.add_argument('--assets-dir', type=Path,
+                        help='Original game pack directory (overrides ETWASM_ASSETS)')
     args = parser.parse_args()
     config = args.config.resolve()
     try:
@@ -52,7 +58,25 @@ def main():
     build = args.build_dir.resolve() if args.build_dir is not None else browser_build()
     if args.build_dir is not None and not build.is_dir():
         parser.error('--build-dir must name an existing browser release directory')
+    try:
+        verify_browser(build)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        parser.error('Browser release failed validation: ' + str(error))
     env=os.environ.copy()
+    if args.assets_dir is not None:
+        env['ETWASM_ASSETS'] = str(args.assets_dir.resolve())
+    if args.check:
+        assets = Path(env.get('ETWASM_ASSETS', r'C:\Users\allen\Downloads\etlegacy-wasm\assets'))
+        try:
+            for name in ('pak0.pk3', 'pak1.pk3', 'pak2.pk3', 'etloose.pk3'):
+                with zipfile.ZipFile(assets / name) as archive:
+                    if not archive.infolist() or archive.testzip() is not None:
+                        raise ValueError('Empty or corrupt pack: ' + name)
+        except (OSError, ValueError, zipfile.BadZipFile, RuntimeError, NotImplementedError) as error:
+            parser.error('Game packs failed validation: ' + str(error))
+        print(f'Hosting preflight passed: {build}; four game packs in {assets.resolve()}')
+        print('No services started. TLS, DNS and server compatibility require separate live checks.')
+        return
     origins = [args.public_origin] if args.public_origin else [f'http://localhost:{web}', f'http://127.0.0.1:{web}']
     relay_url = 'wss://' + args.public_origin[len('https://'):] + '/relay' if args.public_origin else f'ws://127.0.0.1:{relay}/relay'
     env.update(ETWASM_RELAY_URL=relay_url,ETWASM_BIND='127.0.0.1',

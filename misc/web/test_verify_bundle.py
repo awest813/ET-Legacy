@@ -6,7 +6,7 @@ import tempfile
 import unittest
 import zlib
 
-from verify_bundle import CORE, verify
+from verify_bundle import CORE, verify, verify_browser
 
 
 class BundleTests(unittest.TestCase):
@@ -43,6 +43,14 @@ class BundleTests(unittest.TestCase):
 
     def test_complete_bundle(self):
         self.assertEqual(verify(self.build), 7)
+
+    def test_browser_artifact_without_compiler_publication(self):
+        for name in ('libcgame.a', 'libui.a', 'libbundled_cjson.a',
+                     'web-modules/cgame.mp.wasm32.so', 'web-modules/ui.mp.wasm32.so'):
+            (self.build / name).unlink()
+        self.assertEqual(verify_browser(self.build), 7)
+        with self.assertRaises(OSError):
+            verify(self.build)
 
     def test_changed_browser_file(self):
         (self.build / 'etl.wasm').write_bytes(b'x' * len(b'etl.wasm'))

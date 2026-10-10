@@ -31,6 +31,9 @@ proxy example are in [Hosted launcher and retry follow-up](#hosted-launcher-and-
 
 ## Build and runtime
 
+For release staging, preflight, HTTPS setup and rollback, see
+[Build and host the browser app](web-hosting.md).
+
 The Emscripten Release target `etl` builds in `build_wasm`. Its output comprises
 `etl.html`, `etl.js`, `etl.wasm`, and `etl.data`. The build uses the SDL2, Ogg,
 Vorbis, JPEG, FreeType, PNG, and zlib Emscripten ports. `cmake/ETLOmnibotWasm.cmake`
