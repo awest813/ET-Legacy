@@ -1334,6 +1334,7 @@
 		return !canvasDoc.hidden && canvasDoc.hasFocus() && canvasDoc.activeElement === Module.canvas;
 	}
 	function mouseLocked() { return canvasDoc.pointerLockElement === Module.canvas; }
+	function controlProperty(element, name, value) { if (element[name] !== value) element[name] = value; }
 	function controlText(element, text) { if (element.textContent !== text) element.textContent = text; }
 	function controlAttribute(element, name, value) { if (element.getAttribute(name) !== String(value)) element.setAttribute(name, value); }
 	function saveSound()
@@ -1422,7 +1423,7 @@
 		controlText(volumevalue, Math.round(soundVolume * 100) + '%');
 		controlAttribute(volume, 'aria-valuetext', Math.round(soundVolume * 100) + ' percent');
 		controlText(soundbtn, audioGraphError ? 'Retry sound' : muted ? 'Unmute' : state !== 'running' ? 'Enable sound' : 'Mute');
-		soundbtn.disabled = state === 'unavailable' || state === 'closed';
+		controlProperty(soundbtn, 'disabled', state === 'unavailable' || state === 'closed');
 		controlAttribute(soundbtn, 'aria-pressed', String(muted));
 	}
 	function resumeAudio()
@@ -1497,8 +1498,8 @@
 		if (Module['browserTouch']) Module['browserTouch'].frame(mode, focused, !bootFailed && loadState === 'running');
 		if (!focused) { stopDragAim(); releaseMouse(); }
 		if (gamebar.hidden !== (bootFailed || loadState !== 'running')) gamebar.hidden = bootFailed || loadState !== 'running';
-		capturebtn.disabled = mode !== 0 || locked || capturePending;
-		capturebtn.title = mode === 1 ? 'Close the menu to capture the mouse' : mode === 2 ? 'Close the console to capture the mouse' : mode === 3 ? 'Wait for the map to finish loading' : locked ? 'Press Esc to release the mouse' : dragFallback ? 'Click here to retry mouse capture; left click in the game fires' : 'Click here or click the game to capture the mouse';
+		controlProperty(capturebtn, 'disabled', mode !== 0 || locked || capturePending);
+		controlProperty(capturebtn, 'title', mode === 1 ? 'Close the menu to capture the mouse' : mode === 2 ? 'Close the console to capture the mouse' : mode === 3 ? 'Wait for the map to finish loading' : locked ? 'Press Esc to release the mouse' : dragFallback ? 'Click here to retry mouse capture; left click in the game fires' : 'Click here or click the game to capture the mouse');
 		controlText(document.getElementById('inputbadge'), ['IN GAME', 'MENU', 'CONSOLE', 'LOADING'][mode]);
 		controlText(capturebtn, locked ? 'Mouse captured' : capturePending ? 'Capturing…' : 'Capture mouse');
 		controlText(focusstatus, !focused ? 'Click the game to focus' : captureError || (mode === 3 ? 'Loading map…' : mode === 2 ? 'Console · ~ to return' : mode === 1 ? 'Menu · point and click' : locked ? 'Mouse captured · Esc releases' : dragFallback ? 'Hold right mouse to aim · left click fires' : 'Click the game to capture mouse'));

@@ -1482,3 +1482,19 @@ console.log('Match summary, solo setup, keyboard help, canvas focus and error ac
     assert.equal(closing.elements.soundstatus.textContent,'Muted','Old resume rejection cannot affect a replacement after native shutdown');
     console.log('Audio fault checks passed (mute persistence, interruption, graph/automation failure, gesture deduplication, stale restart promises and shutdown).');
 })().catch(error => { console.error(error); process.exitCode=1; });
+
+{
+    const page=launcher();page.start();page.context.Module.browserInputFrame(0);
+    let propertyWrites=0;
+    for(const [element,name] of [[page.elements.capturebtn,'disabled'],[page.elements.capturebtn,'title'],[page.elements.soundbtn,'disabled']]) {
+        let value=element[name];
+        Object.defineProperty(element,name,{configurable:true,get(){return value;},set(next){propertyWrites++;value=next;}});
+    }
+    for(let i=0;i<600;i++) page.context.Module.browserInputFrame(0);
+    assert.equal(propertyWrites,0,'Stable frame polling must not rewrite toolbar DOM properties');
+    page.context.Module.browserInputFrame(1);
+    assert.equal(page.elements.capturebtn.disabled,true,'Menu transitions still update capture controls immediately');
+    assert.match(page.elements.capturebtn.title,/Close the menu/);
+    assert.ok(propertyWrites>0);
+    console.log('Toolbar idle performance: zero redundant property writes across 600 stable frames; menu transition updates immediately.');
+}

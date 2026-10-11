@@ -1,11 +1,12 @@
 const assert = require('node:assert/strict');
 const createTouch = require('./touch.js');
+let touchMutations = 0;
 class Element {
  constructor(attrs = {}) { this.attrs = attrs; this.events = {}; this.style = {}; this.children = []; this.hidden = false; this.captures = new Set(); }
  addEventListener(name, fn) { (this.events[name] ||= []).push(fn); }
- setAttribute(name, value) { this.attrs[name] = String(value); }
+ setAttribute(name, value) { touchMutations++; this.attrs[name] = String(value); }
  getAttribute(name) { return this.attrs[name]; }
- removeAttribute(name) { delete this.attrs[name]; }
+ removeAttribute(name) { touchMutations++; delete this.attrs[name]; }
  querySelectorAll(selector) { const attr=selector.slice(1,-1); return this.children.filter(child=>Object.hasOwn(child.attrs,attr)); }
  getBoundingClientRect() { return {left:0, top:0, width:100, height:100}; }
  setPointerCapture(id) { this.captures.add(id); }
@@ -103,3 +104,12 @@ assert.equal(fixture(false,undefined,false,{denied:true,points:5}).touch.enabled
 assert.equal(fixture(false,undefined,false,{denied:true,points:0}).touch.enabled(),false);
 assert.ok(f.gestures()>0);
 console.log('Touch: primary-pointer defaults, touchscreen laptop preferences, independent move/aim/fire pointers, quick taps, cancellation, dead zone, menu/loading gates and focus/resize resets passed.');
+
+const idleTouch = fixture();
+idleTouch.fire.send('pointerdown',101);
+idleTouch.touch.frame(0,false,true); // First focus loss must still cancel the held shot.
+assert.equal(idleTouch.touch.poll()[4],0);
+touchMutations=0;
+for(let i=0;i<600;i++) idleTouch.touch.frame(0,false,true);
+assert.equal(touchMutations,0,'Idle unfocused frames must not repeatedly mutate touch button attributes');
+console.log('Touch idle performance: zero DOM attribute writes across 600 unfocused frames after cancellation.');

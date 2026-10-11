@@ -3562,3 +3562,38 @@ and returned a disabled empty server catalog. Evidence:
 `offline-launcher-64714.log`. The temporary runner was stopped after checking;
 main services were not restarted. These changes affect service startup and CLI
 diagnostics, so the existing game bundle was reused rather than rebuilt.
+
+
+### Browser idle-frame DOM overhead (2026-10-10)
+
+The native input poll calls the browser toolbar and touch lifecycle every frame.
+A deterministic regression reproduced 1,800 redundant toolbar property writes
+across 600 stable polls: capture disabled, capture title and sound disabled were
+assigned on every poll even when unchanged. Those properties now update only
+when their values change. Mode, focus, capture and audio state are still checked
+every frame; menu transitions update their controls immediately.
+
+Touch reset also ran on every unfocused poll after all input was already clear.
+It allocated an empty pointer snapshot, queried action buttons and removed seven
+held attributes repeatedly: 4,200 removals in 600 polls. Reset now returns early
+only when there are no pointers, movement, look deltas, pressed bits or queued
+actions. The first focus loss still cancels held fire and releases pointer
+captures. Both regressions fail against the previous implementation and pass
+with zero measured redundant writes after the change. These are operation
+counts from the JavaScript harness, not browser FPS or GPU-time measurements.
+
+All six JavaScript suites passed, including input cancellation, mixed touch
+pointers, audio restart/mute, menu capture and PWA state coverage. The browser
+bundle rebuilt successfully and its seven browser files and both module/archive
+identities verified. Evidence: `build_wasm/browser-idle-before-touch.log`,
+`browser-idle-before-launcher.log`, `browser-idle-*-tests.log` and
+`browser-idle-build.log`.
+
+A fresh Chromium smoke check served the rebuilt bundle through the offline
+runner on temporary port 64715. Radar rendered at the Chromebook preset,
+four bots joined two per team, and toggling the touch Menu updated the toolbar
+and hid gameplay controls; closing it restored both. Screenshots are
+`build_wasm/browser-idle-native-menu.png` and `browser-idle-live.png`; native
+output is `browser-idle-native-log.json`. This was spectator startup and menu
+verification, not a full match or a physical-device FPS benchmark. The temporary
+tab and runner were closed, leaving main services untouched.

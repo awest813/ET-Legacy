@@ -18,6 +18,9 @@
   try { var saved = options.storage.getItem('etl.touch'); if (saved === 'true' || saved === 'false') enabled = saved === 'true'; } catch (e) {}
   function held() { var bits = 0; pointers.forEach(function(p) { bits |= p.bit || 0; }); return bits; }
   function reset() {
+   // Native input polls every frame, including when an unfocused tab is idle.
+   // Once cancellation has cleared all pending input, leave the DOM untouched.
+   if (!pointers.size && !move[0] && !move[1] && !look[0] && !look[1] && !pressed && !actions) return;
    var old = Array.from(pointers.entries()); pointers.clear(); move = [0, 0]; look = [0, 0]; pressed = actions = 0;
    thumb.style.transform = 'translate(0px, 0px)';
    old.forEach(function(entry) { try { entry[1].element.releasePointerCapture(entry[0]); } catch (e) {} });
