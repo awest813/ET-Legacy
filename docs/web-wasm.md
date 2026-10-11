@@ -3534,3 +3534,31 @@ This is a live bot startup/combat smoke check, not a completed round or a measur
 human weapon-accuracy comparison. Evidence: `build_wasm/bot-settings-setup.png`,
 `bot-settings-live-match.png`, `bot-settings-native-log.json`, the
 `bot-settings-*-tests.log` files and `bot-settings-polish-build.log`.
+
+
+### Offline quick-start and downloaded release validation (2026-10-10)
+
+`run_online.py --offline` starts only the loopback HTTP launcher, with no server
+configuration read and no relay process or public-discovery signing key. An
+explicit empty relay URL overrides inherited or operator-configured online
+settings. `--web-port` chooses a local port; conflicting online flags and invalid
+ports fail before startup. The existing online runner behavior remains covered
+by the configuration/origin tests. `--check` also works in offline mode without
+a server configuration, validating the bundle and original game packs.
+
+`verify_bundle.py --runtime-only` validates a downloaded browser artifact
+without requiring the separate compiler/module publication artifact. Missing,
+stale and malformed release files produce an actionable CLI validation error
+instead of a Python traceback. Full verification still checks the module and
+archive bytes for matching pure-server pack publication. The hosting guide now
+includes the offline command sequence and explains port selection and shutdown.
+
+All 106 Python service tests passed. Runtime-only validation and offline
+preflight passed against the existing local browser bundle and four installed
+packs. A temporary offline runner on port 64714 served HTML with COOP/COEP,
+returned online enabled=false and publicServers=false with an empty relay URL,
+and returned a disabled empty server catalog. Evidence:
+`build_wasm/easy-build-quality-tests.log`, `easy-offline-service-proof.json` and
+`offline-launcher-64714.log`. The temporary runner was stopped after checking;
+main services were not restarted. These changes affect service startup and CLI
+diagnostics, so the existing game bundle was reused rather than rebuilt.

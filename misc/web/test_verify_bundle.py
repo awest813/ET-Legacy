@@ -3,6 +3,8 @@ import hashlib
 import json
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 import unittest
 import zlib
 
@@ -51,6 +53,21 @@ class BundleTests(unittest.TestCase):
         self.assertEqual(verify_browser(self.build), 7)
         with self.assertRaises(OSError):
             verify(self.build)
+
+    def test_runtime_cli_handles_downloaded_bundle_and_reports_errors(self):
+        for name in ('libcgame.a', 'libui.a', 'libbundled_cjson.a',
+                     'web-modules/cgame.mp.wasm32.so', 'web-modules/ui.mp.wasm32.so'):
+            (self.build / name).unlink()
+        command = [sys.executable, str(Path(__file__).with_name('verify_bundle.py')),
+                   str(self.build), '--runtime-only']
+        result = subprocess.run(command, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('7 browser files', result.stdout)
+        (self.build / 'etl.wasm').write_bytes(b'broken')
+        result = subprocess.run(command, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('Release validation failed', result.stderr)
+        self.assertNotIn('Traceback', result.stderr)
 
     def test_changed_browser_file(self):
         (self.build / 'etl.wasm').write_bytes(b'x' * len(b'etl.wasm'))

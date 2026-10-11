@@ -27,6 +27,32 @@ building a matching pure-server pack. Combine it with the browser bundle from
 and module hashes must match the identity manifest. Compiler archives are not
 required just to host the browser bundle.
 
+## Play offline locally
+
+Offline bot play needs Python and the browser bundle, but no online server
+configuration or relay dependency. Check a downloaded bundle directly with:
+
+```sh
+python misc/web/verify_bundle.py /path/to/browser-bundle --runtime-only
+```
+
+Validate the game packs, then launch using the same paths:
+
+```sh
+python misc/web/run_online.py --offline --build-dir /path/to/browser-bundle \
+  --assets-dir /path/to/game-packs --check
+python misc/web/run_online.py --offline --build-dir /path/to/browser-bundle \
+  --assets-dir /path/to/game-packs
+```
+
+Open `http://localhost:8081/`, choose a map and bot difficulty, and select Play
+offline. Ctrl+C stops the launcher. If that port is occupied, add
+`--web-port 8083` and open the printed URL. Offline mode starts one loopback HTTP
+service, disables online discovery/joining and does not read `web-server.json`.
+It cannot be combined with `--config` or `--public-origin`. Initial play still
+needs the four game packs described below; saved-app offline play follows the
+normal browser caching flow.
+
 ## Validate before starting
 
 Create a Python virtual environment, install the service dependency and copy

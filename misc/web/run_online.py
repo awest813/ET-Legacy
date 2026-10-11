@@ -1,4 +1,4 @@
-"""Run the launcher, public discovery and relay using web-server.json defaults."""
+"""Run the browser launcher locally, with optional online discovery and relay."""
 import json
 import argparse
 import os
@@ -33,7 +33,7 @@ def https_origin(value):
 def main():
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config', type=Path, default=root/'web-server.json',
+    parser.add_argument('--config', type=Path,
                         help='Server configuration file (default: web-server.json)')
     parser.add_argument('--public-origin', type=https_origin,
                         help='Exact HTTPS origin of a TLS reverse proxy; services stay on loopback')
@@ -43,10 +43,20 @@ def main():
                         help='Validate configuration, browser bundle and original packs, then exit without starting services')
     parser.add_argument('--assets-dir', type=Path,
                         help='Original game pack directory (overrides ETWASM_ASSETS)')
+    parser.add_argument('--offline', action='store_true',
+                        help='Run offline bot play only; no server configuration or relay is needed')
+    parser.add_argument('--web-port', type=int,
+                        help='Local launcher port for --offline (default: 8081)')
     args = parser.parse_args()
-    config = args.config.resolve()
+    if args.offline and (args.config is not None or args.public_origin is not None):
+        parser.error('--offline does not use --config or --public-origin')
+    if args.web_port is not None and (not args.offline or not 1 <= args.web_port <= 65535):
+        parser.error('--web-port requires --offline and a port between 1 and 65535')
+    config = (args.config or root/'web-server.json').resolve()
     try:
-        settings=json.loads(config.read_text(encoding='utf-8'))
+        settings = ({'server': '127.0.0.1', 'webPort': args.web_port or 8081,
+                     'relayPort': 8082 if (args.web_port or 8081) != 8082 else 8083}
+                    if args.offline else json.loads(config.read_text(encoding='utf-8')))
         if not isinstance(settings, dict): raise ValueError('Expected a configuration object')
         server=settings['server']
         if not isinstance(server,str) or not server or server.startswith('-'): raise ValueError('Invalid server')
@@ -82,23 +92,31 @@ def main():
     env.update(ETWASM_RELAY_URL=relay_url,ETWASM_BIND='127.0.0.1',
                ETWASM_SERVER_CONFIG=str(config), ETWASM_BUILD=str(build))
     # Shared only by these child services, never written to disk or browser JSON.
-    env['ETWASM_PUBLIC_SECRET'] = secrets.token_hex(32)
+    if args.offline:
+        env['ETWASM_RELAY_URL'] = ''
+        env.pop('ETWASM_PUBLIC_SECRET', None)
+    else:
+        env['ETWASM_PUBLIC_SECRET'] = secrets.token_hex(32)
     flags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0
     children=[]; logs=[]
     try:
         (root/'build_wasm').mkdir(exist_ok=True)
         log_names = (f'online-relay-{relay}.log', f'online-launcher-{web}.log')
+        if args.offline: log_names = (f'offline-launcher-{web}.log',)
         logs=[(root/'build_wasm'/name).open('a',encoding='utf-8') for name in log_names]
         origin_args = [arg for origin in origins for arg in ('--origin', origin)]
-        children.append(subprocess.Popen([sys.executable,'-u',str(root/'misc/web/relay.py'),'--server',server,'--udp-port',str(udp),'--port',str(relay),*origin_args],cwd=root,env=env,creationflags=flags,stdout=logs[0],stderr=subprocess.STDOUT))
-        children.append(subprocess.Popen([sys.executable,'-u',str(root/'misc/web/serve.py'),str(web)],cwd=root,env=env,creationflags=flags,stdout=logs[1],stderr=subprocess.STDOUT))
-        print(f'Online launcher: {args.public_origin or f"http://localhost:{web}"}/ (Ctrl+C stops both services)',flush=True)
+        if not args.offline:
+            children.append(subprocess.Popen([sys.executable,'-u',str(root/'misc/web/relay.py'),'--server',server,'--udp-port',str(udp),'--port',str(relay),*origin_args],cwd=root,env=env,creationflags=flags,stdout=logs[0],stderr=subprocess.STDOUT))
+        children.append(subprocess.Popen([sys.executable,'-u',str(root/'misc/web/serve.py'),str(web)],cwd=root,env=env,creationflags=flags,stdout=logs[-1],stderr=subprocess.STDOUT))
+        mode = 'Offline' if args.offline else 'Online'
+        services = 'the launcher' if args.offline else 'both services'
+        print(f'{mode} launcher: {args.public_origin or f"http://localhost:{web}"}/ (Ctrl+C stops {services})',flush=True)
         print(f'Browser release: {build}', flush=True)
         if args.public_origin:
             print(f'TLS proxy required: /relay and /relay/* -> 127.0.0.1:{relay}; other paths -> 127.0.0.1:{web}',flush=True)
         print('Service logs: '+', '.join('build_wasm/'+name for name in log_names),flush=True)
         while all(child.poll() is None for child in children): time.sleep(.5)
-        raise SystemExit('Launcher or relay stopped. Check the output above.')
+        raise SystemExit('Launcher stopped. Check its service log.' if args.offline else 'Launcher or relay stopped. Check the service logs.')
     except KeyboardInterrupt: pass
     finally:
         for child in children:

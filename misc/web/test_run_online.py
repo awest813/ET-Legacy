@@ -124,6 +124,41 @@ class RunnerTests(unittest.TestCase):
                     run_online.main()
                 start.assert_not_called()
 
+    def test_offline_starts_only_http_without_config_or_public_secret(self):
+        child = Mock()
+        child.poll.return_value = 1
+        output = io.StringIO()
+        with patch('sys.argv', ['run_online.py', '--offline', '--web-port', '8082']), \
+                patch.object(run_online, 'verify_browser', return_value=7), \
+                patch.object(Path, 'read_text', side_effect=AssertionError('Offline must not read server config')), \
+                patch.dict(os.environ, {'ETWASM_PUBLIC_SECRET': 'a' * 64, 'ETWASM_RELAY_URL': 'wss://example.org/relay'}), \
+                patch.object(run_online.subprocess, 'Popen', return_value=child) as start, \
+                contextlib.redirect_stdout(output):
+            with self.assertRaisesRegex(SystemExit, 'Launcher stopped'):
+                run_online.main()
+        start.assert_called_once()
+        command = start.call_args.args[0]
+        self.assertTrue(command[2].endswith('serve.py'))
+        self.assertEqual(command[3], '8082')
+        env = start.call_args.kwargs['env']
+        self.assertEqual(env['ETWASM_RELAY_URL'], '')
+        self.assertNotIn('ETWASM_PUBLIC_SECRET', env)
+        self.assertEqual(env['ETWASM_BIND'], '127.0.0.1')
+        self.assertIn('Offline launcher: http://localhost:8082/', output.getvalue())
+
+    def test_offline_rejects_conflicting_flags_and_bad_ports(self):
+        for flags in (['--offline', '--config', 'ignored.json'],
+                      ['--offline', '--public-origin', 'https://example.org'],
+                      ['--web-port', '8083'], ['--offline', '--web-port', '0'],
+                      ['--offline', '--web-port', '65536']):
+            with self.subTest(flags=flags), patch('sys.argv', ['run_online.py', *flags]), \
+                    patch.object(run_online.subprocess, 'Popen') as start, \
+                    contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as error:
+                    run_online.main()
+                self.assertEqual(error.exception.code, 2)
+                start.assert_not_called()
+
     def test_reject_non_origins(self):
         for value in ['http://play.example.org', 'https://', 'https://user@play.example.org',
                       'https://play.example.org/', 'https://play.example.org/game',

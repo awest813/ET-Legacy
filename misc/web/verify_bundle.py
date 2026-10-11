@@ -49,5 +49,12 @@ def verify(build):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('build', type=Path, nargs='?', default=Path('build_wasm'))
+    parser.add_argument('--runtime-only', action='store_true',
+                        help='Check a downloaded browser bundle without compiler archives or published modules')
     args = parser.parse_args()
-    print(f'Verified {verify(args.build)} browser files and both published module identities/archives.')
+    try:
+        count = verify_browser(args.build) if args.runtime_only else verify(args.build)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        parser.error('Release validation failed: ' + str(error))
+    detail = 'module identity metadata' if args.runtime_only else 'both published module identities/archives'
+    print(f'Verified {count} browser files and {detail}.')
