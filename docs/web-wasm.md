@@ -3500,3 +3500,37 @@ The production runner served that release with a separate loopback launcher/rela
 Explicit Disconnect and Retry on the player restored a rendered online spectator view. Native events show client 0 disconnect at 146800, reconnect at 150450 and begin at 155100, while client 1 had no disconnect during recovery. Both test tabs and the isolated runner/native fixture were stopped afterward; main services were left running. This verifies local pure multiplayer, replication and retry with the current clean artifact. It does not establish public Internet gameplay, TLS deployment, physical device performance or a full online match result.
 
 Evidence: build_wasm/ci-mobile-online-info.json, ci-mobile-online-native-events.json, ci-mobile-online-client-log.json, ci-mobile-online-peer-log.json, ci-mobile-online-peer-before.png, ci-mobile-online-player-fire.png, ci-mobile-online-peer-after.png and ci-mobile-online-reconnected.png; service logs are online-launcher-8099.log and online-relay-8100.log. The earlier archived CI/native fixtures were preserved separately.
+
+
+### Bot difficulty, match guidance and touch input parity (2026-10-10)
+
+Custom bot profiles can explicitly choose skill 0. The difficulty goal now tests
+for a null profile skill instead of treating zero as absent. The production
+GameMonkey regression executes the difficulty Update function with a zero-skill
+profile and verifies its reaction time and locked skill. It also changes an
+unprofiled bot from Easy to Hard and back, checking that maximum view distance
+does not accumulate scaling. This preserves the existing shipped difficulty
+values and default launcher mappings.
+
+Touch Use plus sideways movement now sets the native lean flag and suppresses
+sideways movement, matching CL_KeyMove's activate/strafe behavior. Production
+usercmd tests cover left/right leaning, touch Use with keyboard strafe, keyboard
+Use with touch strafe, normal strafe after release, and preserved forward/input
+flags. The fixture passes with Release `-O3 -ffast-math`, including its existing
+non-finite and mixed-input cases. Physical simultaneous multitouch was not tested.
+
+The launcher describes Easy, Normal and Hard beside the difficulty selector.
+Zero bots disables difficulty and explains that it applies when bots are enabled;
+restoring bots restores the selected difficulty. The hint spans the full match
+settings grid. Touch help now explains holding Use and moving sideways to lean.
+The six JavaScript suites (including settings persistence and graphics staging
+coverage), actual bot interpreter tests, browser engine build and seven-file /
+two-module verification passed.
+
+A fresh Chromium origin on temporary port 64713 confirmed the zero/four-bot UI
+transition and the full-width hint. Radar rendered with the Chromebook preset;
+native output recorded four bot joins split two per team and a bot combat kill.
+This is a live bot startup/combat smoke check, not a completed round or a measured
+human weapon-accuracy comparison. Evidence: `build_wasm/bot-settings-setup.png`,
+`bot-settings-live-match.png`, `bot-settings-native-log.json`, the
+`bot-settings-*-tests.log` files and `bot-settings-polish-build.log`.

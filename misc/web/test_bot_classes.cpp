@@ -143,6 +143,34 @@ int main(int, char **)
     )GM");
     assert(value(machine, "DifficultyOrder") == 1);
     run(machine, R"GM(
+        global IsNull = function(value) { return typeId(value) == 0; };
+        global Clamp = function(n, lo, hi) { if(n < lo) { return lo; } if(n > hi) { return hi; } return n; };
+        global ENTFLAG = { ZOOMING = 1 };
+        Util.WeaponName = function(id) { return "MP40"; };
+        DifficultyGoal.AdjustAim = false;
+        DifficultyGoal.Finished = function() {};
+        DifficultyGoal.Bot = {
+            ProfileSkill = 0, MaxViewDistance = 1000,
+            HasEntityFlag = function(flag) { return false; },
+            GetCurrentWeapon = function() { return 1; }
+        };
+        DifficultyGoal.CurrentDifficulty = 6;
+        DifficultyGoal.Update();
+        global ZeroProfileHonored = DifficultyGoal.Bot.aimskill == 0
+            && DifficultyGoal.Bot.ReactionTime == 2.0 && DifficultyGoal.LockSkill == true;
+        DifficultyGoal.Bot.ProfileSkill = null;
+        DifficultyGoal.Bot.aimskill = null;
+        DifficultyGoal.LockSkill = false;
+        DifficultyGoal.CurrentDifficulty = 2; DifficultyGoal.Update();
+        global EasyView = DifficultyGoal.Bot.MaxViewDistance;
+        DifficultyGoal.CurrentDifficulty = 6; DifficultyGoal.Update();
+        DifficultyGoal.CurrentDifficulty = 2; DifficultyGoal.Update();
+        global DifficultyViewStable = DifficultyGoal.Bot.MaxViewDistance == EasyView;
+    )GM");
+    assert(value(machine, "ZeroProfileHonored") == 1);
+    assert(value(machine, "DifficultyViewStable") == 1);
+
+    run(machine, R"GM(
         global TEAM = { AXIS = 1, ALLIES = 2 };
         global WEAPON = { MOBILE_MG42 = 1, MORTAR = 2, GARAND = 3, K43 = 4, PROTO = 5 };
         global EVENT = { CHANGETEAM = 1, CHANGECLASS = 2, DISCONNECTED = 3 };

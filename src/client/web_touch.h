@@ -29,6 +29,13 @@ static void WebTouch_Apply(usercmd_t *cmd, float *angles, const float *input, in
 	if (buttons & 16) cmd->wbuttons |= WBUTTON_RELOAD;
 	if (buttons & 32) cmd->buttons |= BUTTON_ACTIVATE;
 	if (buttons & 64) cmd->wbuttons |= WBUTTON_PRONE;
+	/* Match CL_KeyMove: activate + strafe leans instead of moving sideways. */
+	if (cmd->buttons & BUTTON_ACTIVATE)
+	{
+		if (cmd->rightmove > 0) cmd->wbuttons |= WBUTTON_LEANRIGHT;
+		else if (cmd->rightmove < 0) cmd->wbuttons |= WBUTTON_LEANLEFT;
+		cmd->rightmove = 0;
+	}
 	if (buttons || x || y) cmd->buttons |= BUTTON_ANY;
 	angles[YAW] -= dx * sensitivity * yaw;
 	angles[PITCH] += dy * sensitivity * pitch;

@@ -30,7 +30,7 @@ this.Update = function()
 	// if a bot profile sets a ProfileSkill, this will run only once per round.
 	if (!this.LockSkill && (IsNull(this.Bot.aimskill) || this.CurrentDifficulty != this.Bot.aimskill))
 	{
-		if (!this.Bot.ProfileSkill)
+		if (IsNull(this.Bot.ProfileSkill))
 		{
 			this.Bot.aimskill = this.CurrentDifficulty;
 		}

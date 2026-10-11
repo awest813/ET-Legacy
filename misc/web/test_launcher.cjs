@@ -363,6 +363,14 @@ for (const map of ['oasis','goldrush','battery','fueldump','radar','railgun']) {
     assert.equal(args[mode-1],'+set');assert.equal(args[mode+1],'2');
     assert.equal(args.at(-1),map,'The selected map remains the match map');
 }
+for (const [difficulty, description] of [['2','slower reactions'],['4','balanced reactions'],['6','precise aim']]) {
+    const page=launcher({query:'?bots=4&difficulty='+difficulty});
+    assert.match(page.elements.difficultyhint.textContent,new RegExp(description));
+    page.elements.botcount.value='0';page.elements.botcount.input();
+    assert.match(page.elements.difficultyhint.textContent,/when bots are enabled/);
+    page.elements.botcount.value='4';page.elements.botcount.input();page.start();
+    assert.match(page.files.get('/omni-bot/et/user/omni-bot.cfg'),new RegExp('CurrentDifficulty = '+difficulty));
+}
 const invalid = launcher({ query: '?map=../../bad&bots=-2&difficulty=999' });
 assert.equal(invalid.elements.mapselect.value, 'oasis');
 assert.equal(invalid.elements.botcount.value, 4);

@@ -49,7 +49,7 @@
 	#matchform { width: 440px; padding: 26px; background: #191b1e; border: 1px solid #484234; border-radius: 12px; box-shadow: 0 20px 55px #0005; text-align: left; }
 	#matchsettings { border: 0; padding: 0; margin: 0 0 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; min-width: 0; }
 	#matchsettings legend { padding: 0 0 20px; color: #eee; font-size: 16px; font-weight: 600; }
-	#mapfield, #mapbrief, #matchhint { grid-column: 1 / -1; }
+	#mapfield, #mapbrief, #matchhint, #difficultyhint { grid-column: 1 / -1; }
 	#matchsettings label { display: grid; gap: 8px; font-size: 13px; color: #ccc; font-weight: 500; }
 	#matchsettings select, #matchsettings input { width: 100%; min-height: 44px; padding: 10px 12px; background: #111316; color: #eee; border: 1px solid #5b5c5d; border-radius: 6px; font-size: 15px; }
 	#matchsettings select:hover:not(:disabled), #matchsettings input:hover:not(:disabled) { border-color: #b19b6c; }
@@ -64,7 +64,7 @@
 	#custommaps summary { cursor: pointer; min-height: 44px; padding: 12px 0; color: #ddd; }
 	#custommaps p { line-height: 1.5; margin: 8px 0; }
 	#custommaps button { min-height: 44px; padding: 8px 12px; border: 1px solid #58544a; border-radius: 5px; background: #222429; color: #eee; }
-	#matchhint { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0; }
+	#matchhint, #difficultyhint { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0; }
 	#matchsummary { margin: 0 0 14px; color: #d8c69d; font-size: 13px; }
 	#playbtn { width: 100%; min-height: 48px; font-size: 15px; padding: 12px; background: #e1bd6e; color: #17140d; border: 1px solid #f1d28e; border-radius: 6px; font-weight: 700; letter-spacing: .7px; }
 	#playbtn:hover:not(:disabled) { background: #f1d28e; }
@@ -272,12 +272,13 @@
 				<input id="botcount" name="bots" type="number" min="0" max="12" step="1" value="4" required aria-describedby="matchhint matchsummary">
 			</label>
 			<label for="difficulty">Difficulty
-				<select id="difficulty" name="difficulty">
+				<select id="difficulty" name="difficulty" aria-describedby="difficultyhint">
 					<option value="2">Easy</option>
 					<option value="4" selected>Normal</option>
 					<option value="6">Hard</option>
 				</select>
 			</label>
+			<p id="difficultyhint" role="status">Normal: balanced reactions, aim and combat movement.</p>
 			<p id="matchhint">Balanced teams. Choose 0 bots to explore alone.</p>
 		</fieldset>
 		<p id="matchsummary">Oasis &middot; 4 bots &middot; Normal</p>
@@ -319,7 +320,7 @@
 	<div class="dialoghead"><h2 id="help-title">Game controls</h2><button id="closehelp" type="button">Close</button></div>
 	<p id="helpstart">Start with <kbd>L</kbd> to choose a team and class. In the team menu, point and click to make your selection.</p>
 	<details id="touchhelp"><summary>Touch controls</summary>
-	<p>Drag the left stick to move and the right side to aim. Hold Fire, Sprint or Crouch; tap Jump, Reload or Use. When wounded, Jump joins the reinforcement queue; waiting lets a Medic revive you. Alt fire switches supported weapon modes, including scopes and rifle grenades. Prone lies down or stands up. Team selects your class; Menu opens options; Weapon cycles weapons. Yes and No answer the current vote or fireteam prompt (F1/F2). Tap native menus to select. Landscape gives a larger view. Touch on/off switches controls.</p></details>
+	<p>Drag the left stick to move and the right side to aim. Hold Fire, Sprint or Crouch; tap Jump or Reload. Tap Use to interact; hold Use while moving the stick sideways to lean. When wounded, Jump joins the reinforcement queue; waiting lets a Medic revive you. Alt fire switches supported weapon modes, including scopes and rifle grenades. Prone lies down or stands up. Team selects your class; Menu opens options; Weapon cycles weapons. Yes and No answer the current vote or fireteam prompt (F1/F2). Tap native menus to select. Landscape gives a larger view. Touch on/off switches controls.</p></details>
 	<details id="keyboardhelp" open><summary>Keyboard and mouse controls</summary>
 	<dl class="bindings">
 		<dt><kbd>W A S D</kbd></dt><dd>Move</dd>
@@ -557,6 +558,8 @@
 		controlAttribute(botcount, 'aria-invalid', String(!valid));
 		var names = { '2': 'Easy', '4': 'Normal', '6': 'Hard' };
 		difficulty.disabled = valid && count === 0;
+		var difficultyHints = {'2':'Easy: slower reactions, forgiving aim and simpler combat movement.', '4':'Normal: balanced reactions, aim and combat movement.', '6':'Hard: fast reactions, precise aim and aggressive combat movement.'};
+		controlText(document.getElementById('difficultyhint'), valid && count === 0 ? 'Difficulty applies when bots are enabled.' : difficultyHints[difficulty.value] || 'Choose a bot difficulty.');
 		controlText(document.getElementById('mapbrief'), !navigation ? 'Custom map · solo exploration. No bot navigation is installed for this map.' : mapBriefs[index] || 'Choose a map for your match.');
 		controlText(document.getElementById('matchsummary'), (mapNames[index] || 'Choose a map') + ' · ' +
 			(!valid ? 'Choose 0–12 bots' : count === 0 ? 'Solo exploration' : count + (count === 1 ? ' bot' : ' bots') + ' · ' + names[difficulty.value]));

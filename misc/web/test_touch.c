@@ -9,9 +9,9 @@ int main(void)
 {
 	usercmd_t cmd = {0}; float angles[3] = {0}; float input[4] = {1, .5f, 20, -10};
 	WebTouch_Apply(&cmd, angles, input, 1|2|8|16|32, 5, .022f, .022f);
-	assert(cmd.rightmove == 127 && cmd.forwardmove == 63 && cmd.upmove == 127);
+	assert(cmd.rightmove == 0 && cmd.forwardmove == 63 && cmd.upmove == 127);
 	assert((cmd.buttons & (BUTTON_ATTACK|BUTTON_SPRINT|BUTTON_ACTIVATE|BUTTON_ANY)) == (BUTTON_ATTACK|BUTTON_SPRINT|BUTTON_ACTIVATE|BUTTON_ANY));
-	assert(cmd.wbuttons & WBUTTON_RELOAD); assert(fabsf(angles[YAW]+2.2f)<.001f && fabsf(angles[PITCH]+1.1f)<.001f);
+	assert((cmd.wbuttons & (WBUTTON_RELOAD|WBUTTON_LEANRIGHT)) == (WBUTTON_RELOAD|WBUTTON_LEANRIGHT)); assert(fabsf(angles[YAW]+2.2f)<.001f && fabsf(angles[PITCH]+1.1f)<.001f);
 	cmd = (usercmd_t){0}; cmd.forwardmove = 90; cmd.buttons = BUTTON_ATTACK;
 	input[0]=input[1]=input[2]=input[3]=0;
 	WebTouch_Apply(&cmd, angles, input, 0, 5,.022f,.022f);
@@ -26,6 +26,18 @@ int main(void)
 	assert(cmd.forwardmove==127 && cmd.upmove==-127);
 	cmd=(usercmd_t){0}; cmd.buttons=BUTTON_WALKING; WebTouch_Apply(&cmd,angles,input,0,5,.022f,.022f);
 	assert(cmd.forwardmove==64); // Respect the saved run/walk setting.
+	cmd=(usercmd_t){0}; input[0]=-1; input[1]=0;
+	WebTouch_Apply(&cmd,angles,input,32,5,.022f,.022f);
+	assert(cmd.rightmove==0 && (cmd.wbuttons & WBUTTON_LEANLEFT));
+	cmd=(usercmd_t){0}; cmd.rightmove=90; input[0]=0;
+	WebTouch_Apply(&cmd,angles,input,32,5,.022f,.022f);
+	assert(cmd.rightmove==0 && (cmd.wbuttons & WBUTTON_LEANRIGHT)); // Touch Use + keyboard strafe.
+	cmd=(usercmd_t){0}; cmd.buttons=BUTTON_ACTIVATE; input[0]=1;
+	WebTouch_Apply(&cmd,angles,input,0,5,.022f,.022f);
+	assert(cmd.rightmove==0 && (cmd.wbuttons & WBUTTON_LEANRIGHT)); // Keyboard Use + touch strafe.
+	cmd=(usercmd_t){0};
+	WebTouch_Apply(&cmd,angles,input,0,5,.022f,.022f);
+	assert(cmd.rightmove==127 && !(cmd.wbuttons & (WBUTTON_LEANLEFT|WBUTTON_LEANRIGHT)));
 	input[0]=1.01f; input[1]=-1.01f; input[2]=501; input[3]=-501;
 	cmd=(usercmd_t){0}; WebTouch_Apply(&cmd,angles,input,0,5,.022f,.022f);
 	assert(cmd.rightmove==0 && cmd.forwardmove==0 && fabsf(angles[YAW]+2.2f)<.001f && fabsf(angles[PITCH]+1.1f)<.001f);
