@@ -83,7 +83,7 @@ function launcher(fault = {}) {
             send() {
                 requests.push(this.url);
                 if (this.url.startsWith('assets/import/')) {
-                    this.status=fault.importForbidden ? 403 : 200; this.responseText=JSON.stringify({installed:{maps:['sample']}});
+                    this.status=fault.importStatus || (fault.importForbidden ? 403 : 200); this.responseText=JSON.stringify({installed:{maps:['sample']}});
                     if (fault.importLate) { pending.push(()=>this.onload()); return; }
                     return this.onload();
                 }
@@ -419,6 +419,13 @@ for (const localImport of [false, undefined, 'true']) {
 const capabilityFault={localImport:false}, capabilityRefresh=launcher(capabilityFault);
 capabilityFault.localImport=true;capabilityRefresh.elements.refreshmaps.click();
 assert.equal(capabilityRefresh.elements.customfile.disabled,false,'A fresh local catalog can enable imports');
+for (const [status, message] of [[413,/too large/i],[502,/unavailable.*retry/i],[503,/unavailable.*retry/i]]) {
+    const page=launcher({importStatus:status});
+    page.elements.customfile.files=[{name:'sample.pk3',size:zip.length}];page.elements.customfile.change();
+    assert.match(page.elements.customstatus.textContent,message);
+    assert.equal(page.elements.customfile.disabled,false);
+    assert.equal(page.elements.playbtn.disabled,false);
+}
 const deniedImport=launcher({importForbidden:true});
 deniedImport.elements.customfile.files=[{name:'sample.pk3',size:zip.length}];deniedImport.elements.customfile.change();
 assert.equal(deniedImport.elements.customfile.disabled,true,'Rejected uploads require a fresh capability check');
@@ -578,7 +585,13 @@ for(const password of ['a"bad','a\\bad','a;bad','a\nbad','x'.repeat(65)]) {
 }
 passwordServer.elements.onlinepassword.value='a+complex password.dm_84';passwordServer.elements.onlinepassword.input();
 assert.equal(passwordServer.elements.joinbtn.disabled,false);
-passwordServer.elements.joinbtn.click();assert.equal(passwordServer.calls.length,1);
+let passwordEnterPrevented=0;
+for (const extra of [{isComposing:true},{repeat:true},{ctrlKey:true},{altKey:true},{metaKey:true},{shiftKey:true},{keyCode:229}]) {
+    passwordServer.elements.onlinepassword.keydown({key:'Enter',...extra,preventDefault(){passwordEnterPrevented++;}});
+    assert.equal(passwordServer.networkCalls.length,0,'Composition, repeats and modified Enter cannot submit a password');
+}
+passwordServer.elements.onlinepassword.keydown({key:'Enter',preventDefault(){passwordEnterPrevented++;}});
+assert.equal(passwordEnterPrevented,1);assert.equal(passwordServer.calls.length,1);
 assert.equal(passwordServer.elements.onlinepassword.value,'');assert.equal(passwordServer.context.matchOptions.password,'');
 assert.equal(passwordServer.files.get('/browser/legacy/browser-connect.cfg'),'set password "a+complex password.dm_84"\n');
 assert.ok(passwordServer.calls[0].includes('browser-connect.cfg'));assert.ok(!passwordServer.calls[0].includes('a+complex password.dm_84'),'Passwords never become command-line commands');
@@ -644,7 +657,7 @@ for (const invalid of ['', 'bad"quote', 'bad\\slash', 'bad;command', 'bad\nline'
  assert.equal(passwordRetry.networkCalls.length,passwordAttempts,'Invalid replacement passwords cannot open a relay');
  assert.equal(passwordRetry.elements.retrypassword['aria-invalid'],'true');
 }
-passwordRetry.elements.retrypassword.value='new +safe password';passwordRetry.elements.retryconnection.click();
+passwordRetry.elements.retrypassword.value='new +safe password';passwordRetry.elements.retrypassword.keydown({key:'Enter',preventDefault(){}});
 assert.equal(passwordRetry.files.get('/browser/legacy/browser-connect.cfg'),'set password "new +safe password"\n');
 assert.equal(passwordRetry.elements.retrypassword.value,'');
 assert.equal(passwordRetry.elements.retrypasswordfield.hidden,true);
@@ -676,6 +689,17 @@ assert.equal(closedRelay.calls.length,0);
 assert.equal(closedRelay.elements.playbtn.textContent,'RETRY');
 assert.equal(closedRelay.elements.matchform.hidden,false,'Pre-boot relay loss exposes the restart action');
 assert.equal(closedRelay.elements.playbtn['aria-describedby'],'etl_status','Fatal retry explains the error to keyboard and screen-reader users');
+const passwordPending=launcher({onlineInfo:privateInfo,relayPending:true});passwordPending.elements.onlinebtn.click();
+passwordPending.elements.onlinepassword.focus();
+passwordPending.elements.onlinepassword.keydown({key:'Enter',preventDefault(){assert.fail('An empty required password cannot submit');}});
+assert.equal(passwordPending.networkCalls.length,0);
+passwordPending.elements.onlinepassword.value='safe';passwordPending.elements.onlinepassword.input();
+passwordPending.elements.onlinepassword.keydown({key:'Enter',preventDefault(){}});
+assert.equal(passwordPending.context.document.activeElement,passwordPending.elements.canceljoin,'Password submission moves focus off the disabled input to Cancel');
+passwordPending.elements.onlinepassword.keydown({key:'Enter',preventDefault(){assert.fail('A pending join cannot submit twice');}});
+assert.equal(passwordPending.networkCalls.length,1);
+passwordPending.elements.canceljoin.click();
+assert.equal(passwordPending.context.document.activeElement,passwordPending.elements.joinbtn,'Cancellation restores a visible action');
 const pendingJoin=launcher({relayPending:true});pendingJoin.elements.onlinebtn.click();pendingJoin.elements.joinbtn.focus();pendingJoin.elements.joinbtn.click();
 assert.equal(pendingJoin.context.document.activeElement,pendingJoin.elements.canceljoin,'A pending keyboard join exposes its cancellation action');
 assert.equal(pendingJoin.elements.joinbtn.textContent,'CONNECTING…');

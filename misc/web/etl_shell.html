@@ -542,7 +542,18 @@
 			if (ok) { refreshCatalog(); return; }
 			input.disabled = loadState !== 'ready' || !localImportAvailable; document.getElementById('refreshmaps').disabled = loadState !== 'ready'; playbtn.disabled = loadState !== 'ready'; updateOnlineJoin(); customStatus(message);
 		}
-		xhr.onload = function() { if (bootFailed || epoch !== catalogEpoch || !catalogBusy) return; if (xhr.status === 403) { localImportAvailable = false; customImportHint(true); } if (xhr.status === 200) try { var result = JSON.parse(xhr.responseText); initialMap = result.installed.maps[0]; } catch (e) {} finish(xhr.status === 200, xhr.status === 403 ? 'Map imports require direct access to the local launcher. Refresh the map list after opening it locally.' : xhr.status === 409 ? 'That pack name is already installed. Rename the new pack, or choose the existing map.' : 'Import rejected. Use a valid ET map PK3 without executable mods, unsafe paths or startup settings.'); };
+		xhr.onload = function()
+		{
+			if (bootFailed || epoch !== catalogEpoch || !catalogBusy) return;
+			if (xhr.status === 403) { localImportAvailable = false; customImportHint(true); }
+			if (xhr.status === 200) try { var result = JSON.parse(xhr.responseText); initialMap = result.installed.maps[0]; } catch (e) {}
+			var message = xhr.status === 403 ? 'Map imports require direct access to the local launcher. Refresh the map list after opening it locally.' :
+				xhr.status === 409 ? 'That pack name is already installed. Rename the new pack, or choose the existing map.' :
+				xhr.status === 413 ? 'This pack is too large for the launcher or hosting service. Choose a smaller pack, or ask the launcher operator to review the upload limit.' :
+				xhr.status >= 500 ? 'The map import service is unavailable. Refresh the map list before retrying, or play an installed map.' :
+				'Import rejected. Use a valid ET map PK3 without executable mods, unsafe paths or startup settings.';
+			finish(xhr.status === 200, message);
+		};
 		xhr.onerror = xhr.ontimeout = function() { finish(false, 'Import did not finish. Start the local launcher, check the connection, then refresh the map list before retrying.'); };
 		xhr.send(file);
 	});
@@ -1144,10 +1155,22 @@
 	document.getElementById('onlinebtn').addEventListener('click', function() { selectPlayMode('online'); });
 	document.getElementById('refreshonline').addEventListener('click', function() { if (!checkingOnline && !joiningOnline && loadState === 'ready') checkOnline(); });
 	document.getElementById('onlinepassword').addEventListener('input', updateOnlineJoin);
+	function passwordEnter(inputId, buttonId)
+	{
+		document.getElementById(inputId).addEventListener('keydown', function(event)
+		{
+			if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229 || event.repeat || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+			var button = document.getElementById(buttonId);
+			if (this.disabled || button.disabled) return;
+			event.preventDefault(); button.click();
+		});
+	}
+	passwordEnter('onlinepassword', 'joinbtn');
+	passwordEnter('retrypassword', 'retryconnection');
 	joinbtn.addEventListener('click', function()
 	{
 		if (joinbtn.disabled || joiningOnline || !onlineConfigured || loadState !== 'ready') return;
-		var focusCancel = document.activeElement === joinbtn;
+		var focusCancel = document.activeElement === joinbtn || document.activeElement === document.getElementById('onlinepassword');
 		if (sameAssetServer(resumeOnlineAssets)) { serverPackSelection = resumeOnlineAssets.required; resumeOnlineAssets = null; }
 		stopPublicScan();
 		joiningOnline = true; updateOnlineJoin(); primeAudio();

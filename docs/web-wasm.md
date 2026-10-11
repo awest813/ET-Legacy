@@ -3626,3 +3626,25 @@ rebuild is not required for these local service checks.
 
 All 111 Python service/build-script tests passed in the integrated run. The log
 is `build_wasm/startup-build-quality-tests.log`.
+
+
+## Password keyboard actions and map-import errors (October 11, 2026)
+
+Pressing Enter in the launcher password field now invokes Join; the replacement
+password field invokes Retry. Both use the existing button validation and
+connection paths. Composition, repeated keydown events, modified Enter and
+disabled controls cannot start another connection. A pending keyboard join moves
+focus to Cancel, and cancellation restores a visible Join action.
+
+Map-import HTTP 413 responses explain the upload limit. Server-side HTTP 5xx
+responses explain that the import service is unavailable and suggest refreshing
+the map list before retrying or playing an installed map. These failures no
+longer report that a valid pack was rejected for its contents.
+
+All six JavaScript regression suites passed, including new password keyboard,
+focus/cancellation and import-error cases. The browser target rebuilt, generated
+JavaScript parsed, and full bundle verification passed for seven browser files
+and both module identities/archives. Browser security denied access to the
+isolated preview on port 64716, so this follow-up does not claim a live UI pass.
+The temporary preview service was stopped; the user's main services were not
+restarted.
