@@ -13,7 +13,7 @@ this.FindFreeRoleSlot = function()
 {
 	// return if map doesn't have Roles table
 	// skip bots that already have a role
-	if (!Map.Roles || this.Bot.HasRole()) {
+	if (!this.Bot || !Map.Roles || this.Bot.HasRole()) {
 		return;
 	}
 
@@ -156,10 +156,9 @@ this.Events[EVENT.CHANGETEAM] = function(team)
 	if (this.justStarted) {
 		this.justStarted = null;
 	} else {
-		// clear role in old team
-		if (team==TEAM.AXIS){ team=TEAM.ALLIES; } else { team=TEAM.AXIS; }
-		teamRoles = Map.Roles[Util.TeamName(team)];
-		if (teamRoles) {
+		// Membership records identify the old team even when moving to spectators.
+		foreach (teamRoles in Map.Roles) {
+			if (!IsTable(teamRoles)) { continue; }
 			bot = this.Bot;
 			foreach (name and role in teamRoles) {
 				if (IsTable(role) && role.bots && role.bots[bot]) {

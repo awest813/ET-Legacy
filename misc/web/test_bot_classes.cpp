@@ -83,6 +83,64 @@ int main(int, char **)
             }
         }
     }
+    // Role slots must be released even when the new team is spectator.
+    gmMachine lifecycle;
+    run(lifecycle, R"GM(
+        global TEAM = { AXIS = 1, ALLIES = 2 };
+        global EVENT = { CHANGETEAM = 1, DISCONNECTED = 3 };
+        global ROLE = { ATTACK = 1 };
+        global IsTable = function(value) { return typeId(value) == typeId(table()); };
+        global IsInt = function(value) { return typeId(value) == 1; };
+        global IsNull = function(value) { return typeId(value) == 0; };
+        global Util = { TeamName = function(team) {
+            if(team == 1) { return "Axis"; } if(team == 2) { return "Allies"; } return "Spectator";
+        }};
+        global Map = { Roles = {
+            Axis = { AllBots = true, ATTACK = { numbots = 1 } },
+            Allies = { AllBots = true, ATTACK = { numbots = 1 } }
+        }};
+        global Server = { Team = { 0, {NumBots=1}, {NumBots=1} } };
+        global CurrentTeam = 2;
+        global RoleHeld = 0;
+        global LifecycleBot = {
+            Name = "Audit", GetTeam = function() { return CurrentTeam; },
+            GetClass = function() { return 3; }, HasRole = function() { return RoleHeld; },
+            SetRoles = function(role) { global RoleHeld = role; },
+            ClearRoles = function(role) { global RoleHeld = 0; }
+        };
+        global LifecycleGoal = { Events = {}, Bot = LifecycleBot };
+    )GM");
+    gmVariable lifecycleGoal = lifecycle.GetGlobals()->Get(&lifecycle, "LifecycleGoal");
+    run(lifecycle, script("/goal_rolemanager.gm"), &lifecycleGoal);
+    run(lifecycle, R"GM(
+        LifecycleGoal.TeamChanged = LifecycleGoal.Events[EVENT.CHANGETEAM];
+        LifecycleGoal.Initialize();
+        LifecycleGoal.TeamChanged(2);
+        global JoinedAllies = Map.Roles.Allies.ATTACK.bots[LifecycleBot] == true;
+        global CurrentTeam = 0; LifecycleGoal.TeamChanged(0);
+        global OldSlotNull = IsNull(Map.Roles.Allies.ATTACK.bots[LifecycleBot]);
+        global HeldAfterSpectating = RoleHeld;
+        global SpectatorReleased = OldSlotNull && RoleHeld == 0;
+    )GM");
+    assert(value(lifecycle, "JoinedAllies") == 1);
+    std::cout << "Spectator slot null=" << value(lifecycle, "OldSlotNull") << " roles=" << value(lifecycle, "HeldAfterSpectating") << std::endl;
+    assert(value(lifecycle, "SpectatorReleased") == 1);
+    run(lifecycle, R"GM(
+        global CurrentTeam = 1; LifecycleGoal.TeamChanged(1);
+        global JoinedAxis = Map.Roles.Axis.ATTACK.bots[LifecycleBot] == true;
+        global CurrentTeam = 2; LifecycleGoal.TeamChanged(2);
+        global SwitchedTeams = IsNull(Map.Roles.Axis.ATTACK.bots[LifecycleBot]) && Map.Roles.Allies.ATTACK.bots[LifecycleBot] == true;
+        global CurrentTeam = 3; LifecycleGoal.TeamChanged(3);
+        global OtherSpectatorReleased = IsNull(Map.Roles.Allies.ATTACK.bots[LifecycleBot]) && RoleHeld == 0;
+    )GM");
+    assert(value(lifecycle, "JoinedAxis") == 1);
+    assert(value(lifecycle, "SwitchedTeams") == 1);
+    assert(value(lifecycle, "OtherSpectatorReleased") == 1);
+    event(lifecycle, "LifecycleGoal", 3, true);
+    lifecycle.Execute(1); // The disconnect callback yields before reassignment.
+    run(lifecycle, "LifecycleGoal.Bot = null; LifecycleGoal.FindFreeRoleSlot();");
+    lifecycle.Execute(1);
+    run(lifecycle, "global LateRoleCallbackCheck = 1;");
     gmMachine machine;
     for (const char *map : {"oasis", "goldrush", "battery", "fueldump", "radar", "railgun"}) {
         const std::string path = std::string("/nav/") + map + ".gm";
@@ -320,5 +378,5 @@ int main(int, char **)
     machine.Execute(1);
     run(machine, "global RatioCheck = 6;");
     assert(value(machine, "RatioKickCalls") == 2);
-    std::cout << "Bot checks passed (16 Rail Gun switch states, eight region entries, six stock map scripts, sparse/highest slots, humans, team isolation, departures, class selection, difficulty ordering, queued goal teardown, manual bot limits, human-team command and capped/unbounded bot ratios).\n";
+    std::cout << "Bot checks passed (16 Rail Gun switch states, eight region entries, six stock map scripts, sparse/highest slots, humans, team isolation, departures, class selection, difficulty ordering, spectator role release, team switching, queued goal teardown, manual bot limits, human-team command and capped/unbounded bot ratios).\n";
 }

@@ -3676,3 +3676,26 @@ All six JavaScript suites and the compiled settings fixture passed. The browser
 release rebuilt, generated JavaScript parsed, and full verification checked
 seven browser files and both published module identities/archives. No new live
 browser/device verification was performed in this follow-up.
+
+
+## Bot role transitions and delayed callbacks (October 11, 2026)
+
+The bot role manager inferred the previous team by reversing the new team. An
+Allied bot entering spectators therefore looked in Axis role records and left
+its Allied objective slot occupied. Cleanup now finds the bot's recorded
+memberships across the map's role tables before assigning a new role. Direct
+Axis/Allies switches continue to release the previous slot and assign the new
+team's role.
+
+Free-slot selection also returns safely when the bot has been torn down. This
+covers a disconnect callback that yields before looking for an available role.
+The actual GameMonkey interpreter regression reproduces the stale slot with the
+original shipped script, then checks spectator team values 0 and 3, Axis/Allies
+switches, and a delayed disconnect callback after bot teardown with the fix.
+
+The bot interpreter suite, six JavaScript suites, Release-style optimized native
+touch conversion and all 111 Python service/build tests passed. The browser
+release rebuilt and full verification passed for seven browser files and both
+published module identities/archives. This follow-up checks shipped bot logic
+and stability fixtures; it does not claim new full-match or physical-device
+playthroughs.
