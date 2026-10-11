@@ -21,6 +21,10 @@ Ninja, then run:
 python misc/web/verify_bundle.py build_wasm
 ```
 
+`./build_wasm.sh --help` works before SDK installation. Extra options after
+`configure` are passed to CMake, preserving arguments containing spaces. Options
+after `build` (or a target such as `etl`) are passed to Ninja.
+
 The separate `browser-module-publication-<commit>` artifact is required when
 building a matching pure-server pack. Combine it with the browser bundle from
 **the same commit** and run `verify_bundle.py` on that directory. Its archive
@@ -90,6 +94,11 @@ export ETWASM_SITE=https://play.example.org
 caddy validate --config misc/web/Caddyfile.example --adapter caddyfile
 caddy run --config misc/web/Caddyfile.example --adapter caddyfile
 ```
+
+Use `--log-dir /srv/et/logs` to keep runner logs outside the source checkout.
+The directory is created if needed; the runner prints absolute log paths and
+reports the failed service and exit code if a child stops. Offline mode supports
+the same option. `--check` does not create logs or test directory write access.
 
 Use a process supervisor for the runner and Caddy. Both Python services remain
 on loopback. If their ports differ from 8081/8082, set `ETWASM_WEB_UPSTREAM` and

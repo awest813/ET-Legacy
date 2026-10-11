@@ -43,6 +43,8 @@ def main():
                         help='Validate configuration, browser bundle and original packs, then exit without starting services')
     parser.add_argument('--assets-dir', type=Path,
                         help='Original game pack directory (overrides ETWASM_ASSETS)')
+    parser.add_argument('--log-dir', type=Path,
+                        help='Service log directory (default: repository build_wasm)')
     parser.add_argument('--offline', action='store_true',
                         help='Run offline bot play only; no server configuration or relay is needed')
     parser.add_argument('--web-port', type=int,
@@ -99,11 +101,16 @@ def main():
         env['ETWASM_PUBLIC_SECRET'] = secrets.token_hex(32)
     flags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0
     children=[]; logs=[]
+    log_dir = (args.log_dir or root/'build_wasm').resolve()
+    log_paths = []
     try:
-        (root/'build_wasm').mkdir(exist_ok=True)
+        log_dir.mkdir(parents=True, exist_ok=True)
         log_names = (f'online-relay-{relay}.log', f'online-launcher-{web}.log')
         if args.offline: log_names = (f'offline-launcher-{web}.log',)
-        logs=[(root/'build_wasm'/name).open('a',encoding='utf-8') for name in log_names]
+        log_paths = [log_dir/name for name in log_names]
+        # Append as each open succeeds, so a later failure still closes earlier files.
+        for path in log_paths:
+            logs.append(path.open('a', encoding='utf-8'))
         origin_args = [arg for origin in origins for arg in ('--origin', origin)]
         if not args.offline:
             children.append(subprocess.Popen([sys.executable,'-u',str(root/'misc/web/relay.py'),'--server',server,'--udp-port',str(udp),'--port',str(relay),*origin_args],cwd=root,env=env,creationflags=flags,stdout=logs[0],stderr=subprocess.STDOUT))
@@ -114,10 +121,17 @@ def main():
         print(f'Browser release: {build}', flush=True)
         if args.public_origin:
             print(f'TLS proxy required: /relay and /relay/* -> 127.0.0.1:{relay}; other paths -> 127.0.0.1:{web}',flush=True)
-        print('Service logs: '+', '.join('build_wasm/'+name for name in log_names),flush=True)
-        while all(child.poll() is None for child in children): time.sleep(.5)
-        raise SystemExit('Launcher stopped. Check its service log.' if args.offline else 'Launcher or relay stopped. Check the service logs.')
+        print('Service logs: '+', '.join(str(path) for path in log_paths),flush=True)
+        while True:
+            for index, child in enumerate(children):
+                code = child.poll()
+                if code is not None:
+                    service = 'Launcher' if args.offline or index == 1 else 'Relay'
+                    raise SystemExit(f'{service} stopped (exit code {code}). Check {log_paths[index]}')
+            time.sleep(.5)
     except KeyboardInterrupt: pass
+    except OSError as error:
+        raise SystemExit(f'Could not start launcher services: {error}. Log directory: {log_dir}') from None
     finally:
         for child in children:
             if child.poll() is None: child.terminate()

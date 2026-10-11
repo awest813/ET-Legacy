@@ -1,7 +1,18 @@
 #!/bin/bash
 # Build ET: Legacy for WebAssembly (Emscripten).
-# Usage: ./build_wasm.sh [configure|build]
+# Usage: ./build_wasm.sh [configure|build|TARGET] [arguments]
 set -e
+
+case "${1:-}" in
+	-h|--help)
+		printf '%s\n' \
+			'Usage: ./build_wasm.sh configure [CMake options]' \
+			'       ./build_wasm.sh [build] [Ninja targets/options]' \
+			'Example: ./build_wasm.sh etl -j2' \
+			'Activate emsdk_env.sh or set EMSDK before building.'
+		exit 0
+		;;
+esac
 
 SOURCE="$(cd "$(dirname "$0")" && pwd)"
 # Use an activated Emscripten environment, or an explicitly supplied SDK path.
@@ -17,6 +28,9 @@ MODE="${1:-build}"
 if [ "$MODE" = "configure" ] || [ "$MODE" = "build" ]; then
 	if [ "$#" -gt 0 ]; then shift; fi
 fi
+
+configure_args=()
+if [ "$MODE" = "configure" ]; then configure_args=("$@"); fi
 
 cmake_args=(
 	-G Ninja
@@ -61,7 +75,7 @@ cmake_args=(
 if [ "$MODE" = "configure" ] || [ ! -f "$BUILD_DIR/build.ninja" ]; then
 	mkdir -p "$BUILD_DIR"
 	cd "$BUILD_DIR"
-	emcmake cmake "${cmake_args[@]}" "$SOURCE"
+	emcmake cmake "${cmake_args[@]}" "${configure_args[@]}" "$SOURCE"
 	[ "$MODE" = "configure" ] && exit 0
 fi
 

@@ -34,7 +34,7 @@ class RunnerTests(unittest.TestCase):
                     patch.object(run_online, 'verify_browser', return_value=7), \
                     patch.dict(os.environ, {'ETWASM_BUILD': inherited} if inherited else {}, clear=True), \
                     contextlib.redirect_stdout(output):
-                with self.assertRaisesRegex(SystemExit, 'Launcher or relay stopped'):
+                with self.assertRaisesRegex(SystemExit, r'Relay stopped \(exit code 1\)'):
                     run_online.main()
             self.assertEqual(start.call_count, 2)
             calls = start.call_args_list
@@ -158,6 +158,72 @@ class RunnerTests(unittest.TestCase):
                     run_online.main()
                 self.assertEqual(error.exception.code, 2)
                 start.assert_not_called()
+
+    def test_second_process_failure_stops_first_and_closes_logs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory)/'config.json'
+            config.write_text(json.dumps({'server': '127.0.0.1'}), encoding='utf-8')
+            log_dir = Path(directory)/'logs with spaces'/'nested'
+            child = Mock()
+            child.poll.return_value = None
+            handles = []
+            real_open = Path.open
+            def capture_open(path, *args, **kwargs):
+                handle = real_open(path, *args, **kwargs)
+                if path.suffix == '.log': handles.append(handle)
+                return handle
+            with patch('sys.argv', ['run_online.py', '--config', str(config), '--log-dir', str(log_dir)]), \
+                    patch.object(run_online, 'verify_browser', return_value=7), \
+                    patch.object(Path, 'open', capture_open), \
+                    patch.object(run_online.subprocess, 'Popen', side_effect=[child, OSError('Cannot spawn child')]), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaisesRegex(SystemExit, 'Could not start launcher services: Cannot spawn child'):
+                    run_online.main()
+            child.terminate.assert_called_once()
+            child.wait.assert_called_once_with(timeout=5)
+            self.assertEqual(len(handles), 2)
+            self.assertTrue(all(handle.closed for handle in handles))
+            self.assertTrue((log_dir/'online-relay-8082.log').is_file())
+
+    def test_second_log_failure_closes_first_and_starts_no_services(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory)/'config.json'
+            config.write_text(json.dumps({'server': '127.0.0.1'}), encoding='utf-8')
+            log_dir = Path(directory)/'logs'
+            handles = []
+            real_open = Path.open
+            def fail_second_log(path, *args, **kwargs):
+                if path.name == 'online-launcher-8081.log': raise PermissionError('Log is read-only')
+                handle = real_open(path, *args, **kwargs)
+                if path.suffix == '.log': handles.append(handle)
+                return handle
+            with patch('sys.argv', ['run_online.py', '--config', str(config), '--log-dir', str(log_dir)]), \
+                    patch.object(run_online, 'verify_browser', return_value=7), \
+                    patch.object(Path, 'open', fail_second_log), \
+                    patch.object(run_online.subprocess, 'Popen') as start:
+                with self.assertRaisesRegex(SystemExit, 'Log is read-only'):
+                    run_online.main()
+            start.assert_not_called()
+            self.assertEqual(len(handles), 1)
+            self.assertTrue(handles[0].closed)
+
+    def test_failed_launcher_reports_exact_log_and_cleans_up_relay(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory)/'config.json'
+            config.write_text(json.dumps({'server': '127.0.0.1'}), encoding='utf-8')
+            relay, launcher = Mock(), Mock()
+            relay.poll.return_value = None
+            launcher.poll.return_value = 9
+            with patch('sys.argv', ['run_online.py', '--config', str(config), '--log-dir', directory]), \
+                    patch.object(run_online, 'verify_browser', return_value=7), \
+                    patch.object(run_online.subprocess, 'Popen', side_effect=[relay, launcher]), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaises(SystemExit) as error:
+                    run_online.main()
+            self.assertIn('Launcher stopped (exit code 9)', str(error.exception))
+            self.assertIn(str(Path(directory)/'online-launcher-8081.log'), str(error.exception))
+            relay.terminate.assert_called_once()
+            launcher.terminate.assert_not_called()
 
     def test_reject_non_origins(self):
         for value in ['http://play.example.org', 'https://', 'https://user@play.example.org',

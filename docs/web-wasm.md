@@ -1,6 +1,6 @@
 # WebAssembly port status
 
-Updated October 9, 2026 (local time).
+Updated October 11, 2026 (local time).
 
 The working source is nested inside the downloaded directory. It originated as
 an extracted archive; the integrated source is now tracked and pushed on the
@@ -3597,3 +3597,32 @@ and hid gameplay controls; closing it restored both. Screenshots are
 output is `browser-idle-native-log.json`. This was spectator startup and menu
 verification, not a full match or a physical-device FPS benchmark. The temporary
 tab and runner were closed, leaving main services untouched.
+
+
+### Build arguments and startup failure diagnostics (2026-10-11)
+
+The latest four GitHub Browser port runs succeeded, including run 38105509806
+for the idle-frame performance changes. The Bash entry point now provides help
+without requiring SDK commands and forwards extra `configure` arguments to
+CMake; previously those options were silently discarded. A real Bash fixture
+checks help with an empty PATH and CMake argument forwarding from a source path
+containing spaces, using a recording SDK wrapper without running a compilation.
+
+The launcher runner accepts `--log-dir` for hosted checkouts with separate
+writable log storage. Paths are absolute in startup output and child-exit
+errors identify the relay or launcher, exit code and relevant log. File-open
+and process-spawn errors produce a concise diagnostic. Partially opened logs
+are now retained for cleanup if a later log cannot open; a failed second spawn
+also terminates the already-started first child. Regressions verify both cases
+and a failed HTTP child while the relay is alive.
+
+A real occupied-port fixture held its own loopback listener, then attempted an
+offline launcher on the same port. The runner exited with a launcher-specific
+exit-code/log-path diagnostic without a parent Python traceback, and the
+fixture listener remained intact. Evidence is `build_wasm/startup-error-proof.json`
+and `startup-error-fixture/offline-launcher-52412.log`. No main service was
+stopped or restarted. The source changes affect CLI wiring; a fresh engine
+rebuild is not required for these local service checks.
+
+All 111 Python service/build-script tests passed in the integrated run. The log
+is `build_wasm/startup-build-quality-tests.log`.
