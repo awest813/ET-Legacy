@@ -56,13 +56,14 @@ static inline void UI_WebGraphicsPreset(int preset)
 		"ui_r_texturemode", "ui_r_ext_texture_filter_anisotropic", "ui_r_dynamiclight",
 		"ui_web_shadows", "ui_web_skybox", "ui_web_fastsky", "ui_web_maxfps"
 	};
-	static const char *const values[3][11] = {
+	static const char *const values[4][11] = {
 		{"-1", "960", "540", "2", "GL_LINEAR_MIPMAP_NEAREST", "0", "0", "0", "0", "1", "60"},
 		{"-1", "1280", "720", "1", "GL_LINEAR_MIPMAP_LINEAR", "4", "1", "1", "1", "0", "60"},
-		{"-1", "1920", "1080", "0", "GL_LINEAR_MIPMAP_LINEAR", "16", "2", "1", "1", "0", "60"}
+		{"-1", "1920", "1080", "0", "GL_LINEAR_MIPMAP_LINEAR", "16", "2", "1", "1", "0", "60"},
+		{"-1", "960", "540", "2", "GL_LINEAR_MIPMAP_NEAREST", "0", "0", "0", "0", "1", "30"}
 	};
 	int i;
-	if (preset < 0 || preset > 2) return;
+	if (preset < 0 || preset > 3) return;
 	for (i = 0; i < 11; i++) trap_Cvar_Set(names[i], values[preset][i]);
 }
 

@@ -3648,3 +3648,31 @@ and both module identities/archives. Browser security denied access to the
 isolated preview on port 64716, so this follow-up does not claim a live UI pass.
 The temporary preview service was stopped; the user's main services were not
 restarted.
+
+
+## Chromebook frame-rate choices (October 11, 2026)
+
+The launcher now offers Chromebook / Low power with a 60 FPS cap and Chromebook /
+Battery saver with a 30 FPS cap. Both use 960×540, Medium textures, bilinear
+filtering, no anisotropic filtering, no dynamic lights or shadows, and a simple
+sky. Battery saver reduces the frame cap; it does not lower bot difficulty,
+change input/audio settings, or change the online packet settings. Offline bots
+run locally, so fewer bots can reduce CPU work independently of graphics quality.
+
+In game, Options > System includes Battery saver and a selectable 30 FPS maximum.
+Choose a preset and Apply to save it; Back discards staged changes. The next
+launcher startup defaults to Use saved game settings so individual native
+customizations remain in effect. The launcher supports `?graphics=battery` as a
+one-use preset selection, like the existing named presets.
+
+The compiled System-settings fixture checks staging, Back, Apply and reopening
+the 30 FPS cap. Launcher tests compare all four presets with native definitions
+and exercise both offline and online startup, including the Battery saver URL.
+Physical Chromebook battery use and frame rates remain unmeasured. A lower cap
+trades motion smoothness for less frame work; it does not guarantee 30 FPS on
+all devices.
+
+All six JavaScript suites and the compiled settings fixture passed. The browser
+release rebuilt, generated JavaScript parsed, and full verification checked
+seven browser files and both published module identities/archives. No new live
+browser/device verification was performed in this follow-up.

@@ -74,9 +74,18 @@ int main(void)
 	UI_WebGraphicsPreset(2);
 	assert(!strcmp(values[2], "1920") && !strcmp(values[3], "1080") && !strcmp(values[13], "0"));
 	assert(!strcmp(values[15], "16") && !strcmp(values[16], "2"));
-	UI_WebGraphicsPreset(-1); UI_WebGraphicsPreset(3);
+	UI_WebGraphicsPreset(3);
+	assert(!strcmp(values[2], "960") && !strcmp(values[3], "540") && !strcmp(values[12], "30"));
+	assert(!strcmp(values[13], "2") && !strcmp(values[14], "GL_LINEAR_MIPMAP_NEAREST") && !strcmp(values[16], "0"));
+	assert(!strcmp(values[8], "60")); // staged cap does not affect the live game
+	UI_WebGraphicsReset(); UI_WebGraphicsGet();
+	assert(!strcmp(values[12], "60")); // Back discards battery edits
+	UI_WebGraphicsPreset(3); UI_WebGraphicsApply(); UI_WebGraphicsGet();
+	assert(!strcmp(values[8], "30") && !strcmp(values[12], "30")); // saved cap reopens correctly
+	UI_WebGraphicsPreset(2);
+	UI_WebGraphicsPreset(-1); UI_WebGraphicsPreset(4);
 	assert(!strcmp(values[2], "1920"));
 	puts("Browser System settings: staged width/height, Back discard, Apply, custom-mode restart and reopening passed.");
-	puts("Browser graphics presets: low power, Balanced, Quality, staged effects and invalid preset rejection passed.");
+	puts("Browser graphics presets: low power, Balanced, Quality, Battery saver, staged effects and invalid preset rejection passed.");
 	return 0;
 }

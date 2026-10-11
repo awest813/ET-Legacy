@@ -213,7 +213,8 @@
 		<label for="graphicspreset">Graphics for the next match
 			<select id="graphicspreset" aria-describedby="graphicshint">
 				<option value="saved" selected>Use saved game settings</option>
-				<option value="chromebook">Chromebook / Low power</option>
+				<option value="chromebook">Chromebook / Low power (60 FPS cap)</option>
+				<option value="battery">Chromebook / Battery saver (30 FPS cap)</option>
 				<option value="balanced">Balanced</option>
 				<option value="quality">Quality</option>
 			</select>
@@ -387,7 +388,8 @@
 		var presets = {
 			chromebook:['-1','960','540','2','GL_LINEAR_MIPMAP_NEAREST','0','0','0','0','1','60'],
 			balanced:['-1','1280','720','1','GL_LINEAR_MIPMAP_LINEAR','4','1','1','1','0','60'],
-			quality:['-1','1920','1080','0','GL_LINEAR_MIPMAP_LINEAR','16','2','1','1','0','60']
+			quality:['-1','1920','1080','0','GL_LINEAR_MIPMAP_LINEAR','16','2','1','1','0','60'],
+			battery:['-1','960','540','2','GL_LINEAR_MIPMAP_NEAREST','0','0','0','0','1','30']
 		};
 		var args = [], values = Object.prototype.hasOwnProperty.call(presets, preset) ? presets[preset] : null;
 		if (values) names.forEach(function(name, index) { args.push('+set', name, values[index]); });
@@ -396,7 +398,8 @@
 	function updateGraphicsHint() {
 		var hints = {
 			saved:'Keeps your saved graphics settings. Change individual settings in game: Options > System.',
-			chromebook:'960×540, Medium textures, simpler sky and fewer effects, 60 FPS cap. Reduces rendering and texture memory before the map loads.',
+			chromebook:'960×540, Medium textures, simpler sky and fewer effects, 60 FPS cap. Reduces rendering and texture memory before the map loads. Fewer offline bots reduce CPU work.',
+			battery:'960×540, Medium textures and fewer effects, 30 FPS cap. Trades motion smoothness for less frame work. Fewer offline bots reduce CPU work.',
 			balanced:'1280×720, High textures, trilinear/4× filtering, single-pass lights, 60 FPS cap.',
 			quality:'1920×1080, Very High textures, trilinear/16× filtering, multi-pass lights, 60 FPS cap. Uses more graphics memory.'
 		};
@@ -426,7 +429,7 @@
 	try { savedOptions = JSON.parse(localStorage.getItem('etl.offlineMatch')) || {}; } catch (e) {}
 	var queryOptions = new URLSearchParams(window.location.search);
 	// A recovery reload applies the preset once; later reloads keep native customization.
-	if (['chromebook', 'balanced', 'quality'].includes(queryOptions.get('graphics')))
+	if (['chromebook', 'balanced', 'quality', 'battery'].includes(queryOptions.get('graphics')))
 	{
 		graphicsPreset.value = queryOptions.get('graphics'); updateGraphicsHint();
 		try { var graphicsURL = new URL(window.location.href); graphicsURL.searchParams.delete('graphics'); window.history.replaceState(window.history.state, '', graphicsURL.href); } catch (e) {}
