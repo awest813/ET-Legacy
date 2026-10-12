@@ -1852,13 +1852,15 @@ void CL_KeyEvent(int key, qboolean down, unsigned time)
  */
 void CL_CharEvent(int key)
 {
-	// the console key should never be used as a char
-	// - added uk equivalent of shift+`
-	// the RIGHT way to do this would be to have certain keys disable the equivalent SE_CHAR event
-
-	// this should be fixed in Com_EventLoop but I can't be arsed to leave this as is
-
-	if (key == (unsigned char) '`' || key == (unsigned char) '~' || key == (unsigned char) '\xAC')
+	// Filter console toggle text, including the UK equivalent of shift+`.
+	// Browser chat/form text may contain these characters through paste or
+	// composition, so only filter when the console or gameplay owns input.
+	if (
+#ifdef __EMSCRIPTEN__
+	    ((cls.keyCatchers & KEYCATCH_CONSOLE) ||
+	     !(cls.keyCatchers & (KEYCATCH_UI | KEYCATCH_CGAME))) &&
+#endif
+	    (key == (unsigned char) '`' || key == (unsigned char) '~' || key == (unsigned char) '\xAC'))
 	{
 		return;
 	}

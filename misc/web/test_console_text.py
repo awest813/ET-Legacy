@@ -28,10 +28,11 @@ HARNESS = r'''
 #define CG_KEY_EVENT 0
 #define K_CHAR_FLAG 1024
 #define qtrue 1
-static int consoleButtonWasPressed, characters[100], count, g_consoleField, uivm, cgvm;
+static int consoleButtonWasPressed, characters[100], count, g_consoleField, uivm=1, cgvm=2, lastTextVm;
 static struct { int keyCatchers,state; } cls={KEYCATCH_CONSOLE,1};
 static void Field_CharEvent(int *field,int key) { assert(count<100);characters[count++]=key; }
-static void VM_Call(int vm,int call,int key,int down) { assert(0); }
+static void VM_Call(int vm,int call,int key,int down) { assert(down==qtrue);lastTextVm=vm;Field_CharEvent(&g_consoleField,key & ~K_CHAR_FLAG); }
+static int Key_GetCatcher(void) { return cls.keyCatchers; }
 /* HANDLER */
 static void text_event(int value) {
  struct { int evType,evValue; } ev={SE_CHAR,value};
@@ -83,7 +84,19 @@ int main(void) {
 #else
  assert(count==0); /* Preserve native SDL's existing held-toggle suppression. */
 #endif
- puts("Console text: browser command prefixes/composition preserved; toggle characters filtered; desktop behavior unchanged.");
+#ifdef __EMSCRIPTEN__
+ for(int catcher=KEYCATCH_UI;catcher<=KEYCATCH_CGAME;catcher*=2) {
+  cls.keyCatchers=catcher;webInputFlags=1;lastKeyDown=0;count=0;
+  sdl_text("a`~\xc3\xa9");
+  assert(count==4 && characters[0]=='a' && characters[1]=='`' && characters[2]=='~' && characters[3]==0xe9);
+  assert(lastTextVm==(catcher==KEYCATCH_UI?uivm:cgvm));
+  count=0;text_event(0xac);assert(count==1 && characters[0]==0xac);
+  count=0;webInputFlags=0;sdl_text("private");assert(count==0);
+ }
+ cls.keyCatchers=KEYCATCH_CONSOLE|KEYCATCH_UI;webInputFlags=1;count=0;lastKeyDown=CONSOLE_KEY;
+ sdl_text("`~");assert(count==0); // Opening the console still filters its held key.
+#endif
+ puts("Console/chat text: browser command prefixes and inserted punctuation preserved; console toggle filtered; desktop behavior unchanged.");
 }
 '''
 

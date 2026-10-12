@@ -1,6 +1,6 @@
 # WebAssembly port status
 
-Updated October 11, 2026 (local time).
+Updated October 12, 2026 (local time).
 
 The working source is nested inside the downloaded directory. It originated as
 an extracted archive; the integrated source is now tracked and pushed on the
@@ -3720,3 +3720,30 @@ inside the workspace and the installed SDK cache was used read-only.
 The browser target rebuilt, generated JavaScript parsed, and full release
 verification passed for seven browser files and both published module
 identities/archives. No new live browser/device controls test was performed.
+
+## Chat text, online recovery and audio audit (October 12, 2026)
+
+Browser text insertion containing backticks or tildes could synthesize console
+toggle events instead of reaching chat or form fields. The character handler
+also discarded these characters globally. Browser UI/cgame text now retains
+inserted punctuation, including the UK console-key equivalent. The console
+still takes precedence when open, physical console hotkeys retain their
+handling, and desktop filtering is unchanged. Launcher help now lists the
+default all/team/fireteam chat shortcuts and message send/cancel keys.
+
+The compiled regression reproduces the original failure and checks both browser
+text destinations, accented text, unfocused insertion rejection and console
+precedence. It compiles and passes both browser and desktop variants using the
+production SDL/event/character-handler blocks. Input-focus checks also passed.
+
+All six JavaScript suites passed, including online connection deadlines,
+reconnect isolation, cancellation, stale responses, server asset recovery and
+offline fallback. Audio checks cover mute/volume persistence, interrupted audio,
+graph failures, deduplicated resume gestures, stale restart promises and
+shutdown. This audit found no additional audio or online transport defect.
+
+All 111 Python service/build tests passed with local network fixtures allowed;
+the restricted-network run was interrupted after fixture timeouts. The browser
+release rebuilt, generated JavaScript parsed, and full verification passed for
+seven browser files and both published module identities/archives. No new live
+multiplayer chat, audible-output or physical-device test was performed.

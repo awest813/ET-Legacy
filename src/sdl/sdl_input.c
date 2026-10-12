@@ -1587,7 +1587,14 @@ static void IN_ProcessEvents(void)
 
 					if (utf32 != 0)
 					{
-						if (IN_IsConsoleKey(0, utf32))
+						// Inserted browser text belongs to the active chat/form;
+						// console hotkeys are still handled by keydown events.
+						if (IN_IsConsoleKey(0, utf32)
+#ifdef __EMSCRIPTEN__
+						    && ((Key_GetCatcher() & KEYCATCH_CONSOLE) ||
+						        !(Key_GetCatcher() & (KEYCATCH_UI | KEYCATCH_CGAME)))
+#endif
+						   )
 						{
 #ifdef __EMSCRIPTEN__
 							// Browser composition/inserted text can arrive without a
