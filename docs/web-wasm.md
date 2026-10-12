@@ -3699,3 +3699,24 @@ release rebuilt and full verification passed for seven browser files and both
 published module identities/archives. This follow-up checks shipped bot logic
 and stability fixtures; it does not claim new full-match or physical-device
 playthroughs.
+
+
+## Mixed keyboard/touch vertical movement (October 11, 2026)
+
+Touch Jump and Crouch previously overwrote the keyboard's vertical movement.
+Pressing both touch controls also always chose Crouch. These controls now add
+their movement to the keyboard command before clamping to the engine's signed
+usercmd range. Opposing inputs cancel in both run and walk modes, matching inputs clamp
+safely, and idle touch preserves keyboard movement. A single Jump or Crouch retains its behavior.
+
+The native control fixture covers simultaneous touch Jump/Crouch, both opposing
+keyboard/touch combinations, matching input clamping and an idle-touch command.
+
+The regression fails on the original implementation and passes with the fix
+under `-O3 -ffast-math`. All six JavaScript suites and the compiled SDL input
+focus/mouse/touch-action checks passed. Compiler temporary files were placed
+inside the workspace and the installed SDK cache was used read-only.
+
+The browser target rebuilt, generated JavaScript parsed, and full release
+verification passed for seven browser files and both published module
+identities/archives. No new live browser/device controls test was performed.

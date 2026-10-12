@@ -20,11 +20,14 @@ static void WebTouch_Apply(usercmd_t *cmd, float *angles, const float *input, in
 	float x = WebTouch_Bound(&input[0], 1), y = WebTouch_Bound(&input[1], 1);
 	float dx = WebTouch_Bound(&input[2], 500), dy = WebTouch_Bound(&input[3], 500);
 	int speed = (cmd->buttons & BUTTON_WALKING) ? 64 : 127;
+	int up = cmd->upmove;
 	cmd->rightmove = ClampChar(cmd->rightmove + (int)(x * speed));
 	cmd->forwardmove = ClampChar(cmd->forwardmove + (int)(y * speed));
 	if (buttons & 1) cmd->buttons |= BUTTON_ATTACK;
-	if (buttons & 2) cmd->upmove = 127;
-	if (buttons & 4) cmd->upmove = -127;
+	/* Combine Jump/Crouch with held keys, using the same run/walk magnitude. */
+	if (buttons & 2) up += speed;
+	if (buttons & 4) up -= speed;
+	cmd->upmove = ClampChar(up);
 	if (buttons & 8) cmd->buttons |= BUTTON_SPRINT;
 	if (buttons & 16) cmd->wbuttons |= WBUTTON_RELOAD;
 	if (buttons & 32) cmd->buttons |= BUTTON_ACTIVATE;

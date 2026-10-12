@@ -38,6 +38,32 @@ int main(void)
 	cmd=(usercmd_t){0};
 	WebTouch_Apply(&cmd,angles,input,0,5,.022f,.022f);
 	assert(cmd.rightmove==127 && !(cmd.wbuttons & (WBUTTON_LEANLEFT|WBUTTON_LEANRIGHT)));
+	/* Opposing controls cancel regardless of whether they come from touch or keys. */
+	input[0]=input[1]=0;
+	cmd=(usercmd_t){0};
+	WebTouch_Apply(&cmd,angles,input,2|4,5,.022f,.022f);
+	assert(cmd.upmove==0);
+	cmd=(usercmd_t){0}; cmd.upmove=-127;
+	WebTouch_Apply(&cmd,angles,input,2,5,.022f,.022f);
+	assert(cmd.upmove==0); // Keyboard crouch + touch jump.
+	cmd=(usercmd_t){0}; cmd.upmove=127;
+	WebTouch_Apply(&cmd,angles,input,4,5,.022f,.022f);
+	assert(cmd.upmove==0); // Keyboard jump + touch crouch.
+	cmd=(usercmd_t){0}; cmd.upmove=127;
+	WebTouch_Apply(&cmd,angles,input,2,5,.022f,.022f);
+	assert(cmd.upmove==127); // Matching inputs clamp, rather than overflow.
+	cmd=(usercmd_t){0}; cmd.upmove=-127;
+	WebTouch_Apply(&cmd,angles,input,4,5,.022f,.022f);
+	assert(cmd.upmove==-128); // Signed usercmd range is -128 through 127.
+	cmd=(usercmd_t){0}; cmd.buttons=BUTTON_WALKING; cmd.upmove=-64;
+	WebTouch_Apply(&cmd,angles,input,2,5,.022f,.022f);
+	assert(cmd.upmove==0); // Walking uses the same magnitude for keyboard and touch.
+	cmd=(usercmd_t){0}; cmd.buttons=BUTTON_WALKING; cmd.upmove=64;
+	WebTouch_Apply(&cmd,angles,input,4,5,.022f,.022f);
+	assert(cmd.upmove==0);
+	cmd=(usercmd_t){0}; cmd.upmove=70;
+	WebTouch_Apply(&cmd,angles,input,0,5,.022f,.022f);
+	assert(cmd.upmove==70); // Idle touch leaves keyboard movement intact.
 	input[0]=1.01f; input[1]=-1.01f; input[2]=501; input[3]=-501;
 	cmd=(usercmd_t){0}; WebTouch_Apply(&cmd,angles,input,0,5,.022f,.022f);
 	assert(cmd.rightmove==0 && cmd.forwardmove==0 && fabsf(angles[YAW]+2.2f)<.001f && fabsf(angles[PITCH]+1.1f)<.001f);
